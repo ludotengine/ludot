@@ -514,6 +514,131 @@ Variant constant_default(Luau::AstExpr *expr) {
     if (const auto string = expr->as<Luau::AstExprConstantString>()) return String::utf8(string->value.data, string->value.size);
     return {};
 }
+// A type annotation parsed from its text, so inherited fields (stored as text) can be checked too.
+struct ParsedType {
+    Luau::Allocator allocator;
+    Luau::AstNameTable names{ allocator };
+    Luau::AstType *type = nullptr;
+    explicit ParsedType(const String &p_text) {
+        const std::string source = "local _: " + std::string(p_text.utf8().get_data());
+        const auto parsed = Luau::Parser::parse(source.data(), source.size(), names, allocator);
+        if (!parsed.errors.empty() || parsed.root->body.size != 1) return;
+        if (const auto local = parsed.root->body.data[0]->as<Luau::AstStatLocal>(); local != nullptr && local->vars.size == 1) type = local->vars.data[0]->annotation;
+    }
+};
+bool native_variant(lua_State *L, int p_index, Variant &r_value) {
+    if (lua_type(L, p_index) != LUA_TUSERDATA || !lua_getmetatable(L, p_index)) return false;
+    luaL_getmetatable(L, VARIANT_META);
+    const bool native = lua_rawequal(L, -1, -2);
+    lua_pop(L, 2);
+    return native && LuauLanguage::try_variant(L, p_index, r_value);
+}
+// Checks a live value against a type annotation. Unresolvable names, such as type aliases
+// and generics, do not fit, so those fields fall back to their new default.
+bool value_fits(lua_State *L, int p_index, Luau::AstType *p_type) {
+    using namespace Luau;
+    const int index = lua_absindex(L, p_index);
+    const int kind = lua_type(L, index);
+    if (const auto group = p_type->as<AstTypeGroup>()) return value_fits(L, index, group->type);
+    if (p_type->is<AstTypeOptional>()) return kind == LUA_TNIL;
+    if (const auto either = p_type->as<AstTypeUnion>()) {
+        for (AstType *option : either->types) if (value_fits(L, index, option)) return true;
+        return false;
+    }
+    if (const auto both = p_type->as<AstTypeIntersection>()) {
+        for (AstType *part : both->types) if (!value_fits(L, index, part)) return false;
+        return true;
+    }
+    if (const auto singleton = p_type->as<AstTypeSingletonBool>()) return kind == LUA_TBOOLEAN && bool(lua_toboolean(L, index)) == singleton->value;
+    if (const auto singleton = p_type->as<AstTypeSingletonString>()) {
+        size_t length = 0;
+        const char *text = kind == LUA_TSTRING ? lua_tolstring(L, index, &length) : nullptr;
+        return text != nullptr && length == singleton->value.size && memcmp(text, singleton->value.data, length) == 0;
+    }
+    if (p_type->is<AstTypeFunction>()) return kind == LUA_TFUNCTION;
+    if (const auto table = p_type->as<AstTypeTable>()) {
+        if (kind != LUA_TTABLE) return false;
+        for (const AstTableProp &property : table->props) {
+            lua_getfield(L, index, property.name.value);
+            const bool fits = value_fits(L, -1, property.type);
+            lua_pop(L, 1);
+            if (!fits) return false;
+        }
+        if (table->indexer == nullptr) return true;
+        lua_pushnil(L);
+        while (lua_next(L, index) != 0) {
+            bool named = false;
+            if (lua_type(L, -2) == LUA_TSTRING) for (const AstTableProp &property : table->props) named = named || strcmp(property.name.value, lua_tostring(L, -2)) == 0;
+            if (!named && (!value_fits(L, -2, table->indexer->indexType) || !value_fits(L, -1, table->indexer->resultType))) {
+                lua_pop(L, 2);
+                return false;
+            }
+            lua_pop(L, 1);
+        }
+        return true;
+    }
+    const auto reference = p_type->as<AstTypeReference>();
+    if (reference == nullptr || reference->prefix || reference->parameters.size != 0) return false;
+    const String name = String::utf8(reference->name.value);
+    if (name == "any" || name == "unknown") return true;
+    if (name == "nil") return kind == LUA_TNIL;
+    if (name == "number") return kind == LUA_TNUMBER;
+    if (name == "string") return kind == LUA_TSTRING;
+    if (name == "boolean") return kind == LUA_TBOOLEAN;
+    if (name == "thread") return kind == LUA_TTHREAD;
+    if (name == "buffer") return kind == LUA_TBUFFER;
+    if (name == "vector") return kind == LUA_TVECTOR;
+    if (kind == LUA_TOBJECT) {
+        for (const LuauClass *cls = static_cast<const LuauObject *>(lua_topointer(L, index))->lclass; cls != nullptr; cls = cls->super)
+            if (String::utf8(getstr(cls->name)) == name) return true;
+        return false;
+    }
+    ::Variant native;
+    if (!native_variant(L, index, native)) return false;
+    if (native.get_type() == ::Variant::OBJECT) {
+        const Object *object = native;
+        return object != nullptr && ClassDB::class_exists(name) && object->is_class(name);
+    }
+    return ::Variant::get_type_name(native.get_type()) == name;
+}
+// Pushes a lossless conversion of a value to a scalar or builtin engine type, if one exists.
+bool push_converted(lua_State *L, int p_index, Luau::AstType *p_type) {
+    while (const auto group = p_type->as<Luau::AstTypeGroup>()) p_type = group->type;
+    const auto reference = p_type->as<Luau::AstTypeReference>();
+    if (reference == nullptr || reference->prefix || reference->parameters.size != 0) return false;
+    const String name = String::utf8(reference->name.value);
+    const int index = lua_absindex(L, p_index);
+    const int kind = lua_type(L, index);
+    if (name == "number" && kind == LUA_TSTRING) {
+        int converted = 0;
+        const double number = lua_tonumberx(L, index, &converted);
+        if (converted == 0) return false;
+        lua_pushnumber(L, number);
+        return true;
+    }
+    if (name == "string" && (kind == LUA_TNUMBER || kind == LUA_TBOOLEAN)) {
+        if (kind == LUA_TBOOLEAN) lua_pushstring(L, lua_toboolean(L, index) ? "true" : "false");
+        else {
+            lua_pushvalue(L, index);
+            lua_tostring(L, -1);
+        }
+        return true;
+    }
+    Variant native;
+    if (!native_variant(L, index, native) || native.get_type() == Variant::OBJECT) return false;
+    for (int type = Variant::VECTOR2; type < Variant::VARIANT_MAX; ++type) {
+        if (Variant::get_type_name(Variant::Type(type)) != name || type == Variant::OBJECT) continue;
+        if (!Variant::can_convert_strict(native.get_type(), Variant::Type(type))) return false;
+        Variant converted;
+        Callable::CallError error;
+        const Variant *arguments[] = { &native };
+        Variant::construct(Variant::Type(type), converted, arguments, 1, error);
+        if (error.error != Callable::CallError::CALL_OK) return false;
+        LuauLanguage::push_variant(L, converted);
+        return true;
+    }
+    return false;
+}
 }
 
 String LuauLanguage::api_name(const String &p_name, bool p_property) {
@@ -1157,17 +1282,43 @@ Error LuauScript::reload(bool p_keep_state) {
         if (p_keep_state) {
             for (const PropertyInfo &property : properties) {
                 // A removed property is intentionally dropped during reload.
-                bool remains = false;
-                for (const auto &member : declaration->members) if (const auto prop = Luau::get_if<Luau::AstClassProperty>(&member)) if (String::utf8(prop->name.value) == String(property.name) && property_types.has(property.name) && annotation_key(prop->ty) == property_types[property.name]) remains = true;
-                if (!remains && new_base_script.is_valid()) {
-                    for (const PropertyInfo &inherited : new_base_script->properties) if (inherited.name == property.name && new_base_script->property_types.has(property.name) && property_types.has(property.name) && new_base_script->property_types[property.name] == property_types[property.name]) remains = true;
+                String next_type;
+                bool declared = false;
+                for (const auto &member : declaration->members) {
+                    if (const auto prop = Luau::get_if<Luau::AstClassProperty>(&member); prop != nullptr && String::utf8(prop->name.value) == String(property.name)) {
+                        next_type = annotation_key(prop->ty);
+                        declared = true;
+                    }
                 }
-                if (!remains) continue;
+                if (!declared && new_base_script.is_valid() && new_base_script->property_types.has(property.name)) {
+                    next_type = new_base_script->property_types[property.name];
+                    declared = true;
+                }
+                if (!declared) continue;
+                const String previous_type = property_types.has(property.name) ? property_types[property.name] : String();
+                const CharString field = String(property.name).utf8();
                 lua_getref(L, next_object);
                 lua_getref(L, instance->object_ref);
-                lua_getfield(L, -1, String(property.name).utf8().get_data());
+                lua_getfield(L, -1, field.get_data());
                 lua_remove(L, -2);
-                lua_setfield(L, -2, String(property.name).utf8().get_data());
+                if (previous_type != next_type) {
+                    // Keep a value that still satisfies the new type, or convert it losslessly.
+                    // Otherwise, and for nil, the replacement keeps its new default.
+                    if (lua_isnil(L, -1)) {
+                        lua_pop(L, 2);
+                        continue;
+                    }
+                    const ParsedType parsed(next_type);
+                    if (parsed.type == nullptr || !value_fits(L, -1, parsed.type)) {
+                        if (parsed.type != nullptr && push_converted(L, -1, parsed.type)) lua_remove(L, -2);
+                        else {
+                            WARN_PRINT(vformat("%s: field '%s' changed from '%s' to '%s'. Its value does not fit the new type, so it was reset to the default.", get_path().is_empty() ? String(new_name) : get_path(), property.name, previous_type, next_type));
+                            lua_pop(L, 2);
+                            continue;
+                        }
+                    }
+                }
+                lua_setfield(L, -2, field.get_data());
                 lua_pop(L, 1);
             }
         }
@@ -1215,7 +1366,8 @@ Error LuauScript::reload(bool p_keep_state) {
     evaluation.committed = true;
     valid = true;
     emit_changed();
-    if (was_valid) {
+    // Scripts created in memory have no path, so nothing can import them.
+    if (was_valid && !get_path().is_empty()) {
         const auto affected = language->invalidate_modules(get_path());
         Vector<Ref<LuauScript>> dependents;
         for (LuauScript *dependent : language->scripts)

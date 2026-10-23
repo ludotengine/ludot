@@ -144,6 +144,34 @@ end""")
     ref_owner.set_script(ref_script)
     ref_owner = null
     check(owner_reference.get_ref() == null, "A script does not retain its RefCounted owner")
+    var migrating = ClassDB.instantiate("LuauScript")
+    migrating.set_source_code("""class Migrating extends Node = {
+    private Count: number = 1
+    private Label: string = "a"
+    private Flag: boolean = true
+    private Items: {number} = {}
+    private Spot: Vector2 = Vector2(1, 2)
+    function setUp()
+        self.Count = 42
+        self.Label = "7"
+        self.Flag = false
+        table.insert(self.Items, 3)
+        self.Spot = Vector2(3, 4)
+    end
+    function itemCount(): number return #self.Items end
+}""")
+    check(migrating.reload() == OK, "Field migration script compiles")
+    var migrated := Node.new()
+    migrated.set_script(migrating)
+    migrated.call("setUp")
+    migrating.set_source_code(migrating.get_source_code().replace("Count: number = 1", "Count: string = \"\"").replace("Label: string = \"a\"", "Label: number = 0").replace("Flag: boolean = true", "Flag: number = 5").replace("Items: {number}", "Items: {any}").replace("Spot: Vector2 = Vector2(1, 2)", "Spot: Vector2i = Vector2i(0, 0)").replace("self.Count = 42", "self.Count = \"42\"").replace("self.Label = \"7\"", "self.Label = 7").replace("self.Flag = false", "self.Flag = 1").replace("self.Spot = Vector2(3, 4)", "self.Spot = Vector2i(3, 4)"))
+    check(migrating.reload(true) == OK, "Field type changes reload")
+    check(migrated.get("Count") == "42", "A number field converts to string on reload: " + str(migrated.get("Count")))
+    check(migrated.get("Label") == 7.0, "A numeric string converts to number on reload: " + str(migrated.get("Label")))
+    check(migrated.get("Flag") == 5.0, "An incompatible value resets to the new default: " + str(migrated.get("Flag")))
+    check(migrated.call("itemCount") == 1, "A table keeps its contents when the new type accepts them")
+    check(migrated.get("Spot") == Vector2i(3, 4), "An engine value converts to the new engine type: " + str(migrated.get("Spot")))
+    migrated.free()
     player.free()
     if failures.is_empty():
         print("LUDOT_ENGINE_TESTS_PASSED")
