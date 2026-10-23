@@ -28,6 +28,11 @@ python -m venv .venv
 .venv/bin/scons -C engine platform=linuxbsd target=editor debug_symbols=no module_mono_enabled=no -j4
 ```
 
+Rebuilds are much faster with a SCons cache, which reuses objects for unchanged files
+even after switching branches or cleaning. Add `cache_path=../.scons_cache` (or set
+`SCONS_CACHE`). On Linux, `linker=mold` cuts link time. Use every core with
+`-j$(nproc)`. CI uses the cache, all cores, and mold.
+
 Use `platform=windows` with an MSVC developer environment on Windows and
 `platform=macos` on macOS. Ludot's module is desktop-only. GDScript stays enabled.
 The fork includes mobile and web source inherited from Godot, but Ludot does not

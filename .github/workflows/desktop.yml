@@ -60,11 +60,30 @@ jobs:
       - name: Store cache timestamp
         shell: bash
         run: echo "CACHE_TIMESTAMP=$(date +%s)" >> "$GITHUB_ENV"
+      # Prebuilt SDKs that the Windows and macOS builds link against, as in upstream Godot CI.
+      # Each one is optional, so a failed download builds without that feature.
+      - name: Engine SDK dependencies
+        id: deps
+        if: runner.os != 'Linux'
+        working-directory: engine
+        shell: bash
+        run: |
+          flags=""
+          install() {
+            if python "./misc/scripts/$2"; then flags="$flags $1=yes"; else echo "::warning::$2 failed, building with $1=no"; flags="$flags $1=no"; fi
+          }
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            install d3d12 install_d3d12_sdk_windows.py
+            python ./misc/scripts/install_winrt.py || echo "::warning::WinRT components failed to install"
+          fi
+          install angle install_angle.py
+          install accesskit install_accesskit.py
+          echo "flags=$flags" >> "$GITHUB_OUTPUT"
       - name: Build editor
         id: build
         working-directory: engine
         shell: bash
-        run: scons platform=${{ matrix.platform }} target=editor debug_symbols=no module_mono_enabled=no ${{ matrix.sconsflags }} -j$(python -c "import os; print(os.cpu_count())")
+        run: scons platform=${{ matrix.platform }} target=editor debug_symbols=no module_mono_enabled=no ${{ matrix.sconsflags }} ${{ steps.deps.outputs.flags }} -j$(python -c "import os; print(os.cpu_count())" | tr -d '\r')
       - name: Drop cache entries the build did not use
         if: always() && steps.build.outcome != 'skipped'
         working-directory: engine
