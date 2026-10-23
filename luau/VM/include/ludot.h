@@ -9,3 +9,7 @@ LUA_API void lua_migrateobject(lua_State* L, int object, int replacement);
 LUA_API void lua_setclassmember(lua_State* L, int cls, const char* name);
 // Run a C callback with Luau error recovery. On failure the error is on the stack.
 LUA_API int lua_rawrunprotected(lua_State* L, void (*callback)(lua_State* L, void* context), void* context);
+// Retargets live closures of the old chunk's functions to the matching functions of the new chunk.
+// Functions match by name and position within their parent function. A closure keeps its old
+// code while it is executing or when its captured upvalues differ. Returns the retargeted count.
+LUA_API int lua_migratefunctions(lua_State* L, int oldchunk, int newchunk);

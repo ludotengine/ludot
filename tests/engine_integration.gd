@@ -172,6 +172,42 @@ end""")
     check(migrated.call("itemCount") == 1, "A table keeps its contents when the new type accepts them")
     check(migrated.get("Spot") == Vector2i(3, 4), "An engine value converts to the new engine type: " + str(migrated.get("Spot")))
     migrated.free()
+    var callbacks = ClassDB.instantiate("LuauScript")
+    callbacks.set_source_code("""class Callbacks extends Node = {
+    private Hits: number = 0
+    private Source: Timer? = nil
+    private Stored: (() -> number)? = nil
+    function connectAll()
+        self.Source = Timer()
+        self.Source.Timeout:connect(function()
+            self.Hits += 1
+        end)
+        self.Stored = function(): number
+            return 1
+        end
+    end
+    function fire()
+        self.Source.Timeout:emit()
+    end
+    function stored(): number
+        return self.Stored()
+    end
+    function release()
+        self.Source:free()
+    end
+}""")
+    check(callbacks.reload() == OK, "Closure reload script compiles")
+    var holder := Node.new()
+    holder.set_script(callbacks)
+    holder.call("connectAll")
+    holder.call("fire")
+    callbacks.set_source_code(callbacks.get_source_code().replace("self.Hits += 1", "self.Hits += 10").replace("return 1", "return 2"))
+    check(callbacks.reload(true) == OK, "Closure reload applies")
+    holder.call("fire")
+    check(holder.get("Hits") == 11.0, "A connected callback runs its reloaded body: " + str(holder.get("Hits")))
+    check(holder.call("stored") == 2.0, "A stored function runs its reloaded body")
+    holder.call("release")
+    holder.free()
     player.free()
     if failures.is_empty():
         print("LUDOT_ENGINE_TESTS_PASSED")

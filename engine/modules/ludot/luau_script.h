@@ -106,6 +106,9 @@ public:
     Mutex mutex;
     HashSet<LuauScript *> scripts;
     HashMap<String, int> module_cache;
+    // Last executed chunk function per module or script, so a reload can retarget live closures.
+    HashMap<String, int> chunk_refs;
+    void commit_chunk(lua_State *L, const String &p_key, int p_chunk);
     HashMap<String, Ref<LuauScript>> module_resources;
     HashSet<String> loading;
     HashMap<String, HashSet<String>> module_dependents;

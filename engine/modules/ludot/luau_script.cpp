@@ -485,11 +485,19 @@ int ludot_require(lua_State *L) {
     if (error == OK && module.is_valid()) error = language->load_chunk(module->get_source_code(), path, L);
     else { language->last_error = "Cannot load module '" + path + "'"; error = ERR_CANT_OPEN; }
     ModuleEvaluation evaluation(language, path);
+    int chunk = LUA_NOREF;
+    if (error == OK) {
+        lua_pushvalue(L, -1);
+        chunk = lua_ref(L, -1);
+        lua_pop(L, 1);
+    }
     if (error == OK && lua_pcall(L, 0, 1, 0) != LUA_OK) {
         language->last_error = String::utf8(lua_tostring(L, -1));
         lua_pop(L, 1);
         error = ERR_SCRIPT_FAILED;
     }
+    if (error == OK) language->commit_chunk(L, path, chunk);
+    else if (chunk != LUA_NOREF) lua_unref(L, chunk);
     language->loading.erase(path);
     if (error != OK) luaL_error(L, "%s", language->last_error.utf8().get_data());
     evaluation.committed = true;
@@ -926,6 +934,16 @@ void LuauLanguage::frame() {
     profile_last_frame = profile_frame;
     profile_frame.clear();
 }
+void LuauLanguage::commit_chunk(lua_State *L, const String &p_key, int p_chunk) {
+    if (const int *previous = chunk_refs.getptr(p_key)) {
+        lua_getref(L, *previous);
+        lua_getref(L, p_chunk);
+        lua_migratefunctions(L, -2, -1);
+        lua_pop(L, 2);
+        lua_unref(L, *previous);
+    }
+    chunk_refs[p_key] = p_chunk;
+}
 void LuauLanguage::init() {
     static uint64_t next_generation = 0;
     generation = ++next_generation;
@@ -996,6 +1014,7 @@ void LuauLanguage::finish() {
     module_dependencies.clear();
     native_classes.clear();
     native_members.clear();
+    chunk_refs.clear();
     debug_cursors.clear();
     stepping_state = nullptr;
     if (state != nullptr) { lua_State *closing = state; state = nullptr; lua_close(closing); }
@@ -1224,6 +1243,17 @@ Error LuauScript::reload(bool p_keep_state) {
     if (error != OK) { ERR_PRINT(language->last_error); return error; }
     lua_State *L = language->state;
     ModuleEvaluation evaluation(language, get_path());
+    // Released unless the reload commits, in which case it replaces the previous chunk.
+    struct ChunkReference {
+        lua_State *state;
+        int reference;
+        bool committed = false;
+        ~ChunkReference() { if (!committed) lua_unref(state, reference); }
+    };
+    lua_pushvalue(L, -1);
+    ChunkReference chunk{ L, lua_ref(L, -1) };
+    lua_pop(L, 1);
+    const String chunk_key = get_path().is_empty() ? "memory:" + itos(get_instance_id()) : get_path();
     if (lua_pcall(L, 0, 1, 0) != LUA_OK) {
         language->last_error = String::utf8(lua_tostring(L, -1)); lua_pop(L, 1);
         ERR_PRINT(language->last_error);
@@ -1232,6 +1262,8 @@ Error LuauScript::reload(bool p_keep_state) {
     if (!lua_isclass(L, -1)) {
         lua_pop(L, 1);
         evaluation.committed = true;
+        language->commit_chunk(L, chunk_key, chunk.reference);
+        chunk.committed = true;
         valid = true;
         return OK;
     }
@@ -1364,6 +1396,9 @@ Error LuauScript::reload(bool p_keep_state) {
         lua_unref(L, replacement.value);
     }
     evaluation.committed = true;
+    // Retarget closures created by the previous version, such as connected callbacks.
+    language->commit_chunk(L, chunk_key, chunk.reference);
+    chunk.committed = true;
     valid = true;
     emit_changed();
     // Scripts created in memory have no path, so nothing can import them.

@@ -20,6 +20,9 @@
 #include "lvector.h"
 
 #include <string.h>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 LUAU_FASTFLAG(LuauGcTraceUdata)
 LUAU_FASTFLAGVARIABLE(LuauNewPointerEncode)
@@ -2349,4 +2352,95 @@ void lua_setclassmember(lua_State* L, int clsindex, const char* name)
 int lua_rawrunprotected(lua_State* L, void (*callback)(lua_State* L, void* context), void* context)
 {
     return luaD_rawrunprotected(L, callback, context);
+}
+
+namespace
+{
+void matchprotos(Proto* oldproto, Proto* newproto, std::unordered_map<Proto*, Proto*>& matches)
+{
+    matches[oldproto] = newproto;
+    // Children match by debug name and by their order among siblings with that name.
+    std::unordered_map<std::string, int> seen;
+    for (int i = 0; i < oldproto->sizep; ++i)
+    {
+        Proto* child = oldproto->p[i];
+        std::string name = child->debugname ? getstr(child->debugname) : "";
+        int ordinal = seen[name]++;
+        for (int j = 0; j < newproto->sizep; ++j)
+        {
+            Proto* candidate = newproto->p[j];
+            std::string candidatename = candidate->debugname ? getstr(candidate->debugname) : "";
+            if (candidatename == name && ordinal-- == 0)
+            {
+                matchprotos(child, candidate, matches);
+                break;
+            }
+        }
+    }
+}
+
+bool sameupvalues(Proto* oldproto, Proto* newproto)
+{
+    if (oldproto->nups != newproto->nups)
+        return false;
+    if (oldproto->sizeupvalues != oldproto->nups || newproto->sizeupvalues != newproto->nups)
+        return true; // no debug names to compare
+    for (int i = 0; i < oldproto->nups; ++i)
+        if (oldproto->upvalues[i] != newproto->upvalues[i]) // interned strings
+            return false;
+    return true;
+}
+
+struct FunctionMigration
+{
+    lua_State* L;
+    std::unordered_map<Proto*, Proto*> matches;
+    std::unordered_set<Closure*> active;
+    int migrated = 0;
+};
+
+bool collectactive(void* context, lua_Page* page, GCObject* gco)
+{
+    FunctionMigration* migration = static_cast<FunctionMigration*>(context);
+    if (gco->gch.tt == LUA_TTHREAD)
+    {
+        lua_State* thread = gco2th(gco);
+        for (CallInfo* ci = thread->base_ci + 1; ci <= thread->ci; ++ci)
+            if (ttisfunction(ci->func))
+                migration->active.insert(clvalue(ci->func));
+    }
+    return false;
+}
+
+bool retarget(void* context, lua_Page* page, GCObject* gco)
+{
+    FunctionMigration* migration = static_cast<FunctionMigration*>(context);
+    if (gco->gch.tt != LUA_TFUNCTION)
+        return false;
+    Closure* cl = gco2cl(gco);
+    if (cl->isC || migration->active.count(cl))
+        return false;
+    auto match = migration->matches.find(cl->l.p);
+    if (match == migration->matches.end() || match->first == match->second || !sameupvalues(match->first, match->second))
+        return false;
+    cl->l.p = match->second;
+    cl->stacksize = match->second->maxstacksize;
+    luaC_objbarrier(migration->L, cl, match->second);
+    migration->migrated++;
+    return false;
+}
+} // namespace
+
+int lua_migratefunctions(lua_State* L, int oldchunk, int newchunk)
+{
+    const TValue* oldvalue = index2addr(L, oldchunk);
+    const TValue* newvalue = index2addr(L, newchunk);
+    api_check(L, ttisfunction(oldvalue) && !clvalue(oldvalue)->isC);
+    api_check(L, ttisfunction(newvalue) && !clvalue(newvalue)->isC);
+    FunctionMigration migration;
+    migration.L = L;
+    matchprotos(clvalue(oldvalue)->l.p, clvalue(newvalue)->l.p, migration.matches);
+    luaM_visitgco(L, &migration, collectactive);
+    luaM_visitgco(L, &migration, retarget);
+    return migration.migrated;
 }
