@@ -6,10 +6,11 @@ Ludot is a private engine monorepo containing independent hard forks of Godot
 4.7.2-stable and Luau 0.743. GDScript remains available. Desktop targets are Linux,
 Windows, and macOS. Original source provenance is recorded in `upstreams.json`.
 
-This is an early implementation, not a finished engine distribution. Native class
-syntax and imports, a restricted shader compiler, an engine module, and a standalone
-LSP are under development. Read [the implementation status](docs/status.md) before
-using it for a project.
+Luau runs alongside GDScript as a native scripting language, with brace classes,
+`import` syntax, user-defined module aliases, hot reload, editor checking and
+completion, debugging, and profiling. `.lushader` files compile a typed Luau subset to
+canvas, spatial, and particle shaders. A standalone LSP serves other editors. Read
+[the implementation status](docs/status.md) for verified behavior and known limits.
 
 | Directory | Contents |
 | --- | --- |
