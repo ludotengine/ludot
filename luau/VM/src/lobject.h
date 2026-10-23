@@ -600,6 +600,10 @@ typedef struct LuauClass
     // is added via luaR_addclassmember.
     LuaTable* instancemetatable;
 
+    // Embedder-defined property accessors, inherited by native subclasses.
+    LuaTable* propertygetters;
+    LuaTable* propertysetters;
+
     // Number of instance members that we expect instances of this class object
     // to have.
     uint32_t numberofinstancemembers;

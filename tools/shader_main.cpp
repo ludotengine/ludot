@@ -3,6 +3,10 @@
 #include <iostream>
 #include <iterator>
 int main(int argc, char** argv) {
+    if (argc == 2 && std::string(argv[1]) == "--completion-list") {
+        for (const auto& word : Ludot::shaderCompletions()) std::cout << word << '\n';
+        return 0;
+    }
     if (argc != 2) { std::cerr << "usage: ludot-shader file.lushader\n"; return 2; }
     std::ifstream file(argv[1]);
     if (!file) { std::cerr << "Cannot open shader\n"; return 2; }

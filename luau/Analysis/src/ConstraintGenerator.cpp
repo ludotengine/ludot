@@ -2171,6 +2171,19 @@ ControlFlow ConstraintGenerator::visit(const ScopePtr& scope, AstStatTypeAlias* 
         return ControlFlow::None;
 
     ScopePtr defnScope = *defnScopePtr;
+    if (alias->isImportAlias)
+    {
+        auto ref = alias->type->as<AstTypeReference>();
+        auto imported = scope->lookupImportedType(ref->prefix->value, ref->name.value);
+        if (imported)
+        {
+            TypeId placeholder = bindingIt->second.type;
+            bindingIt->second = *imported;
+            emplaceType<BoundType>(asMutable(placeholder), imported->type);
+            module->astResolvedTypes[alias->type] = imported->type;
+            return ControlFlow::None;
+        }
+    }
     resolveGenericDefaultParameters(defnScope, alias, bindingIt->second);
 
     TypeId ty = resolveType(
@@ -2929,6 +2942,7 @@ InferencePack ConstraintGenerator::checkPack(
 
 InferencePack ConstraintGenerator::checkPack(const ScopePtr& scope, AstExprCall* call, std::optional<TypeId> expectedType)
 {
+    if (call->isClassBaseInit) return InferencePack{builtinTypes->emptyTypePack};
     Checkpoint funcBeginCheckpoint = checkpoint(this);
 
     TypeId fnType = nullptr;

@@ -477,6 +477,10 @@ static void traverseclass(global_State* g, LuauClass* classobject)
         markvalue(g, &classobject->staticmembers[i]);
     if (classobject->metatable)
         markobject(g, classobject->metatable);
+    if (classobject->propertygetters)
+        markobject(g, classobject->propertygetters);
+    if (classobject->propertysetters)
+        markobject(g, classobject->propertysetters);
     if (classobject->instancemetatable)
         markobject(g, classobject->instancemetatable);
 }

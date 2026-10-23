@@ -6,3 +6,5 @@ __pycache__/
 .godot/
 /extension_api.json
 *.egg-info/
+
+/dist/

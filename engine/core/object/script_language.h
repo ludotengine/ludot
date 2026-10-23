@@ -436,6 +436,10 @@ public:
 	virtual void debug_get_globals(List<String> *p_globals, List<Variant> *p_values, int p_max_subitems = -1, int p_max_depth = -1) = 0;
 	virtual String debug_parse_stack_level_expression(int p_level, const String &p_expression, int p_max_subitems = -1, int p_max_depth = -1) = 0;
 
+	// Languages with native expression syntax can provide typed debugger results.
+	// Returning false keeps the debugger's existing Variant expression evaluator.
+	virtual bool debug_evaluate_expression(int p_level, const String &p_expression, Variant &r_value, String &r_error) { return false; }
+
 	virtual Vector<StackInfo> debug_get_current_stack_info() { return Vector<StackInfo>(); }
 
 	virtual void reload_all_scripts() = 0;

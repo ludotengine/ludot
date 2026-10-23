@@ -32,6 +32,8 @@ LuauClass* luaR_newblankclass(lua_State* L, TString* name, bool isopen)
     classobject->offsettomember = NULL;
     classobject->metatable = NULL;
     classobject->instancemetatable = NULL;
+    classobject->propertygetters = NULL;
+    classobject->propertysetters = NULL;
     classobject->numberofinstancemembers = 0;
     classobject->numberofallmembers = 0;
     classobject->isopen = isopen;
@@ -180,6 +182,8 @@ LuauClass* luaR_inheritclass(lua_State* L, const LuauClass* child, LuauClass* pa
     LuauClass* newClass = luaR_newblankclass(L, child->name, child->isopen);
 
     newClass->super = parent;
+    newClass->propertygetters = parent->propertygetters;
+    newClass->propertysetters = parent->propertysetters;
 
     // Count how many static members we'll actually need to copy from parent, ie non-overridden ones
     uint32_t numStaticMembersToCopy = 0;

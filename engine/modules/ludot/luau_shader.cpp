@@ -28,7 +28,9 @@ Error LuauShader::compile_source(const String &p_source) {
     info.shader_types = ShaderTypes::get_singleton()->get_types();
     const Error error = validator.compile(generated, info);
     if (error != OK) {
-        diagnostics = validator.get_error_text();
+        const int generated_line = validator.get_error_line() - 1;
+        const unsigned original_line = generated_line >= 0 && size_t(generated_line) < result.sourceLines.size() ? result.sourceLines[generated_line] : 0;
+        diagnostics = vformat("%s:%d: %s", get_path(), original_line + 1, validator.get_error_text());
         emit_changed();
         return error;
     }

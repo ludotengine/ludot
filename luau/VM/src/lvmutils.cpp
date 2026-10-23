@@ -237,6 +237,15 @@ void luaV_gettable(lua_State* L, const TValue* t, TValue* key, StkId val)
         else if (LUAU_UNLIKELY(FFlag::DebugLuauUserDefinedClassesRuntime && ttisobject(t)))
         {
             LuauObject* inst = objectvalue(t);
+            if (inst->lclass->propertygetters)
+            {
+                const TValue* getter = luaH_get(inst->lclass->propertygetters, key);
+                if (!ttisnil(getter))
+                {
+                    callTMres(L, val, getter, t, key);
+                    return;
+                }
+            }
             const TValue* offsettval = luaH_get(inst->lclass->memberstooffset, key);
 
             // Class instances throw if you try to access a member that is not
@@ -323,6 +332,15 @@ void luaV_settable(lua_State* L, const TValue* t, TValue* key, StkId val)
         else if (LUAU_UNLIKELY(FFlag::DebugLuauUserDefinedClassesRuntime && ttisobject(t)))
         {
             LuauObject* inst = objectvalue(t);
+            if (inst->lclass->propertysetters)
+            {
+                const TValue* setter = luaH_get(inst->lclass->propertysetters, key);
+                if (!ttisnil(setter))
+                {
+                    callTM(L, setter, t, key, val);
+                    return;
+                }
+            }
             const TValue* offset = luaH_get(inst->lclass->memberstooffset, key);
             if (ttisnil(offset))
                 luaG_missingmembererror(L, t, key);

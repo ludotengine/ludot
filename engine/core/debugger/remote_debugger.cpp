@@ -549,6 +549,16 @@ void RemoteDebugger::debug(bool p_can_continue, bool p_is_error_breakpoint) {
 			} else if (command == "evaluate") {
 				String expression_str = data[0];
 				int frame = data[1];
+				Variant native_value;
+				String native_error;
+				if (script_lang && script_lang->debug_evaluate_expression(frame, expression_str, native_value, native_error)) {
+					DebuggerMarshalls::ScriptStackVariable variable;
+					variable.name = expression_str;
+					variable.value = native_error.is_empty() ? native_value : Variant(native_error);
+					variable.type = 3;
+					send_message("evaluation_return", variable.serialize());
+					continue;
+				}
 
 				ScriptInstance *breaked_instance = script_debugger->get_break_language()->debug_get_stack_level_instance(frame);
 				if (!breaked_instance) {

@@ -1,18 +1,25 @@
 #include "luau_script.h"
+#include "luau_callable.h"
+#include "core/object/method_bind.h"
 #ifdef TOOLS_ENABLED
 #include "luau_analysis.h"
 #endif
 #include "Luau/Compiler.h"
 #include "Luau/ExperimentalFlags.h"
 #include "Luau/Parser.h"
+#include "Luau/PrettyPrinter.h"
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
 #include "core/io/file_access.h"
+#include "core/io/dir_access.h"
 #include "core/io/json.h"
 #include "core/object/class_db.h"
 #include "core/debugger/script_debugger.h"
 #include "core/debugger/engine_debugger.h"
 #include "lualib.h"
+#include "ludot.h"
+#include "lobject.h"
+#include "lstate.h"
 #include <new>
 #include <set>
 
@@ -27,46 +34,237 @@ LuauLanguage::LuauLanguage() {
         if (strncmp(flag->name, "Luau", 4) == 0 && !Luau::isAnalysisFlagExperimental(flag->name)) flag->value = true;
 }
 namespace {
+struct ModuleEvaluation {
+    LuauLanguage *language;
+    String path;
+    HashSet<String> previous;
+    bool committed = false;
+    ModuleEvaluation(LuauLanguage *p_language, const String &p_path) : language(p_language), path(p_path) {
+        if (const auto *dependencies = language->module_dependencies.getptr(path)) previous = *dependencies;
+        remove_edges();
+    }
+    void remove_edges() {
+        if (const auto *dependencies = language->module_dependencies.getptr(path)) {
+            for (const String &dependency : *dependencies) {
+                auto *importers = language->module_dependents.getptr(dependency);
+                if (importers != nullptr) {
+                    importers->erase(path);
+                    if (importers->is_empty()) language->module_dependents.erase(dependency);
+                }
+            }
+        }
+        language->module_dependencies.erase(path);
+    }
+    ~ModuleEvaluation() {
+        if (committed) return;
+        remove_edges();
+        language->module_dependencies.insert(path, previous);
+        for (const String &dependency : previous) language->module_dependents[dependency].insert(path);
+    }
+};
+void record_dependency(LuauLanguage *language, const String &from, const String &path) {
+    language->module_dependents[path].insert(from);
+    language->module_dependencies[from].insert(path);
+}
+String annotation_key(Luau::AstType *type) { return type != nullptr ? String::utf8(Luau::toString(type).c_str()) : String(); }
 constexpr const char *VARIANT_META = "Ludot.Variant";
-Variant *variant_at(lua_State *L, int index) { return static_cast<Variant *>(luaL_checkudata(L, index, VARIANT_META)); }
-void destroy_variant(lua_State *L, void *pointer) { static_cast<Variant *>(pointer)->~Variant(); }
+struct NativeValue {
+    Variant value;
+    ObjectID owner;
+};
+Variant variant_at(lua_State *L, int index) {
+    const auto *native = static_cast<NativeValue *>(luaL_checkudata(L, index, VARIANT_META));
+    if (native->owner.is_valid()) return ObjectDB::get_instance(native->owner);
+    return native->value;
+}
+void update_variant(lua_State *L, int index, const Variant &value) {
+    auto *native = static_cast<NativeValue *>(luaL_checkudata(L, index, VARIANT_META));
+    if (native->owner.is_null()) native->value = value;
+}
+void destroy_variant(lua_State *L, void *pointer) { static_cast<NativeValue *>(pointer)->~NativeValue(); }
+void push_owner(lua_State *L, Object *owner) {
+    new (lua_newuserdatadtor(L, sizeof(NativeValue), destroy_variant)) NativeValue{Variant(), owner->get_instance_id()};
+    luaL_getmetatable(L, VARIANT_META);
+    lua_setmetatable(L, -2);
+}
+Variant native_argument(lua_State *L, int index, Variant::Type expected) {
+    if (lua_istable(L, index) && expected >= Variant::ARRAY) {
+        const int absolute = lua_absindex(L, index);
+        const int size = lua_objlen(L, absolute);
+        Array array;
+        array.resize(size);
+        lua_pushnil(L);
+        int entries = 0;
+        while (lua_next(L, absolute) != 0) {
+            if (!lua_isnumber(L, -2)) luaL_error(L, "An engine array requires consecutive integer keys starting at 1");
+            const double key = lua_tonumber(L, -2);
+            if (key < 1 || key > size || key != int(key)) luaL_error(L, "An engine array requires consecutive integer keys starting at 1");
+            array[int(key) - 1] = LuauLanguage::to_variant(L, -1);
+            ++entries;
+            lua_pop(L, 1);
+        }
+        if (entries != size) luaL_error(L, "An engine array cannot contain holes");
+        if (expected == Variant::ARRAY) return array;
+        const Variant value = array;
+        const Variant *args[] = {&value};
+        Variant converted;
+        Callable::CallError error;
+        Variant::construct(expected, converted, args, 1, error);
+        if (error.error != Callable::CallError::CALL_OK) luaL_error(L, "Invalid packed array element type");
+        return converted;
+    }
+    return LuauLanguage::to_variant(L, index);
+}
+int native_static_call(lua_State *L) {
+    const StringName method = String::utf8(lua_tostring(L, lua_upvalueindex(2)));
+    const bool builtin = lua_isnumber(L, lua_upvalueindex(1));
+    const auto type = builtin ? Variant::Type(lua_tointeger(L, lua_upvalueindex(1))) : Variant::NIL;
+    MethodBind *bind = builtin ? nullptr : ClassDB::get_method(String::utf8(lua_tostring(L, lua_upvalueindex(1))), method);
+    const int count = lua_gettop(L);
+    Vector<Variant> values;
+    Vector<const Variant *> pointers;
+    values.resize(count); pointers.resize(count);
+    for (int i = 0; i < count; ++i) {
+        Variant::Type expected = Variant::NIL;
+        if (builtin && i < Variant::get_builtin_method_argument_count(type, method)) expected = Variant::get_builtin_method_argument_type(type, method, i);
+        else if (bind != nullptr && i < bind->get_argument_count()) expected = bind->get_argument_info(i).type;
+        values.write[i] = native_argument(L, i + 1, expected); pointers.write[i] = &values[i];
+    }
+    Variant result;
+    Callable::CallError error;
+    if (builtin) Variant::call_static(type, method, pointers.ptrw(), count, result, error);
+    else if (bind != nullptr) result = bind->call(nullptr, pointers.ptrw(), count, error);
+    else luaL_error(L, "Unknown static native method");
+    if (error.error != Callable::CallError::CALL_OK) luaL_error(L, "%s", Variant::get_call_error_text(method, pointers.ptrw(), count, error).utf8().get_data());
+    LuauLanguage::push_variant(L, result);
+    return 1;
+}
+struct VariantConversion { int index; Variant value; };
+void convert_value(lua_State *L, void *context) {
+    auto conversion = static_cast<VariantConversion *>(context);
+    conversion->value = LuauLanguage::to_variant(L, conversion->index);
+}
+bool try_variant(lua_State *L, int index, Variant &value) {
+    const int top = lua_gettop(L);
+    VariantConversion conversion{lua_absindex(L, index), Variant()};
+    const int status = lua_rawrunprotected(L, convert_value, &conversion);
+    if (status == LUA_OK) value = conversion.value;
+    else LuauLanguage::get_singleton()->last_error = String::utf8(lua_tostring(L, -1));
+    lua_settop(L, top);
+    return status == LUA_OK;
+}
+int native_length(lua_State *L) {
+    Variant self = variant_at(L, 1);
+    if (!self.is_array() && self.get_type() != Variant::DICTIONARY) luaL_error(L, "Only native collections have a length");
+    Variant result;
+    Callable::CallError error;
+    self.callp("size", nullptr, 0, result, error);
+    lua_pushnumber(L, int64_t(result));
+    return 1;
+}
+int native_iterator_next(lua_State *L) {
+    Variant self = variant_at(L, lua_upvalueindex(1));
+    const int index = lua_tointeger(L, lua_upvalueindex(3));
+    Variant key;
+    if (self.get_type() == Variant::DICTIONARY) {
+        const Array keys = variant_at(L, lua_upvalueindex(2));
+        if (index >= keys.size()) return 0;
+        key = keys[index];
+    } else {
+        Variant size;
+        Callable::CallError error;
+        self.callp("size", nullptr, 0, size, error);
+        if (index >= int64_t(size)) return 0;
+        key = index;
+    }
+    bool valid;
+    const Variant value = self.get(key, &valid);
+    LuauLanguage::push_variant(L, self.is_array() ? Variant(index + 1) : key);
+    LuauLanguage::push_variant(L, value);
+    lua_pushinteger(L, index + 1);
+    lua_replace(L, lua_upvalueindex(3));
+    return 2;
+}
+int native_iterate(lua_State *L) {
+    Variant self = variant_at(L, 1);
+    if (!self.is_array() && self.get_type() != Variant::DICTIONARY) luaL_error(L, "Only native collections can be iterated");
+    lua_pushvalue(L, 1);
+    if (self.get_type() == Variant::DICTIONARY) LuauLanguage::push_variant(L, Dictionary(self).keys());
+    else lua_pushnil(L);
+    lua_pushinteger(L, 0);
+    lua_pushcclosure(L, native_iterator_next, "native collection iterator", 3);
+    return 1;
+}
 int native_call(lua_State *L) {
-    Variant *self = variant_at(L, 1);
+    Variant self = variant_at(L, 1);
     const StringName method = String::utf8(lua_tostring(L, lua_upvalueindex(1)));
     const int count = lua_gettop(L) - 1;
     Vector<Variant> values;
     Vector<const Variant *> pointers;
     values.resize(count);
     pointers.resize(count);
-    for (int i = 0; i < count; ++i) { values.write[i] = LuauLanguage::to_variant(L, i + 2); pointers.write[i] = &values[i]; }
+    MethodBind *bind = nullptr;
+    if (self.get_type() == Variant::OBJECT) {
+        Object *object = self;
+        if (object == nullptr) luaL_error(L, "The native object has been freed");
+        bind = ClassDB::get_method(object->get_class_name(), method);
+    }
+    for (int i = 0; i < count; ++i) {
+        Variant::Type expected = Variant::NIL;
+        if (bind != nullptr && i < bind->get_argument_count()) expected = bind->get_argument_info(i).type;
+        else if (self.get_type() != Variant::OBJECT && i < Variant::get_builtin_method_argument_count(self.get_type(), method)) expected = Variant::get_builtin_method_argument_type(self.get_type(), method, i);
+        values.write[i] = native_argument(L, i + 2, expected); pointers.write[i] = &values[i];
+    }
     Variant result;
     Callable::CallError error;
-    self->callp(method, pointers.ptrw(), count, result, error);
+    auto language = LuauLanguage::get_singleton();
+    lua_State *previous = language->active_state;
+    language->active_state = L;
+    self.callp(method, pointers.ptrw(), count, result, error);
+    language->active_state = previous;
+    update_variant(L, 1, self);
     if (error.error != Callable::CallError::CALL_OK) luaL_error(L, "%s", Variant::get_call_error_text(method, pointers.ptrw(), count, error).utf8().get_data());
     LuauLanguage::push_variant(L, result);
     return 1;
 }
 int native_index(lua_State *L) {
-    Variant *self = variant_at(L, 1);
+    Variant self = variant_at(L, 1);
     if (lua_type(L, 2) == LUA_TNUMBER) {
         bool valid;
-        const Variant result = self->get(LuauLanguage::to_variant(L, 2), &valid);
+        const Variant key = self.is_array() ? Variant(lua_tointeger(L, 2) - 1) : LuauLanguage::to_variant(L, 2);
+        const Variant result = self.get(key, &valid);
         if (!valid) luaL_error(L, "Invalid native index");
         LuauLanguage::push_variant(L, result);
         return 1;
     }
     const String requested = String::utf8(luaL_checkstring(L, 2));
+    if (self.get_type() == Variant::DICTIONARY && Dictionary(self).has(requested)) {
+        LuauLanguage::push_variant(L, Dictionary(self)[requested]);
+        return 1;
+    }
     List<PropertyInfo> properties;
-    self->get_property_list(&properties);
+    self.get_property_list(&properties);
     for (const PropertyInfo &property : properties) {
         if (LuauLanguage::api_name(property.name, true) == requested) {
             bool valid;
-            LuauLanguage::push_variant(L, self->get_named(property.name, valid));
+            LuauLanguage::push_variant(L, self.get_named(property.name, valid));
             return 1;
         }
     }
+    if (self.get_type() == Variant::OBJECT) {
+        Object *object = self;
+        if (object == nullptr) luaL_error(L, "The native object has been freed");
+        List<MethodInfo> signals;
+        object->get_signal_list(&signals);
+        for (const auto &signal : signals) {
+            if (LuauLanguage::api_name(signal.name, true) == requested) {
+                LuauLanguage::push_variant(L, Signal(object, signal.name));
+                return 1;
+            }
+        }
+    }
     List<MethodInfo> methods;
-    self->get_method_list(&methods);
+    self.get_method_list(&methods);
     for (const MethodInfo &method : methods) {
         if (LuauLanguage::api_name(method.name) == requested) {
             lua_pushstring(L, String(method.name).utf8().get_data());
@@ -78,28 +276,67 @@ int native_index(lua_State *L) {
     return 1;
 }
 int native_newindex(lua_State *L) {
-    Variant *self = variant_at(L, 1);
+    Variant self = variant_at(L, 1);
+    if (lua_type(L, 2) == LUA_TNUMBER) {
+        bool valid;
+        const Variant key = self.is_array() ? Variant(lua_tointeger(L, 2) - 1) : LuauLanguage::to_variant(L, 2);
+        self.set(key, LuauLanguage::to_variant(L, 3), &valid);
+        if (!valid) luaL_error(L, "Invalid native index assignment");
+        update_variant(L, 1, self);
+        return 0;
+    }
     const String requested = String::utf8(luaL_checkstring(L, 2));
     List<PropertyInfo> properties;
-    self->get_property_list(&properties);
+    self.get_property_list(&properties);
     for (const PropertyInfo &property : properties) {
         if (LuauLanguage::api_name(property.name, true) == requested) {
             bool valid;
-            self->set_named(property.name, LuauLanguage::to_variant(L, 3), valid);
+            self.set_named(property.name, native_argument(L, 3, property.type), valid);
             if (!valid) luaL_error(L, "Invalid native property assignment");
+            update_variant(L, 1, self);
             return 0;
         }
     }
+    if (self.get_type() == Variant::DICTIONARY) {
+        Dictionary dictionary = self;
+        dictionary[requested] = LuauLanguage::to_variant(L, 3);
+        update_variant(L, 1, dictionary);
+        return 0;
+    }
     luaL_error(L, "Unknown native property '%s'", requested.utf8().get_data());
+}
+int native_property_get(lua_State *L) {
+    lua_getfield(L, 1, "_native");
+    Variant owner = variant_at(L, -1);
+    bool valid;
+    LuauLanguage::push_variant(L, owner.get_named(String::utf8(lua_tostring(L, lua_upvalueindex(1))), valid));
+    return 1;
+}
+int native_signal_get(lua_State *L) {
+    lua_getfield(L, 1, "_native");
+    const Variant owner = variant_at(L, -1);
+    Object *object = owner;
+    if (object == nullptr) luaL_error(L, "The native object has been freed");
+    LuauLanguage::push_variant(L, Signal(object, String::utf8(lua_tostring(L, lua_upvalueindex(1)))));
+    return 1;
+}
+int native_property_set(lua_State *L) {
+    const Variant value = LuauLanguage::to_variant(L, 3);
+    lua_getfield(L, 1, "_native");
+    Variant owner = variant_at(L, -1);
+    bool valid;
+    owner.set_named(String::utf8(lua_tostring(L, lua_upvalueindex(1))), value, valid);
+    if (!valid) luaL_error(L, "Invalid native property assignment");
+    return 0;
 }
 int native_construct(lua_State *L) {
     const Variant::Type type = Variant::Type(lua_tointeger(L, lua_upvalueindex(1)));
-    const int count = lua_gettop(L);
+    const int count = lua_gettop(L) - 1;
     Vector<Variant> values;
     Vector<const Variant *> pointers;
     values.resize(count);
     pointers.resize(count);
-    for (int i = 0; i < count; ++i) { values.write[i] = LuauLanguage::to_variant(L, i + 1); pointers.write[i] = &values[i]; }
+    for (int i = 0; i < count; ++i) { values.write[i] = native_argument(L, i + 2, type >= Variant::ARRAY ? type : Variant::NIL); pointers.write[i] = &values[i]; }
     Variant value;
     Callable::CallError error;
     Variant::construct(type, value, pointers.ptrw(), count, error);
@@ -118,20 +355,36 @@ int native_operator(lua_State *L) {
 }
 int native_new(lua_State *L) {
     const StringName name = String::utf8(luaL_checkstring(L, 1));
-    Object *object = ClassDB::instantiate(name);
+    auto language = LuauLanguage::get_singleton();
+    Object *object = language->construction_owner != nullptr ? language->construction_owner : ClassDB::instantiate(name);
     if (object == nullptr) luaL_error(L, "Cannot instantiate native class '%s'", String(name).utf8().get_data());
-    LuauLanguage::push_variant(L, object);
+    if (language->construction_owner != nullptr) push_owner(L, object);
+    else LuauLanguage::push_variant(L, object);
     return 1;
 }
 int native_global(lua_State *L) {
     const StringName name = String::utf8(luaL_checkstring(L, 2));
-    if (!ClassDB::class_exists(name)) { lua_pushnil(L); return 1; }
     auto language = LuauLanguage::get_singleton();
+    if (!ClassDB::class_exists(name)) {
+        if (ScriptServer::is_global_class(name)) {
+            const String path = ScriptServer::get_global_class_path(name);
+            const Ref<LuauScript> script = ResourceLoader::load(path, "LuauScript");
+            if (script.is_valid() && script->get_class_reference() != LUA_NOREF) {
+                language->module_resources.insert(path, script);
+                lua_getref(L, script->get_class_reference());
+                lua_Debug debug = {};
+                lua_getinfo(L, 1, "s", &debug);
+                if (debug.source != nullptr) record_dependency(language, String::utf8(debug.source).trim_prefix("@"), path);
+                return 1;
+            }
+        }
+        lua_pushnil(L); return 1;
+    }
     if (language->ensure_native_class(name) != OK) luaL_error(L, "%s", language->last_error.utf8().get_data());
     lua_getglobal(L, String(name).utf8().get_data());
     return 1;
 }
-int native_tostring(lua_State *L) { lua_pushstring(L, String(*variant_at(L, 1)).utf8().get_data()); return 1; }
+int native_tostring(lua_State *L) { lua_pushstring(L, String(variant_at(L, 1)).utf8().get_data()); return 1; }
 int ludot_print(lua_State *L) {
     String message;
     const int count = lua_gettop(L);
@@ -153,16 +406,22 @@ int ludot_require(lua_State *L) {
     String from = debug.source != nullptr ? String::utf8(debug.source).trim_prefix("@") : "res://";
     const String path = language->resolve_module(requested, from);
     if (path.is_empty()) luaL_error(L, "Cannot resolve module '%s'", requested.utf8().get_data());
-    language->module_dependents[path].insert(from);
+    record_dependency(language, from, path);
     if (const int *cached = language->module_cache.getptr(path)) { lua_getref(L, *cached); return 1; }
     if (language->loading.has(path)) luaL_error(L, "Cyclic import of '%s'", path.utf8().get_data());
     language->loading.insert(path);
     Error error;
-    const Ref<FileAccess> file = FileAccess::open(path, FileAccess::READ, &error);
-    String module_source;
-    if (error == OK) module_source = file->get_as_text();
-    for (LuauScript *script : language->scripts) if (script->get_path() == path) module_source = script->get_source_code();
-    if (error == OK) error = language->load_chunk(module_source, path, L);
+    Ref<LuauScript> module = ResourceLoader::load(path, "LuauScript", ResourceFormatLoader::CACHE_MODE_REUSE, &error);
+    if (error == OK && module.is_valid() && module->get_class_reference() != LUA_NOREF) {
+        lua_getref(L, module->get_class_reference());
+        language->module_resources.insert(path, module);
+        language->loading.erase(path);
+        language->module_cache.insert(path, lua_ref(L, -1));
+        return 1;
+    }
+    if (error == OK && module.is_valid()) error = language->load_chunk(module->get_source_code(), path, L);
+    else { language->last_error = "Cannot load module '" + path + "'"; error = ERR_CANT_OPEN; }
+    ModuleEvaluation evaluation(language, path);
     if (error == OK && lua_pcall(L, 0, 1, 0) != LUA_OK) {
         language->last_error = String::utf8(lua_tostring(L, -1));
         lua_pop(L, 1);
@@ -170,6 +429,7 @@ int ludot_require(lua_State *L) {
     }
     language->loading.erase(path);
     if (error != OK) luaL_error(L, "%s", language->last_error.utf8().get_data());
+    evaluation.committed = true;
     const int ref = lua_ref(L, -1);
     language->module_cache.insert(path, ref);
     return 1;
@@ -196,7 +456,7 @@ Variant constant_default(Luau::AstExpr *expr) {
 String LuauLanguage::api_name(const String &p_name, bool p_property) {
     const bool internal = p_name.begins_with("_");
     const String body = internal ? p_name.substr(1) : p_name;
-    const String renamed = p_property ? body.to_pascal_case() : body.to_camel_case();
+    const String renamed = p_property && !internal ? body.to_pascal_case() : body.to_camel_case();
     return internal ? "_" + renamed : renamed;
 }
 void LuauLanguage::push_variant(lua_State *L, const Variant &p_value) {
@@ -211,7 +471,7 @@ void LuauLanguage::push_variant(lua_State *L, const Variant &p_value) {
         }
         default: break;
     }
-    new (lua_newuserdatadtor(L, sizeof(Variant), destroy_variant)) Variant(p_value);
+    new (lua_newuserdatadtor(L, sizeof(NativeValue), destroy_variant)) NativeValue{p_value, ObjectID()};
     luaL_getmetatable(L, VARIANT_META);
     lua_setmetatable(L, -2);
 }
@@ -222,10 +482,11 @@ Variant LuauLanguage::to_variant(lua_State *L, int p_index, int p_depth) {
         case LUA_TBOOLEAN: return bool(lua_toboolean(L, p_index));
         case LUA_TNUMBER: return lua_tonumber(L, p_index);
         case LUA_TSTRING: { size_t size; const char *text = lua_tolstring(L, p_index, &size); return String::utf8(text, size); }
-        case LUA_TUSERDATA: return *variant_at(L, p_index);
+        case LUA_TFUNCTION: return ludot_callable(L, p_index);
+        case LUA_TUSERDATA: return variant_at(L, p_index);
         case LUA_TOBJECT: {
             lua_getfield(L, p_index, "_native");
-            Variant result = lua_isuserdata(L, -1) ? *variant_at(L, -1) : Variant();
+            Variant result = lua_isuserdata(L, -1) ? variant_at(L, -1) : Variant();
             lua_pop(L, 1);
             return result;
         }
@@ -243,32 +504,41 @@ Variant LuauLanguage::to_variant(lua_State *L, int p_index, int p_depth) {
     }
 }
 namespace {
-void debug_step(lua_State *L, lua_Debug *unused) {
+void debug_step(lua_State *L, lua_Debug *) {
     auto debugger = EngineDebugger::get_script_debugger();
-    if (debugger == nullptr || debugger->is_skipping_breakpoints()) return;
+    if (debugger == nullptr) return;
     lua_Debug info = {};
-    if (lua_getinfo(L, 0, "sl", &info) == 0 || info.source == nullptr) return;
-    const String source = String::utf8(info.source).trim_prefix("@");
-    static thread_local String previous_source;
-    static thread_local int previous_line = -1;
-    static thread_local int previous_depth = 0;
+    if (!lua_getinfo(L, 0, "slp", &info) || info.currentline <= 0) return;
+    const String source = String::utf8(info.source != nullptr ? info.source : "").trim_prefix("@");
+    if (source.begins_with("native/")) return;
+    auto language = LuauLanguage::get_singleton();
     const int depth = lua_stackdepth(L);
-    if (debugger->get_depth() >= 0 && debugger->get_lines_left() > 0) debugger->set_depth(debugger->get_depth() + depth - previous_depth);
-    previous_depth = depth;
-    if (source == previous_source && info.currentline == previous_line) return;
-    previous_source = source;
-    previous_line = info.currentline;
+    auto &cursor = language->debug_cursors[L];
+    const void *pc = L->ci->savedpc;
+    const bool same_line = source == cursor.source && info.currentline == cursor.line && depth == cursor.depth && info.protoid == cursor.prototype && uintptr_t(pc) > uintptr_t(cursor.pc);
+    const int previous_depth = cursor.pc != nullptr ? cursor.depth : depth;
+    if (debugger->get_depth() >= 0 && debugger->get_lines_left() > 0 && (language->stepping_state == nullptr || language->stepping_state == L))
+        debugger->set_depth(debugger->get_depth() + depth - previous_depth);
+    cursor = {source, info.currentline, depth, info.protoid, pc};
+    if (same_line) return;
     bool stepping = false;
-    if (debugger->get_lines_left() > 0 && debugger->get_depth() <= 0) {
+    if (debugger->get_lines_left() > 0 && debugger->get_depth() <= 0 && (debugger->get_depth() < 0 || language->stepping_state == nullptr || language->stepping_state == L)) {
         debugger->set_lines_left(debugger->get_lines_left() - 1);
         stepping = debugger->get_lines_left() == 0;
     }
     if (stepping || debugger->is_breakpoint(info.currentline, source)) {
-        auto language = LuauLanguage::get_singleton();
         language->debug_state = L;
+        language->stepping_state = L;
         debugger->debug(language, true);
+        if (debugger->get_lines_left() < 0) language->stepping_state = nullptr;
         language->debug_state = nullptr;
     }
+}
+void debug_thread(lua_State *parent, lua_State *thread) {
+    if (parent != nullptr) return;
+    auto language = LuauLanguage::get_singleton();
+    language->debug_cursors.erase(thread);
+    if (language->stepping_state == thread) language->stepping_state = nullptr;
 }
 void debug_error(lua_State *L) {
     auto debugger = EngineDebugger::get_script_debugger();
@@ -281,16 +551,21 @@ void debug_error(lua_State *L) {
 }
 }
 void LuauLanguage::init() {
+    static uint64_t next_generation = 0;
+    generation = ++next_generation;
     state = luaL_newstate();
     luaL_openlibs(state);
     if (EngineDebugger::is_active()) {
         lua_callbacks(state)->debugstep = debug_step;
+        lua_callbacks(state)->userthread = debug_thread;
         lua_callbacks(state)->debugprotectederror = debug_error;
         lua_singlestep(state, true);
     }
     luaL_newmetatable(state, VARIANT_META);
     lua_pushcfunction(state, native_index, "native index"); lua_setfield(state, -2, "__index");
     lua_pushcfunction(state, native_newindex, "native assignment"); lua_setfield(state, -2, "__newindex");
+    lua_pushcfunction(state, native_length, "native collection length"); lua_setfield(state, -2, "__len");
+    lua_pushcfunction(state, native_iterate, "native collection iteration"); lua_setfield(state, -2, "__iter");
     lua_pushcfunction(state, native_tostring, "native string"); lua_setfield(state, -2, "__tostring");
     const char *operators[] = {"__add", "__sub", "__mul", "__div", "__unm", "__eq", "__lt", "__le"};
     const Variant::Operator operation[] = {Variant::OP_ADD, Variant::OP_SUBTRACT, Variant::OP_MULTIPLY, Variant::OP_DIVIDE, Variant::OP_NEGATE, Variant::OP_EQUAL, Variant::OP_LESS, Variant::OP_LESS_EQUAL};
@@ -303,22 +578,49 @@ void LuauLanguage::init() {
     lua_pushcfunction(state, ludot_print, "print"); lua_setglobal(state, "print");
     lua_pushcfunction(state, ludot_require, "require"); lua_setglobal(state, "require");
     for (int i = Variant::VECTOR2; i < Variant::VARIANT_MAX; ++i) {
+        if (i == Variant::OBJECT) continue;
+        const auto type = Variant::Type(i);
+        lua_newtable(state);
+        List<StringName> constants;
+        Variant::get_constants_for_type(type, &constants);
+        for (const StringName &constant : constants) {
+            push_variant(state, Variant::get_constant_value(type, constant));
+            lua_setfield(state, -2, api_name(constant, true).utf8().get_data());
+        }
+        List<StringName> methods;
+        Variant::get_builtin_method_list(type, &methods);
+        for (const StringName &method : methods) {
+            if (!Variant::is_builtin_method_static(type, method)) continue;
+            lua_pushinteger(state, i);
+            lua_pushstring(state, String(method).utf8().get_data());
+            lua_pushcclosure(state, native_static_call, "native static method", 2);
+            lua_setfield(state, -2, api_name(method).utf8().get_data());
+        }
+        lua_newtable(state);
         lua_pushinteger(state, i);
         lua_pushcclosure(state, native_construct, "native constructor", 1);
-        lua_setglobal(state, Variant::get_type_name(Variant::Type(i)).utf8().get_data());
+        lua_setfield(state, -2, "__call");
+        lua_setmetatable(state, -2);
+        lua_setreadonly(state, -1, true);
+        lua_setglobal(state, Variant::get_type_name(type).utf8().get_data());
     }
     List<Engine::Singleton> singletons;
     Engine::get_singleton()->get_singletons(&singletons);
     for (const auto &entry : singletons) { push_variant(state, entry.ptr); lua_setglobal(state, String(entry.name).utf8().get_data()); }
     GLOBAL_DEF("luau/modules/aliases", Dictionary());
+    GLOBAL_DEF("luau/editor/require_autocomplete", true);
 }
 void LuauLanguage::finish() {
 #ifdef TOOLS_ENABLED
     ludot_clear_analysis();
 #endif
     module_cache.clear();
+    module_resources.clear();
     module_dependents.clear();
+    module_dependencies.clear();
     native_classes.clear();
+    debug_cursors.clear();
+    stepping_state = nullptr;
     if (state != nullptr) { lua_State *closing = state; state = nullptr; lua_close(closing); }
 }
 Error LuauLanguage::load_chunk(const String &p_source, const String &p_path, lua_State *p_state) {
@@ -326,7 +628,8 @@ Error LuauLanguage::load_chunk(const String &p_source, const String &p_path, lua
     const CharString source = p_source.utf8();
     Luau::CompileOptions options;
     options.debugLevel = 2;
-    options.optimizationLevel = 1;
+    // Optimization folds constant locals out of registers, hiding them from the debugger.
+    options.optimizationLevel = EngineDebugger::is_active() ? 0 : 1;
     const std::string bytecode = Luau::compile(std::string(source.get_data(), source.length()), options);
     if (luau_load(L, ("@" + p_path).utf8().get_data(), bytecode.data(), bytecode.size(), 0) != 0) {
         last_error = String::utf8(lua_tostring(L, -1));
@@ -346,26 +649,47 @@ HashSet<String> LuauLanguage::invalidate_modules(const String &p_path) {
         affected.insert(path);
         if (const auto *dependents = module_dependents.getptr(path)) for (const String &dependent : *dependents) pending.push_back(dependent);
         if (const int *ref = module_cache.getptr(path)) { lua_unref(state, *ref); module_cache.erase(path); }
+        module_resources.erase(path);
     }
     return affected;
+}
+Dictionary LuauLanguage::module_aliases(const String &p_from) const {
+    Dictionary aliases;
+    const Dictionary project_aliases = GLOBAL_GET("luau/modules/aliases");
+    for (const Variant &key : project_aliases.keys()) {
+        const String target = project_aliases[key];
+        aliases[String(key).to_lower()] = target.begins_with("res://") ? target : String("res://").path_join(target).simplify_path();
+    }
+    Vector<String> directories;
+    String directory = p_from.get_base_dir();
+    while (directory.begins_with("res://")) {
+        directories.push_back(directory);
+        if (directory == "res://") break;
+        directory = directory.get_base_dir();
+    }
+    for (int i = directories.size() - 1; i >= 0; --i) {
+        const String config_path = directories[i].path_join(".luaurc");
+        if (!FileAccess::exists(config_path)) continue;
+        const Variant parsed = JSON::parse_string(FileAccess::get_file_as_string(config_path));
+        if (parsed.get_type() != Variant::DICTIONARY) continue;
+        const Dictionary config = parsed;
+        if (!config.has("aliases")) continue;
+        const Dictionary configured = config["aliases"];
+        for (const Variant &key : configured.keys()) {
+            const String target = configured[key];
+            aliases[String(key).to_lower()] = target.begins_with("res://") ? target : directories[i].path_join(target).simplify_path();
+        }
+    }
+    return aliases;
 }
 String LuauLanguage::resolve_module(const String &p_requested, const String &p_from) const {
     String path;
     if (p_requested.begins_with("@")) {
         const int slash = p_requested.find("/");
-        const String alias = p_requested.substr(1, slash == -1 ? p_requested.length() - 1 : slash - 1);
-        const Dictionary project_aliases = GLOBAL_GET("luau/modules/aliases");
-        Dictionary aliases = project_aliases.duplicate();
-        if (FileAccess::exists("res://.luaurc")) {
-            const Variant parsed = JSON::parse_string(FileAccess::get_file_as_string("res://.luaurc"));
-            if (parsed.get_type() == Variant::DICTIONARY) {
-                const Dictionary config = parsed;
-                if (config.has("aliases")) { const Dictionary user_aliases = config["aliases"]; aliases.merge(user_aliases, true); }
-            }
-        }
+        const String alias = p_requested.substr(1, slash == -1 ? p_requested.length() - 1 : slash - 1).to_lower();
+        const Dictionary aliases = module_aliases(p_from);
         if (!aliases.has(alias)) return "";
         path = String(aliases[alias]);
-        if (!path.begins_with("res://")) path = String("res://").path_join(path);
         if (slash != -1) path = path.path_join(p_requested.substr(slash + 1));
     } else if (p_requested.begins_with("./") || p_requested.begins_with("../")) {
         path = p_from.get_base_dir().path_join(p_requested);
@@ -389,6 +713,21 @@ Error LuauLanguage::ensure_native_class(const StringName &p_name) {
         const String name = api_name(property.name, true);
         if (!String(property.name).contains("/") && name.is_valid_ascii_identifier() && names.insert(name).second) source += " public " + name + "\n";
     }
+    List<MethodInfo> signals;
+    ClassDB::get_signal_list(p_name, &signals);
+    for (const auto &signal : signals) {
+        const String name = api_name(signal.name, true);
+        if (name.is_valid_ascii_identifier() && names.insert(name).second) source += " public " + name + "\n";
+    }
+    List<String> constants;
+    ClassDB::get_integer_constant_list(p_name, &constants);
+    HashMap<String, int64_t> constant_values;
+    for (const String &constant : constants) {
+        const String name = api_name(constant, true);
+        if (!name.is_valid_ascii_identifier() || !names.insert(name).second) continue;
+        source += " public function " + name + "(self) end\n";
+        constant_values.insert(name, ClassDB::get_integer_constant(p_name, constant));
+    }
     List<MethodInfo> methods;
     ClassDB::get_method_list(p_name, &methods);
     for (const auto &method : methods) {
@@ -400,6 +739,39 @@ Error LuauLanguage::ensure_native_class(const StringName &p_name) {
     const Error error = load_chunk(source, "native/" + String(p_name));
     if (error != OK) return error;
     if (lua_pcall(state, 0, 1, 0) != LUA_OK) { last_error = String::utf8(lua_tostring(state, -1)); lua_pop(state, 1); return ERR_SCRIPT_FAILED; }
+    for (const auto &constant : constant_values) {
+        lua_pushnumber(state, constant.value);
+        lua_setclassmember(state, -2, constant.key.utf8().get_data());
+    }
+    for (const auto &method : methods) {
+        if ((method.flags & METHOD_FLAG_STATIC) == 0) continue;
+        const String name = api_name(method.name);
+        if (!name.is_valid_ascii_identifier() || name.begins_with("__")) continue;
+        lua_pushstring(state, String(p_name).utf8().get_data());
+        lua_pushstring(state, String(method.name).utf8().get_data());
+        lua_pushcclosure(state, native_static_call, "native static method", 2);
+        lua_setclassmember(state, -2, name.utf8().get_data());
+    }
+    lua_newtable(state);
+    lua_newtable(state);
+    for (const auto &signal : signals) {
+        const String name = api_name(signal.name, true);
+        if (!name.is_valid_ascii_identifier()) continue;
+        lua_pushstring(state, String(signal.name).utf8().get_data());
+        lua_pushcclosure(state, native_signal_get, "native signal", 1);
+        lua_setfield(state, -3, name.utf8().get_data());
+    }
+    for (const auto &property : properties) {
+        const String name = api_name(property.name, true);
+        if (String(property.name).contains("/") || !name.is_valid_ascii_identifier()) continue;
+        lua_pushstring(state, String(property.name).utf8().get_data());
+        lua_pushcclosure(state, native_property_get, "native property getter", 1);
+        lua_setfield(state, -3, name.utf8().get_data());
+        lua_pushstring(state, String(property.name).utf8().get_data());
+        lua_pushcclosure(state, native_property_set, "native property setter", 1);
+        lua_setfield(state, -2, name.utf8().get_data());
+    }
+    lua_setclassaccessors(state, -3);
     lua_setglobal(state, String(p_name).utf8().get_data());
     native_classes.insert(p_name);
     return OK;
@@ -444,6 +816,7 @@ Array LuauScript::get_diagnostics() const {
 Error LuauScript::reload(bool p_keep_state) {
     auto language = LuauLanguage::get_singleton();
     MutexLock lock(language->mutex);
+    const bool was_valid = valid;
     const CharString text = source.utf8();
     Luau::Allocator allocator;
     Luau::AstNameTable names(allocator);
@@ -455,34 +828,56 @@ Error LuauScript::reload(bool p_keep_state) {
     }
     Luau::AstStatClass *declaration = nullptr;
     for (auto stat : parsed.root->body) if (auto cls = stat->as<Luau::AstStatClass>()) declaration = cls;
-    if (declaration == nullptr || declaration->super == nullptr ||
-        (declaration->super->is<Luau::AstExprGlobal>() && !ClassDB::class_exists(String::utf8(declaration->super->as<Luau::AstExprGlobal>()->name.value)))) {
+    if (declaration == nullptr) {
         const Error error = language->load_chunk(source, get_path());
         if (error != OK) return error;
         lua_pop(language->state, 1);
-        const auto affected = language->invalidate_modules(get_path());
+        const auto affected = was_valid ? language->invalidate_modules(get_path()) : HashSet<String>();
         valid = true;
         for (LuauScript *dependent : language->scripts) {
             if (dependent != this && dependent->can_instantiate() && affected.has(dependent->get_path())) dependent->reload(true);
         }
         return OK;
     }
-    if (declaration->super == nullptr || declaration->super->is<Luau::AstExprGlobal>() == false) {
-        language->last_error = "An attached class must extend a native engine class";
-        return ERR_INVALID_DATA;
-    }
     const StringName new_name = String::utf8(declaration->name->name.value);
-    const auto super = declaration->super != nullptr ? declaration->super->as<Luau::AstExprGlobal>() : nullptr;
-    const StringName new_base = super != nullptr ? StringName(String::utf8(super->name.value)) : StringName("RefCounted");
-    Error error = language->ensure_native_class(new_base);
-    if (error != OK) { ERR_PRINT(language->last_error); return error; }
-    error = language->load_chunk(source + "\nreturn " + String(new_name), get_path());
+    const bool has_return = parsed.root->body.size > 0 && parsed.root->body.data[parsed.root->body.size - 1]->is<Luau::AstStatReturn>();
+    Error error = language->load_chunk(source + (has_return ? String() : "\nreturn " + String(new_name)), get_path());
     if (error != OK) { ERR_PRINT(language->last_error); return error; }
     lua_State *L = language->state;
+    ModuleEvaluation evaluation(language, get_path());
     if (lua_pcall(L, 0, 1, 0) != LUA_OK) {
         language->last_error = String::utf8(lua_tostring(L, -1)); lua_pop(L, 1);
         ERR_PRINT(language->last_error);
         return ERR_SCRIPT_FAILED;
+    }
+    if (!lua_isclass(L, -1)) {
+        lua_pop(L, 1);
+        evaluation.committed = true;
+        valid = true;
+        return OK;
+    }
+    StringName new_base;
+    Ref<LuauScript> new_base_script;
+    const auto *next_type = static_cast<const LuauClass *>(lua_topointer(L, -1));
+    for (const LuauClass *parent = next_type->super; parent != nullptr; parent = parent->super) {
+        const StringName name = String::utf8(getstr(parent->name));
+        if (language->native_classes.has(name)) { new_base = name; break; }
+        if (new_base_script.is_null()) {
+            for (LuauScript *candidate : language->scripts) {
+                if (candidate == this || candidate->class_ref == LUA_NOREF) continue;
+                lua_getref(L, candidate->class_ref);
+                const bool matches = lua_topointer(L, -1) == parent;
+                lua_pop(L, 1);
+                if (matches) { new_base_script = Ref<LuauScript>(candidate); break; }
+            }
+        }
+    }
+    for (LuauScriptInstance *instance : instances) {
+        if (new_base.is_empty() || !instance->owner->is_class(new_base)) {
+            lua_pop(L, 1);
+            language->last_error = "The new base class is incompatible with an existing native owner";
+            return ERR_INVALID_DATA;
+        }
     }
     const int next_class = lua_ref(L, -1);
     lua_pop(L, 1);
@@ -490,13 +885,17 @@ Error LuauScript::reload(bool p_keep_state) {
     HashMap<LuauScriptInstance *, int> replacements;
     for (LuauScriptInstance *instance : instances) {
         lua_getref(L, next_class);
-        if (lua_pcall(L, 0, 1, 0) != LUA_OK) {
+        Object *previous_owner = language->construction_owner;
+        language->construction_owner = instance->owner;
+        const int construction_status = lua_pcall(L, 0, 1, 0);
+        language->construction_owner = previous_owner;
+        if (construction_status != LUA_OK) {
             language->last_error = String::utf8(lua_tostring(L, -1)); lua_pop(L, 1);
             for (const auto &replacement : replacements) lua_unref(L, replacement.value);
             lua_unref(L, next_class);
             return ERR_SCRIPT_FAILED;
         }
-        language->push_variant(L, instance->owner);
+        push_owner(L, instance->owner);
         lua_setfield(L, -2, "_native");
         const int next_object = lua_ref(L, -1);
         lua_pop(L, 1);
@@ -505,7 +904,10 @@ Error LuauScript::reload(bool p_keep_state) {
             for (const PropertyInfo &property : properties) {
                 // A removed property is intentionally dropped during reload.
                 bool remains = false;
-                for (const auto &member : declaration->members) if (const auto prop = Luau::get_if<Luau::AstClassProperty>(&member)) if (String::utf8(prop->name.value) == String(property.name)) remains = true;
+                for (const auto &member : declaration->members) if (const auto prop = Luau::get_if<Luau::AstClassProperty>(&member)) if (String::utf8(prop->name.value) == String(property.name) && property_types.has(property.name) && annotation_key(prop->ty) == property_types[property.name]) remains = true;
+                if (!remains && new_base_script.is_valid()) {
+                    for (const PropertyInfo &inherited : new_base_script->properties) if (inherited.name == property.name && new_base_script->property_types.has(property.name) && property_types.has(property.name) && new_base_script->property_types[property.name] == property_types[property.name]) remains = true;
+                }
                 if (!remains) continue;
                 lua_getref(L, next_object);
                 lua_getref(L, instance->object_ref);
@@ -520,7 +922,14 @@ Error LuauScript::reload(bool p_keep_state) {
     class_ref = next_class;
     class_name = new_name;
     base_type = new_base;
-    methods.clear(); properties.clear(); defaults.clear();
+    base_script = new_base_script;
+    methods.clear(); properties.clear(); defaults.clear(); property_types.clear();
+    if (base_script.is_valid()) {
+        methods = base_script->methods;
+        properties = base_script->properties;
+        defaults = base_script->defaults;
+        property_types = base_script->property_types;
+    }
     for (const auto &member : declaration->members) {
         if (const auto property = Luau::get_if<Luau::AstClassProperty>(&member)) {
             PropertyInfo info(annotation_type(property->ty), String::utf8(property->name.value));
@@ -531,6 +940,7 @@ Error LuauScript::reload(bool p_keep_state) {
                 if (property->rangeStep != nullptr) info.hint_string += "," + String(constant_default(property->rangeStep));
             }
             properties.push_back(info);
+            property_types.insert(info.name, annotation_key(property->ty));
             defaults.insert(info.name, constant_default(property->defaultValue));
         } else if (const auto method = Luau::get_if<Luau::AstClassMethod>(&member)) {
             MethodInfo info(String::utf8(method->functionName.value));
@@ -541,9 +951,23 @@ Error LuauScript::reload(bool p_keep_state) {
             methods.insert(info.name, info);
         }
     }
-    for (const auto &replacement : replacements) { lua_unref(L, replacement.key->object_ref); replacement.key->object_ref = replacement.value; }
+    for (const auto &replacement : replacements) {
+        lua_getref(L, replacement.key->object_ref);
+        lua_getref(L, replacement.value);
+        lua_migrateobject(L, -2, -1);
+        lua_pop(L, 2);
+        lua_unref(L, replacement.value);
+    }
+    evaluation.committed = true;
     valid = true;
     emit_changed();
+    if (was_valid) {
+        const auto affected = language->invalidate_modules(get_path());
+        Vector<Ref<LuauScript>> dependents;
+        for (LuauScript *dependent : language->scripts)
+            if (dependent != this && dependent->can_instantiate() && affected.has(dependent->get_path())) dependents.push_back(Ref<LuauScript>(dependent));
+        for (const auto &dependent : dependents) dependent->reload(true);
+    }
     return OK;
 }
 bool LuauScript::has_method(const StringName &p_method) const { return methods.has(p_method) || methods.has(LuauLanguage::api_name(p_method)); }
@@ -575,13 +999,17 @@ LuauScriptInstance::LuauScriptInstance(Object *p_owner, const Ref<LuauScript> &p
     MutexLock lock(language->mutex);
     lua_State *L = language->state;
     lua_getref(L, script->class_ref);
-    if (lua_pcall(L, 0, 1, 0) != LUA_OK) {
+    Object *previous_owner = language->construction_owner;
+    language->construction_owner = owner;
+    const int construction_status = lua_pcall(L, 0, 1, 0);
+    language->construction_owner = previous_owner;
+    if (construction_status != LUA_OK) {
         language->last_error = String::utf8(lua_tostring(L, -1)); lua_pop(L, 1);
         ERR_PRINT(language->last_error);
         return;
     }
     // Each object keeps its native owner; engine calls still use the original API.
-    language->push_variant(L, owner);
+    push_owner(L, owner);
     lua_setfield(L, -2, "_native");
     object_ref = lua_ref(L, -1); lua_pop(L, 1);
     script->instances.insert(this);
@@ -612,9 +1040,9 @@ bool LuauScriptInstance::get(const StringName &p_name, Variant &r_value) const {
     MutexLock lock(language->mutex);
     lua_getref(language->state, object_ref);
     lua_getfield(language->state, -1, String(p_name).utf8().get_data());
-    r_value = language->to_variant(language->state, -1);
+    const bool converted = try_variant(language->state, -1, r_value);
     lua_pop(language->state, 2);
-    return true;
+    return converted;
 }
 Variant::Type LuauScriptInstance::get_property_type(const StringName &p_name, bool *r_valid) const {
     for (const PropertyInfo &property : script->properties) if (property.name == p_name) { if (r_valid != nullptr) *r_valid = true; return property.type; }
@@ -629,18 +1057,7 @@ Variant LuauScriptInstance::callp(const StringName &p_method, const Variant **p_
     lua_State *L = language->state;
     const int top = lua_gettop(L);
     const String method = script->methods.has(p_method) ? String(p_method) : LuauLanguage::api_name(p_method);
-    List<PropertyInfo> native_properties;
-    ClassDB::get_property_list(owner->get_class_name(), &native_properties);
-    HashMap<StringName, Variant> before;
     lua_getref(L, object_ref);
-    for (const PropertyInfo &property : native_properties) {
-        const String name = LuauLanguage::api_name(property.name, true);
-        if (!name.is_valid_ascii_identifier() || String(property.name).contains("/")) continue;
-        const Variant value = owner->get(property.name);
-        before.insert(property.name, value);
-        language->push_variant(L, value);
-        lua_setfield(L, -2, name.utf8().get_data());
-    }
     lua_getfield(L, -1, method.utf8().get_data());
     lua_pushvalue(L, -2);
     for (int i = 0; i < p_count; ++i) language->push_variant(L, *p_args[i]);
@@ -650,13 +1067,12 @@ Variant LuauScriptInstance::callp(const StringName &p_method, const Variant **p_
         lua_settop(L, top);
         return {};
     }
-    const Variant result = language->to_variant(L, -1);
-    lua_pop(L, 1);
-    for (const auto &property : before) {
-        lua_getfield(L, -1, LuauLanguage::api_name(property.key, true).utf8().get_data());
-        const Variant after = language->to_variant(L, -1);
-        lua_pop(L, 1);
-        if (after != property.value) owner->set(property.key, after);
+    Variant result;
+    if (!try_variant(L, -1, result)) {
+        ERR_PRINT(get_script()->get_path() + ": " + language->last_error);
+        lua_settop(L, top);
+        r_error.error = Callable::CallError::CALL_ERROR_INVALID_ARGUMENT;
+        return {};
     }
     lua_settop(L, top);
     r_error.error = Callable::CallError::CALL_OK;
@@ -666,6 +1082,29 @@ void LuauScriptInstance::notification(int p_notification, bool p_reversed) {
     if (has_method("_notification")) { const Variant arg = p_notification; const Variant *args[] = {&arg}; Callable::CallError error; callp("_notification", args, 1, error); }
 }
 ScriptLanguage *LuauScriptInstance::get_language() { return LuauLanguage::get_singleton(); }
+
+String LuauLanguage::get_global_class_name(const String &p_path, String *r_base_type, String *r_icon_path, bool *r_is_abstract, bool *r_is_tool) const {
+    const CharString source = FileAccess::get_file_as_string(p_path).utf8();
+    Luau::Allocator allocator;
+    Luau::AstNameTable names(allocator);
+    const auto parsed = Luau::Parser::parse(source.get_data(), source.length(), names, allocator);
+    if (!parsed.errors.empty()) return "";
+    String name;
+    for (auto stat : parsed.root->body) {
+        if (auto declaration = stat->as<Luau::AstStatClass>()) {
+            name = String::utf8(declaration->name->name.value);
+            if (r_base_type != nullptr) {
+                if (auto base = declaration->super != nullptr ? declaration->super->as<Luau::AstExprGlobal>() : nullptr) *r_base_type = String::utf8(base->name.value);
+                else if (auto base = declaration->super != nullptr ? declaration->super->as<Luau::AstExprLocal>() : nullptr) *r_base_type = String::utf8(base->local->name.value);
+                else *r_base_type = "RefCounted";
+            }
+        }
+    }
+    if (r_icon_path != nullptr) *r_icon_path = "";
+    if (r_is_abstract != nullptr) *r_is_abstract = false;
+    if (r_is_tool != nullptr) *r_is_tool = false;
+    return name;
+}
 
 Vector<String> LuauLanguage::get_reserved_words() const { return {"and", "break", "continue", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "const", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "class", "extends", "export", "private", "public", "import", "type", "from", "as", "to", "step"}; }
 bool LuauLanguage::validate(const String &p_script, const String &p_path, List<String> *r_functions, List<ScriptError> *r_errors, List<Warning> *r_warnings, HashSet<int> *r_safe_lines) const {
@@ -684,6 +1123,49 @@ bool LuauLanguage::validate(const String &p_script, const String &p_path, List<S
 Error LuauLanguage::complete_code(const String &p_code, const String &p_path, Object *p_owner, List<CodeCompletionOption> *r_options, bool &r_force, String &r_call_hint) {
 #ifdef TOOLS_ENABLED
     r_force = true;
+    if (bool(GLOBAL_GET("luau/editor/require_autocomplete"))) {
+        const int cursor = p_code.find(String::chr(0xffff));
+        if (cursor >= 0) {
+            const String line = p_code.substr(0, cursor).get_slice("\n", p_code.substr(0, cursor).get_slice_count("\n") - 1);
+            const int quote = MAX(line.rfind("\""), line.rfind("'"));
+            if (quote >= 0) {
+                const String before = line.substr(0, quote).strip_edges();
+                if (before.begins_with("import ") || before.ends_with("from") || before.ends_with("require(")) {
+                    const String requested = line.substr(quote + 1);
+                    const Dictionary aliases = module_aliases(p_path);
+                    const int slash = requested.rfind("/");
+                    if (requested.begins_with("@") && slash == -1) {
+                        for (const Variant &key : aliases.keys()) {
+                            const String name = "@" + String(key);
+                            if (name.begins_with(requested.to_lower())) r_options->push_back(CodeCompletionOption(name, CODE_COMPLETION_KIND_FILE_PATH));
+                        }
+                        return OK;
+                    }
+                    const String base = requested.substr(0, slash + 1);
+                    const String tail = requested.substr(slash + 1);
+                    String directory;
+                    if (requested.begins_with("@")) {
+                        const int first = requested.find("/");
+                        const String alias = requested.substr(1, first - 1).to_lower();
+                        if (aliases.has(alias)) directory = String(aliases[alias]).path_join(base.substr(first + 1));
+                    } else directory = p_path.get_base_dir().path_join(base);
+                    const Ref<DirAccess> dir = DirAccess::open(directory);
+                    if (dir.is_valid()) {
+                        dir->list_dir_begin();
+                        for (String entry = dir->get_next(); !entry.is_empty(); entry = dir->get_next()) {
+                            if (entry.begins_with(".")) continue;
+                            const bool folder = dir->current_is_dir();
+                            if (!folder && entry.get_extension() != "luau") continue;
+                            const String name = folder ? entry + "/" : entry.get_basename();
+                            if (name.begins_with(tail)) r_options->push_back(CodeCompletionOption(base + name, CODE_COMPLETION_KIND_FILE_PATH));
+                        }
+                        dir->list_dir_end();
+                    }
+                    return OK;
+                }
+            }
+        }
+    }
     return ludot_complete(p_code, p_path, r_options);
 #else
     return ERR_UNAVAILABLE;
@@ -710,9 +1192,6 @@ int LuauLanguage::debug_get_stack_level_count() const { return state != nullptr 
 int LuauLanguage::debug_get_stack_level_line(int p_level) const { lua_Debug info = {}; return lua_getinfo(debug_state != nullptr ? debug_state : state, p_level, "l", &info) != 0 ? info.currentline : -1; }
 String LuauLanguage::debug_get_stack_level_function(int p_level) const { lua_Debug info = {}; lua_getinfo(debug_state != nullptr ? debug_state : state, p_level, "n", &info); return info.name != nullptr ? String::utf8(info.name) : ""; }
 String LuauLanguage::debug_get_stack_level_source(int p_level) const { lua_Debug info = {}; lua_getinfo(debug_state != nullptr ? debug_state : state, p_level, "s", &info); return info.source != nullptr ? String::utf8(info.source).trim_prefix("@") : ""; }
-void LuauLanguage::debug_get_stack_level_locals(int p_level, List<String> *r_names, List<Variant> *r_values, int p_max_subitems, int p_max_depth) {
-    for (int i = 1;; ++i) { const char *name = lua_getlocal(debug_state != nullptr ? debug_state : state, p_level, i); if (name == nullptr) break; r_names->push_back(String::utf8(name)); r_values->push_back(to_variant(debug_state != nullptr ? debug_state : state, -1)); lua_pop(debug_state != nullptr ? debug_state : state, 1); }
-}
 Ref<Resource> ResourceFormatLoaderLuau::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, CacheMode p_cache_mode) {
     Error error;
     const Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::READ, &error);

@@ -1444,6 +1444,8 @@ void TypeChecker2::visit(const AstTypeList* typeList)
 
 void TypeChecker2::visit(AstStatTypeAlias* stat)
 {
+    if (stat->isImportAlias && module->astResolvedTypes.contains(stat->type))
+        return;
     // We will not visit type aliases that do not have an associated scope,
     // this means that (probably) this was a duplicate type alias or a
     // type alias with an illegal name (like `typeof`).
@@ -1757,6 +1759,8 @@ struct FindUninitializedAccesses : public AstVisitor
     {
         LUAU_ASSERT(FFlag::DebugLuauUserDefinedClasses);
     }
+
+    bool visit(AstExprCall* call) override { return !call->isClassBaseInit; }
 
     bool visit(AstExprLocal* local) override
     {
@@ -2415,6 +2419,7 @@ void TypeChecker2::visitCall(AstExprCall* call)
 
 void TypeChecker2::visit(AstExprCall* call)
 {
+    if (call->isClassBaseInit) return;
     std::optional<InConditionalContext> flipper;
 
     // We want to preserve the existing conditional context if we are in a `typeof` call.

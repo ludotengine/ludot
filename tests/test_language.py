@@ -93,6 +93,14 @@ local d: Female = {Name = "Ada", Age = 30}
 return {a, b, c, d}
 ''', 'luau-analyze')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+    def test_generic_named_type_import(self):
+        self.write('box.luau', 'export type Box<T = number> = {value: T}\nexport type Fn<A...> = (A...) -> ()\nreturn {}')
+        source = '--!strict\nimport type (Box as Container), Fn from "./box"\nlocal a: Container<string> = {value = "ok"}\nlocal b: Container = {value = 42}\nlocal f: Fn<number, string> = function(a: number, b: string) end\nreturn {a, b, f}'
+        result = self.run_luau(source, 'luau-analyze')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = self.run_luau(source.replace('{value = "ok"}', '{value = 42}'), 'luau-analyze')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('TypeError', result.stderr)
     def test_full_type_system_still_checks(self):
         result = self.run_luau('--!strict\ntype Box<T> = {value: T}\nlocal box: Box<number> = {value = "wrong"}\nreturn box', 'luau-analyze')
         self.assertNotEqual(result.returncode, 0)
@@ -102,7 +110,7 @@ return {a, b, c, d}
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('private member', result.stderr)
     def test_inheritance_and_default_captures(self):
-        result = self.run_luau('local value = 7\nclass Base = { public X: number = value }\nclass Child extends Base = { public Y: number = value + 1 }\nlocal child = Child()\nassert(child.Y == 8)')
+        result = self.run_luau('local value = 7\nclass Base = { public X: number = value }\nclass Child extends Base = { public Y: number = value + 1 }\nlocal child = Child()\nassert(child.X == 7)\nassert(child.Y == 8)')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
     def test_class_types(self):
         result = self.run_luau('''--!strict

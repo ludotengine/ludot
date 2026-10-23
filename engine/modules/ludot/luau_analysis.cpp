@@ -39,6 +39,7 @@ struct Session {
     Config configs;
     Luau::Frontend frontend;
     std::unordered_map<std::string, Luau::TypeId> instances;
+    std::unordered_map<std::string, Luau::TypeId> classes;
     explicit Session() : frontend(Luau::SolverMode::New, &files, &configs) {
         using namespace Luau;
         registerBuiltinGlobals(frontend, frontend.globals);
@@ -57,6 +58,7 @@ struct Session {
             TypeId constructor = arena.addType(FunctionType{arena.addTypePack({}, arena.addTypePack(VariadicTypePack{builtins->anyType})), arena.addTypePack({instance})});
             TypeId metatable = arena.addType(TableType{{{"__call", Property::readonly(constructor)}}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
             TypeId cls = arena.addType(ExternType{name, {}, builtins->classType, metatable, {}, nullptr, "ludot", std::nullopt, true});
+            this->classes[name] = cls;
             getMutable<ExternType>(cls)->relation = Obj{instance};
             getMutable<ExternType>(instance)->relation = Klass{cls};
             scope->bindings[frontend.globals.globalNames.names->getOrAdd(name.c_str())] = Binding{cls, Location()};
@@ -65,7 +67,10 @@ struct Session {
         for (const StringName &name : classes) {
             auto object = getMutable<ExternType>(instances.at(utf8(name)));
             const StringName parent = ClassDB::get_parent_class(name);
-            if (instances.count(utf8(parent))) object->parent = instances.at(utf8(parent));
+            if (instances.count(utf8(parent))) {
+                object->parent = instances.at(utf8(parent));
+                getMutable<ExternType>(this->classes.at(utf8(name)))->parent = this->classes.at(utf8(parent));
+            }
             List<PropertyInfo> properties;
             ClassDB::get_property_list(name, &properties, true);
             for (const PropertyInfo &property : properties) {
@@ -76,8 +81,15 @@ struct Session {
             ClassDB::get_method_list(name, &methods, true);
             for (const MethodInfo &method : methods) {
                 const String renamed = LuauLanguage::api_name(method.name);
-                if (renamed.is_valid_ascii_identifier()) object->props[utf8(renamed)] = Property::readonly(function(method, instances.at(utf8(name))));
+                auto target = (method.flags & METHOD_FLAG_STATIC) != 0 ? getMutable<ExternType>(this->classes.at(utf8(name))) : object;
+                if (renamed.is_valid_ascii_identifier()) target->props[utf8(renamed)] = Property::readonly(function(method, instances.at(utf8(name))));
             }
+            List<String> constants;
+            ClassDB::get_integer_constant_list(name, &constants, true);
+            for (const String &constant : constants) getMutable<ExternType>(this->classes.at(utf8(name)))->props[utf8(LuauLanguage::api_name(constant, true))] = Property::readonly(builtins->numberType);
+            List<MethodInfo> signals;
+            ClassDB::get_signal_list(name, &signals, true);
+            for (const auto &signal : signals) object->props[utf8(LuauLanguage::api_name(signal.name, true))] = Property::readonly(instances.at("Signal"));
         }
         for (int i = ::Variant::VECTOR2; i < ::Variant::VARIANT_MAX; ++i) {
             if (i == ::Variant::OBJECT) continue;
@@ -93,7 +105,16 @@ struct Session {
             for (const PropertyInfo &property : properties) object->props[utf8(LuauLanguage::api_name(property.name, true))] = Property::rw(type(property));
             List<MethodInfo> methods;
             value.get_method_list(&methods);
-            for (const MethodInfo &method : methods) object->props[utf8(LuauLanguage::api_name(method.name))] = Property::readonly(function(method, it->second));
+            for (const MethodInfo &method : methods) {
+                auto target = (method.flags & METHOD_FLAG_STATIC) != 0 ? getMutable<ExternType>(this->classes.at(it->first)) : object;
+                target->props[utf8(LuauLanguage::api_name(method.name))] = Property::readonly(function(method, it->second));
+            }
+            List<StringName> constants;
+            ::Variant::get_constants_for_type(::Variant::Type(i), &constants);
+            for (const auto &constant : constants) {
+                const ::Variant value = ::Variant::get_constant_value(::Variant::Type(i), constant);
+                getMutable<ExternType>(this->classes.at(it->first))->props[utf8(LuauLanguage::api_name(constant, true))] = Property::readonly(type(PropertyInfo(value.get_type(), "")));
+            }
             TableType::Props operations;
             for (const char *operation : {"__add", "__sub", "__mul", "__div"}) operations[operation] = Property::readonly(arena.addType(FunctionType{arena.addTypePack({it->second, builtins->anyType}), arena.addTypePack({it->second})}));
             object->metatable = arena.addType(TableType{operations, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
@@ -126,10 +147,13 @@ struct Session {
     Luau::TypeId function(const MethodInfo &method, Luau::TypeId self) {
         using namespace Luau;
         auto &arena = frontend.globals.globalTypes;
-        std::vector<TypeId> arguments{self};
+        const bool is_static = (method.flags & METHOD_FLAG_STATIC) != 0;
+        std::vector<TypeId> arguments;
+        if (!is_static) arguments.push_back(self);
         int index = 0;
         for (const PropertyInfo &arg : method.arguments) {
             TypeId arg_type = type(arg);
+            if (arg.type == ::Variant::CALLABLE) arg_type = arena.addType(UnionType{{arg_type, frontend.builtinTypes->functionType}});
             if (index >= method.arguments.size() - method.default_arguments.size()) arg_type = arena.addType(UnionType{{arg_type, frontend.builtinTypes->nilType}});
             arguments.push_back(arg_type);
             ++index;
@@ -138,7 +162,7 @@ struct Session {
         if ((method.flags & METHOD_FLAG_VARARG) != 0) tail = arena.addTypePack(VariadicTypePack{frontend.builtinTypes->anyType});
         TypePackId returns = method.return_val.type == ::Variant::NIL && (method.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) == 0 ? frontend.builtinTypes->emptyTypePack : arena.addTypePack({type(method.return_val)});
         auto result = arena.addType(FunctionType{arena.addTypePack(arguments, tail), returns});
-        getMutable<FunctionType>(result)->hasSelf = true;
+        getMutable<FunctionType>(result)->hasSelf = !is_static;
         return result;
     }
     std::string update(const String &source, const String &path) {

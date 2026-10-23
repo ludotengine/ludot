@@ -23,4 +23,4 @@ install(DIRECTORY tools/ludot_lsp DESTINATION lib/ludot FILES_MATCHING PATTERN "
 
 install(PROGRAMS tools/ludot-lsp DESTINATION bin)
 
-install(FILES types/core.d.luau DESTINATION share/ludot)
+install(FILES types/core.d.luau types/engine.api DESTINATION share/ludot)

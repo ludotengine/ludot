@@ -11,7 +11,9 @@ struct Diagnostic {
 struct ShaderResult {
     std::string code;
     std::vector<Diagnostic> diagnostics;
+    std::vector<unsigned> sourceLines;
 };
 // Produces Godot shader source. The engine shader compiler performs GPU type checking.
+std::vector<std::string> shaderCompletions();
 ShaderResult compileShader(const std::string& source);
 }

@@ -473,6 +473,7 @@ public:
     AstArray<AstExpr*> args;
     bool self;
     bool tableCall;
+    bool isClassBaseInit = false;
     Location argLocation;
 };
 
@@ -1038,6 +1039,7 @@ public:
     AstArray<AstGenericTypePack*> genericPacks;
     AstType* type;
     bool exported;
+    bool isImportAlias = false;
 };
 
 class AstStatTypeFunction : public AstStat

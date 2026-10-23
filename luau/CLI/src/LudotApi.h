@@ -1,0 +1,113 @@
+// Ludot nominal engine declarations. Licensed under the MIT license.
+#pragma once
+#include "Luau/Frontend.h"
+#include "Luau/Type.h"
+#include "Luau/TypeArena.h"
+#include <sstream>
+#include <unordered_map>
+
+inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source)
+{
+    using namespace Luau;
+    std::istringstream stream(source);
+    std::string line;
+    if (!std::getline(stream, line)) return false;
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (line != "LUDOT_API_1") return false;
+    std::vector<std::vector<std::string>> rows;
+    while (std::getline(stream, line))
+    {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        std::vector<std::string> fields;
+        size_t start = 0;
+        do
+        {
+            size_t end = line.find('\t', start);
+            fields.push_back(line.substr(start, end == std::string::npos ? end : end - start));
+            if (end == std::string::npos) break;
+            start = end + 1;
+        } while (true);
+        rows.push_back(std::move(fields));
+    }
+    auto& arena = frontend.globals.globalTypes;
+    auto scope = frontend.globals.globalScope;
+    auto builtins = frontend.builtinTypes;
+    std::unordered_map<std::string, TypeId> instances, classes;
+    auto bind = [&](const std::string& name, TypeId type) {
+        scope->bindings[frontend.globals.globalNames.names->getOrAdd(name.c_str())] = Binding{type, Location()};
+    };
+    for (const auto& row : rows)
+    {
+        if (row[0] != "C" || row.size() != 4) continue;
+        TypeId instance = arena.addType(ExternType{row[1], {}, std::nullopt, std::nullopt, {}, nullptr, "ludot", std::nullopt});
+        TypeId constructor = arena.addType(FunctionType{arena.addTypePack({}, arena.addTypePack(VariadicTypePack{builtins->anyType})), arena.addTypePack({instance})});
+        TypeId metatable = arena.addType(TableType{{{"__call", Property::readonly(constructor)}}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
+        TypeId cls = arena.addType(ExternType{row[1], {}, builtins->classType, metatable, {}, nullptr, "ludot", std::nullopt, true});
+        getMutable<ExternType>(cls)->relation = Obj{instance};
+        getMutable<ExternType>(instance)->relation = Klass{cls};
+        instances[row[1]] = instance;
+        classes[row[1]] = cls;
+        scope->exportedTypeBindings[row[1]] = TypeFun{{}, {}, instance};
+        bind(row[1], cls);
+    }
+    auto type = [&](auto&& resolve, std::string name) -> TypeId {
+        if (!name.empty() && name.back() == '?')
+        {
+            name.pop_back();
+            return arena.addType(UnionType{{resolve(resolve, name), builtins->nilType}});
+        }
+        if (name == "int" || name == "float") return builtins->numberType;
+        if (name == "bool") return builtins->booleanType;
+        if (name == "String" || name == "StringName" || name == "NodePath") return builtins->stringType;
+        if (name == "Nil") return builtins->nilType;
+        if (name.rfind("enum::", 0) == 0 || name.rfind("bitfield::", 0) == 0) return builtins->numberType;
+        if (name.rfind("typedarray::", 0) == 0) name = "Array";
+        auto it = instances.find(name);
+        return it == instances.end() ? builtins->anyType : it->second;
+    };
+    for (const auto& row : rows)
+    {
+        if (row.size() < 3) continue;
+        auto it = instances.find(row[1]);
+        if (row[0] == "S")
+        {
+            if (instances.count(row[2])) bind(row[1], instances.at(row[2]));
+            continue;
+        }
+        if (it == instances.end()) continue;
+        auto instance = getMutable<ExternType>(it->second);
+        auto cls = getMutable<ExternType>(classes.at(row[1]));
+        if (row[0] == "C" && row.size() == 4)
+        {
+            if (instances.count(row[2])) instance->parent = instances.at(row[2]);
+            if (classes.count(row[2])) cls->parent = classes.at(row[2]);
+            if (row[3] == "1")
+            {
+                TableType::Props operations;
+                for (const char* operation : {"__add", "__sub", "__mul", "__div"})
+                    operations[operation] = Property::readonly(arena.addType(FunctionType{arena.addTypePack({it->second, builtins->anyType}), arena.addTypePack({it->second})}));
+                instance->metatable = arena.addType(TableType{operations, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
+            }
+        }
+        else if (row[0] == "P" && row.size() == 4) instance->props[row[2]] = Property::rw(type(type, row[3]));
+        else if (row[0] == "K" && row.size() == 4) cls->props[row[2]] = Property::readonly(type(type, row[3]));
+        else if (row[0] == "F" && row.size() >= 6)
+        {
+            bool isStatic = row[4] == "1";
+            std::vector<TypeId> args;
+            if (!isStatic) args.push_back(it->second);
+            for (size_t i = 6; i < row.size(); ++i) {
+                TypeId argument = type(type, row[i]);
+                if (row[i] == "Callable" || row[i] == "Callable?") argument = arena.addType(UnionType{{argument, builtins->functionType}});
+                args.push_back(argument);
+            }
+            std::optional<TypePackId> tail;
+            if (row[5] == "1") tail = arena.addTypePack(VariadicTypePack{builtins->anyType});
+            TypePackId returns = row[3] == "void" ? builtins->emptyTypePack : arena.addTypePack({type(type, row[3])});
+            TypeId fn = arena.addType(FunctionType{arena.addTypePack(args, tail), returns});
+            getMutable<FunctionType>(fn)->hasSelf = !isStatic;
+            (isStatic ? cls : instance)->props[row[2]] = Property::readonly(fn);
+        }
+    }
+    return true;
+}

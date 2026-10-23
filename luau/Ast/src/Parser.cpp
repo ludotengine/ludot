@@ -661,8 +661,10 @@ AstStat* Parser::parseImport(const Location& start)
         {
             auto reference = allocator.alloc<AstTypeReference>(imported.location, ns->name, imported.name,
                 namespaceName.location, imported.location, false, AstArray<AstTypeOrPack>{}, ns);
-            stats.push_back(allocator.alloc<AstStatTypeAlias>(binding.location, binding.name, binding.location,
-                AstArray<AstGenericType*>{}, AstArray<AstGenericTypePack*>{}, reference, false));
+            auto alias = allocator.alloc<AstStatTypeAlias>(binding.location, binding.name, binding.location,
+                AstArray<AstGenericType*>{}, AstArray<AstGenericTypePack*>{}, reference, false);
+            alias->isImportAlias = true;
+            stats.push_back(alias);
         }
         else
         {
@@ -1860,6 +1862,29 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
             declarations.push_back(AstClassMethod{std::nullopt, start, nameTable.getOrAdd("__init"), start, constructor});
         }
         std::vector<AstStat*> initializers;
+        if (super)
+        {
+            // Rebuild the base reference in constructor scope so captured imports
+            // and local classes use upvalue access without changing the outer AST.
+            auto cloneBase = [&](auto&& clone, AstExpr* expr) -> AstExpr* {
+                if (auto local = expr->as<AstExprLocal>())
+                    return allocator.alloc<AstExprLocal>(expr->location, local->local, true);
+                if (auto global = expr->as<AstExprGlobal>())
+                    return allocator.alloc<AstExprGlobal>(expr->location, global->name);
+                if (auto index = expr->as<AstExprIndexName>())
+                    return allocator.alloc<AstExprIndexName>(expr->location, clone(clone, index->expr), index->index,
+                        index->indexLocation, index->opPosition, index->op);
+                if (auto index = expr->as<AstExprIndexExpr>())
+                    return allocator.alloc<AstExprIndexExpr>(expr->location, clone(clone, index->expr), clone(clone, index->index));
+                return expr;
+            };
+            AstExpr* base = cloneBase(cloneBase, super);
+            AstExpr* init = allocator.alloc<AstExprIndexName>(start, base, nameTable.getOrAdd("__init"), start, start.begin, '.');
+            AstExpr* self = allocator.alloc<AstExprLocal>(start, constructor->args.data[0], false);
+            auto call = allocator.alloc<AstExprCall>(start, init, copy(&self, 1), false, false, AstArray<AstTypeOrPack>{}, start);
+            call->isClassBaseInit = true;
+            initializers.push_back(allocator.alloc<AstStatExpr>(start, call));
+        }
         for (auto& member : declarations)
             if (auto prop = get_if<AstClassProperty>(&member); prop && prop->defaultValue)
             {

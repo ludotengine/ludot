@@ -648,7 +648,7 @@ reentry:
 
                         // fall through to slow path
                     }
-                    else if (LUAU_UNLIKELY(FFlag::DebugLuauUserDefinedClassesRuntime && ttisobject(rb)))
+                    else if (LUAU_UNLIKELY(FFlag::DebugLuauUserDefinedClassesRuntime && ttisobject(rb) && !objectvalue(rb)->lclass->propertygetters))
                     {
                         // fast-path: the "hash line" is an offset that points
                         // to the class member with the same name.

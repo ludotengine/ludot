@@ -82,6 +82,7 @@ struct Generator {
         using namespace Luau;
         std::string code;
         for (auto stat : body->body) {
+            code += "// ludot:" + std::to_string(stat->location.begin.line) + "\n";
             if (auto n = stat->as<AstStatAssign>()) {
                 if (n->vars.size != n->values.size) fail(stat, "Shader assignments require one value per target");
                 for (size_t i = 0; i < n->vars.size; ++i) code += expression(n->vars.data[i]) + " = " + expression(n->values.data[i]) + ";\n";
@@ -142,6 +143,7 @@ ShaderResult compileShader(const std::string& source) {
         gen.result.code = "shader_type " + gen.kind + ";\n";
         std::set<std::string> entries;
         for (auto stat : parsed.root->body) {
+            gen.result.code += "// ludot:" + std::to_string(stat->location.begin.line) + "\n";
             if (auto decl = stat->as<AstStatLocal>()) {
                 auto key = std::to_string(stat->location.begin.line) + ":" + std::to_string(stat->location.begin.column);
                 if (gen.uniforms.count(key) == 0 || decl->vars.size != 1 || decl->values.size > 1) gen.fail(stat, "Top-level shader variables must use 'export Name: type'");
@@ -169,6 +171,21 @@ ShaderResult compileShader(const std::string& source) {
             } else gen.fail(stat, "Only exported uniforms and shader entry points are allowed at top level");
         }
     } catch (const std::runtime_error&) { gen.result.code.clear(); }
+    std::istringstream generated(gen.result.code);
+    std::string line;
+    unsigned sourceLine = 0;
+    while (std::getline(generated, line)) {
+        if (line.rfind("// ludot:", 0) == 0) sourceLine = unsigned(std::stoul(line.substr(9)));
+        gen.result.sourceLines.push_back(sourceLine);
+    }
     return gen.result;
+}
+std::vector<std::string> shaderCompletions() {
+    Generator gen;
+    std::set<std::string> words = gen.types;
+    words.insert(gen.functions.begin(), gen.functions.end());
+    for (const auto& item : gen.builtins) words.insert(item.first);
+    for (const char* word : {"shader", "canvas_item", "spatial", "particles", "export", "function", "vertex", "fragment", "light", "start", "process", "local", "const", "if", "then", "else", "end", "return"}) words.insert(word);
+    return {words.begin(), words.end()};
 }
 }

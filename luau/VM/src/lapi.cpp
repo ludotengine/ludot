@@ -1,6 +1,8 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 // This code is based on Lua 5.x implementation licensed under MIT License; see lua_LICENSE.txt for details
 #include "lapi.h"
+#include "ludot.h"
+#include "lmem.h"
 
 #include "lbytecode.h"
 #include "lobject.h"
@@ -2295,4 +2297,56 @@ void lua_userdatadirectfield_setnil(void* result)
 {
     TValue* slot = LUA_VECTOR_DOUBLE ? static_cast<DirectFieldResult*>(result)->slot : static_cast<TValue*>(result);
     setnilvalue(slot);
+}
+
+void lua_setclassaccessors(lua_State* L, int index)
+{
+    api_checknelems(L, 2);
+    TValue* value = index2addr(L, index);
+    api_check(L, ttisclass(value));
+    api_check(L, ttistable(L->top - 2) && ttistable(L->top - 1));
+    LuauClass* cls = classvalue(value);
+    cls->propertygetters = hvalue(L->top - 2);
+    cls->propertysetters = hvalue(L->top - 1);
+    luaC_objbarrier(L, cls, cls->propertygetters);
+    luaC_objbarrier(L, cls, cls->propertysetters);
+    L->top -= 2;
+}
+
+void lua_migrateobject(lua_State* L, int object, int replacement)
+{
+    const TValue* target = index2addr(L, object);
+    const TValue* source = index2addr(L, replacement);
+    api_check(L, ttisobject(target) && ttisobject(source));
+    LuauObject* previous = objectvalue(target);
+    LuauObject* next = objectvalue(source);
+    TValue* members = luaM_newarray(L, next->numberofmembers, TValue, previous->memcat);
+    for (uint32_t i = 0; i < next->numberofmembers; ++i)
+        setobj2class(L, &members[i], &next->members[i]);
+    luaM_freearray(L, previous->members, previous->numberofmembers, TValue, previous->memcat);
+    previous->members = members;
+    previous->numberofmembers = next->numberofmembers;
+    previous->lclass = next->lclass;
+    luaC_objbarrier(L, previous, previous->lclass);
+    for (uint32_t i = 0; i < previous->numberofmembers; ++i)
+        luaC_barrier(L, previous, &members[i]);
+}
+
+void lua_setclassmember(lua_State* L, int clsindex, const char* name)
+{
+    api_checknelems(L, 1);
+    TValue* value = index2addr(L, clsindex);
+    api_check(L, ttisclass(value));
+    LuauClass* cls = classvalue(value);
+    const TValue* offset = luaH_getstr(cls->memberstooffset, luaS_new(L, name));
+    api_check(L, ttisnumber(offset) && nvalue(offset) >= cls->numberofinstancemembers);
+    uint32_t slot = uint32_t(nvalue(offset)) - cls->numberofinstancemembers;
+    setobj2class(L, &cls->staticmembers[slot], L->top - 1);
+    luaC_barrier(L, cls, L->top - 1);
+    L->top--;
+}
+
+int lua_rawrunprotected(lua_State* L, void (*callback)(lua_State* L, void* context), void* context)
+{
+    return luaD_rawrunprotected(L, callback, context);
 }

@@ -20,6 +20,8 @@
 #include "Luau/Flags.h"
 #include "Luau/RequireNavigator.h"
 
+#include "LudotApi.h"
+#include "LudotNavigation.h"
 #include "lua.h"
 #include "lualib.h"
 
@@ -31,6 +33,12 @@
 #include <unordered_set>
 #include <utility>
 #include <fstream>
+#include <algorithm>
+#include <iostream>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 #ifdef CALLGRIND
 #include <valgrind/callgrind.h>
@@ -163,6 +171,28 @@ struct LuauConfigInterruptInfo
 };
 
 static std::unordered_map<std::string, std::string> ludotOverlays;
+
+static bool decodeLudotOverlays(const std::string& manifest, std::unordered_map<std::string, std::string>& overlays)
+{
+    size_t pos = 0;
+    while (pos < manifest.size()) {
+        size_t pathEnd = manifest.find('\0', pos);
+        size_t sourceEnd = pathEnd == std::string::npos ? pathEnd : manifest.find('\0', pathEnd + 1);
+        if (sourceEnd == std::string::npos) return false;
+        std::string path = manifest.substr(pos, pathEnd - pos);
+        std::replace(path.begin(), path.end(), '\\', '/');
+        overlays[path] = manifest.substr(pathEnd + 1, sourceEnd - pathEnd - 1);
+        pos = sourceEnd + 1;
+    }
+    return true;
+}
+static bool readLudotUint32(unsigned& value)
+{
+    unsigned char bytes[4];
+    if (!std::cin.read(reinterpret_cast<char*>(bytes), 4)) return false;
+    value = unsigned(bytes[0]) | (unsigned(bytes[1]) << 8) | (unsigned(bytes[2]) << 16) | (unsigned(bytes[3]) << 24);
+    return true;
+}
 
 struct CliFileResolver : Luau::FileResolver
 {
@@ -418,8 +448,10 @@ int main(int argc, char** argv)
     Luau::Mode mode = Luau::Mode::Nonstrict;
     bool annotate = false;
     bool ludotQuery = false;
+    bool ludotSession = false;
     unsigned queryLine = 0, queryColumn = 0;
     std::string ludotDefinitions;
+    std::string ludotApi;
     int threadCount = 0;
     std::string basePath = "";
     Luau::SolverMode solverMode = Luau::SolverMode::New;
@@ -429,27 +461,25 @@ int main(int argc, char** argv)
         if (argv[i][0] != '-')
             continue;
 
-        if (strncmp(argv[i], "--ludot-query=", 14) == 0)
+        if (strcmp(argv[i], "--ludot-session") == 0) {
+            ludotSession = true;
+            ludotQuery = true;
+        }
+        else if (strncmp(argv[i], "--ludot-query=", 14) == 0)
         {
             ludotQuery = true;
             if (sscanf(argv[i] + 14, "%u,%u", &queryLine, &queryColumn) != 2)
                 return 2;
         }
+        else if (strncmp(argv[i], "--ludot-api=", 12) == 0)
+            ludotApi = argv[i] + 12;
         else if (strncmp(argv[i], "--ludot-definitions=", 20) == 0)
             ludotDefinitions = argv[i] + 20;
         else if (strncmp(argv[i], "--ludot-overlays=", 17) == 0)
         {
             auto manifest = readFile(argv[i] + 17);
             if (!manifest) return 2;
-            size_t pos = 0;
-            while (pos < manifest->size())
-            {
-                size_t pathEnd = manifest->find('\0', pos);
-                size_t sourceEnd = pathEnd == std::string::npos ? std::string::npos : manifest->find('\0', pathEnd + 1);
-                if (sourceEnd == std::string::npos) return 2;
-                ludotOverlays[manifest->substr(pos, pathEnd - pos)] = manifest->substr(pathEnd + 1, sourceEnd - pathEnd - 1);
-                pos = sourceEnd + 1;
-            }
+            if (!decodeLudotOverlays(*manifest, ludotOverlays)) return 2;
         }
         else if (strcmp(argv[i], "--formatter=plain") == 0)
             format = ReportFormat::Luacheck;
@@ -552,6 +582,10 @@ int main(int argc, char** argv)
             if (scope->bindings.find(binding) == scope->bindings.end()) scope->bindings[binding] = Luau::Binding{classType, Luau::Location()};
         }
     }
+    if (!ludotApi.empty()) {
+        auto api = readFile(ludotApi);
+        if (!api || !loadLudotApi(frontend, *api)) { fprintf(stderr, "Invalid Ludot API manifest\n"); return 2; }
+    }
     Luau::freeze(frontend.globals.globalTypes);
 
 #ifdef CALLGRIND
@@ -559,6 +593,29 @@ int main(int argc, char** argv)
 #endif
 
     std::vector<std::string> files = getSourceFiles(argc, argv);
+#ifdef _WIN32
+    if (ludotSession) _setmode(_fileno(stdin), _O_BINARY);
+#endif
+    for (;;) {
+    if (ludotSession) {
+        unsigned pathSize, overlaySize;
+        if (!readLudotUint32(pathSize)) return std::cin.eof() ? 0 : 2;
+        if (!readLudotUint32(queryLine) || !readLudotUint32(queryColumn) || !readLudotUint32(overlaySize)) return 2;
+        if (pathSize > 1024 * 1024 || overlaySize > 32 * 1024 * 1024) return 2;
+        std::string path(pathSize, '\0'), manifest(overlaySize, '\0');
+        if (!std::cin.read(path.data(), pathSize) || !std::cin.read(manifest.data(), overlaySize)) return 2;
+        std::replace(path.begin(), path.end(), '\\', '/');
+        std::unordered_map<std::string, std::string> overlays;
+        if (!decodeLudotOverlays(manifest, overlays)) return 2;
+        for (const auto& [name, source] : ludotOverlays)
+            if (!overlays.count(name)) frontend.markDirty(name);
+        for (const auto& [name, source] : overlays) {
+            auto previous = ludotOverlays.find(name);
+            if (previous == ludotOverlays.end() || previous->second != source) frontend.markDirty(name);
+        }
+        ludotOverlays = std::move(overlays);
+        files = {path};
+    }
 
     for (const std::string& path : files)
         frontend.queueModuleCheck(path);
@@ -609,9 +666,9 @@ int main(int argc, char** argv)
         Luau::Json::JsonEmitter json;
         json.writeRaw("{\"diagnostics\":[");
         bool first = true;
-        for (const auto& name : checkedModules)
+        for (const auto& name : files)
         {
-            auto checked = frontend.getCheckResult(name, false);
+            auto checked = frontend.getCheckResult(name, true);
             if (!checked) continue;
             for (const auto& error : checked->errors)
             {
@@ -652,8 +709,11 @@ int main(int argc, char** argv)
                 if (auto ty = Luau::findTypeAtPosition(*module, *source, {queryLine, queryColumn})) hover = Luau::toString(*ty);
         }
         Luau::Json::write(json, hover);
+        if (!files.empty()) LudotNavigation::write(json, frontend, files.front(), {queryLine, queryColumn});
         json.writeRaw('}');
         printf("%s\n", json.str().c_str());
+        fflush(stdout);
+        if (ludotSession) continue;
         return 0;
     }
 
@@ -685,4 +745,5 @@ int main(int argc, char** argv)
         return 0;
     else
         return failed != 0 ? 1 : 0;
+    }
 }

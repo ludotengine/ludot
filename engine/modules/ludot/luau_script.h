@@ -15,19 +15,22 @@ class LuauScript : public Script {
     String source;
     StringName class_name;
     StringName base_type = "RefCounted";
+    Ref<LuauScript> base_script;
     bool valid = false;
     int class_ref = LUA_NOREF;
     List<PropertyInfo> properties;
     HashMap<StringName, Variant> defaults;
+    HashMap<StringName, String> property_types;
     HashMap<StringName, MethodInfo> methods;
     HashSet<LuauScriptInstance *> instances;
 protected:
     static void _bind_methods();
 public:
-    bool can_instantiate() const override { return valid && class_ref != LUA_NOREF; }
-    Ref<Script> get_base_script() const override { return {}; }
+    bool can_instantiate() const override { return valid && class_ref != LUA_NOREF && !base_type.is_empty(); }
+    int get_class_reference() const { return class_ref; }
+    Ref<Script> get_base_script() const override { return base_script; }
     StringName get_global_name() const override { return class_name; }
-    bool inherits_script(const Ref<Script> &p_script) const override { return false; }
+    bool inherits_script(const Ref<Script> &p_script) const override { return base_script == p_script || (base_script.is_valid() && base_script->inherits_script(p_script)); }
     StringName get_instance_base_type() const override { return base_type; }
     ScriptInstance *instance_create(Object *p_this) override;
     PlaceHolderScriptInstance *placeholder_instance_create(Object *p_this) override;
@@ -88,11 +91,25 @@ class LuauLanguage : public ScriptLanguage {
 public:
     lua_State *state = nullptr;
     lua_State *debug_state = nullptr;
+    lua_State *active_state = nullptr;
+    lua_State *stepping_state = nullptr;
+    struct DebugCursor {
+        String source;
+        int line = -1;
+        int depth = 0;
+        int prototype = 0;
+        const void *pc = nullptr;
+    };
+    HashMap<lua_State *, DebugCursor> debug_cursors;
+    uint64_t generation = 0;
+    Object *construction_owner = nullptr;
     Mutex mutex;
     HashSet<LuauScript *> scripts;
     HashMap<String, int> module_cache;
+    HashMap<String, Ref<LuauScript>> module_resources;
     HashSet<String> loading;
     HashMap<String, HashSet<String>> module_dependents;
+    HashMap<String, HashSet<String>> module_dependencies;
     HashSet<String> invalidate_modules(const String &p_path);
     HashSet<StringName> native_classes;
     String last_error;
@@ -102,10 +119,13 @@ public:
     static Variant to_variant(lua_State *L, int p_index, int p_depth = 0);
     Error ensure_native_class(const StringName &p_name);
     Error load_chunk(const String &p_source, const String &p_path, lua_State *p_state = nullptr);
+    Dictionary module_aliases(const String &p_from) const;
     String resolve_module(const String &p_requested, const String &p_from) const;
     String get_name() const override { return "Luau"; }
     String get_type() const override { return "LuauScript"; }
     String get_extension() const override { return "luau"; }
+    bool handles_global_class_type(const String &p_type) const override { return p_type == "LuauScript"; }
+    String get_global_class_name(const String &p_path, String *r_base_type = nullptr, String *r_icon_path = nullptr, bool *r_is_abstract = nullptr, bool *r_is_tool = nullptr) const override;
     void init() override;
     void finish() override;
     Vector<String> get_reserved_words() const override;
@@ -135,16 +155,18 @@ public:
     String debug_get_stack_level_function(int p_level) const override;
     String debug_get_stack_level_source(int p_level) const override;
     void debug_get_stack_level_locals(int p_level, List<String> *r_names, List<Variant> *r_values, int p_max_subitems, int p_max_depth) override;
-    void debug_get_stack_level_members(int p_level, List<String> *r_names, List<Variant> *r_values, int p_max_subitems, int p_max_depth) override {}
-    void debug_get_globals(List<String> *r_names, List<Variant> *r_values, int p_max_subitems, int p_max_depth) override {}
-    String debug_parse_stack_level_expression(int p_level, const String &p_expression, int p_max_subitems, int p_max_depth) override { return ""; }
+    void debug_get_stack_level_members(int p_level, List<String> *r_names, List<Variant> *r_values, int p_max_subitems, int p_max_depth) override;
+    ScriptInstance *debug_get_stack_level_instance(int p_level) override;
+    bool debug_evaluate_expression(int p_level, const String &p_expression, Variant &r_value, String &r_error) override;
+    void debug_get_globals(List<String> *r_names, List<Variant> *r_values, int p_max_subitems, int p_max_depth) override;
+    String debug_parse_stack_level_expression(int p_level, const String &p_expression, int p_max_subitems, int p_max_depth) override;
     void profiling_start() override {}
     void profiling_stop() override {}
     void profiling_set_save_native_calls(bool p_enable) override {}
     int profiling_get_accumulated_data(ProfilingInfo *p_info, int p_max) override { return 0; }
     int profiling_get_frame_data(ProfilingInfo *p_info, int p_max) override { return 0; }
     LuauLanguage();
-    ~LuauLanguage() { singleton = nullptr; }
+    ~LuauLanguage() override { singleton = nullptr; }
 };
 class ResourceFormatLoaderLuau : public ResourceFormatLoader {
     GDCLASS(ResourceFormatLoaderLuau, ResourceFormatLoader);

@@ -637,6 +637,9 @@ struct lua_Callbacks
 };
 typedef struct lua_Callbacks lua_Callbacks;
 
+// Set native property getter/setter tables for a class. Consumes both tables.
+LUA_API void lua_setclassaccessors(lua_State* L, int index);
+
 LUA_API lua_Callbacks* lua_callbacks(lua_State* L);
 
 // Must be called after lua_newstate and before the state creates any additional objects
