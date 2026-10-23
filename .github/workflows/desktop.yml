@@ -5,6 +5,12 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# A newer push to the same branch makes older runs obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  SCONS_CACHE: ${{ github.workspace }}/.scons_cache/
 jobs:
   desktop:
     strategy:
@@ -13,10 +19,13 @@ jobs:
         include:
           - os: ubuntu-24.04
             platform: linuxbsd
+            sconsflags: linker=mold
           - os: windows-2022
             platform: windows
+            sconsflags: ''
           - os: macos-14
             platform: macos
+            sconsflags: ''
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -27,7 +36,7 @@ jobs:
         if: runner.os == 'Windows'
       - name: Linux dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libudev-dev
+        run: sudo apt-get update && sudo apt-get install -y mold libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libudev-dev
       - name: macOS Vulkan SDK
         if: runner.os == 'macOS'
         run: bash engine/misc/scripts/install_vulkan_sdk_macos.sh
@@ -35,12 +44,37 @@ jobs:
       - name: Configure language tools
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUAU_BUILD_TESTS=OFF
       - name: Build language tools
-        run: cmake --build build --target Luau.Repl.CLI Luau.Analyze.CLI Luau.Compile.CLI ludot-shader -j 2
+        run: cmake --build build --target Luau.Repl.CLI Luau.Analyze.CLI Luau.Compile.CLI ludot-shader --parallel
       - name: Language, shader, and LSP tests
         run: ctest --test-dir build --output-on-failure
+      # SCons caches objects by content, so only files that changed since the cached
+      # build are recompiled.
+      - name: Restore SCons cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.SCONS_CACHE }}
+          key: scons-${{ matrix.platform }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            scons-${{ matrix.platform }}-${{ github.ref_name }}-
+            scons-${{ matrix.platform }}-main-
+      - name: Store cache timestamp
+        shell: bash
+        run: echo "CACHE_TIMESTAMP=$(date +%s)" >> "$GITHUB_ENV"
       - name: Build editor
+        id: build
         working-directory: engine
-        run: scons platform=${{ matrix.platform }} target=editor debug_symbols=no module_mono_enabled=no -j2
+        shell: bash
+        run: scons platform=${{ matrix.platform }} target=editor debug_symbols=no module_mono_enabled=no ${{ matrix.sconsflags }} -j$(python -c "import os; print(os.cpu_count())")
+      - name: Drop cache entries the build did not use
+        if: always() && steps.build.outcome != 'skipped'
+        working-directory: engine
+        run: python misc/scripts/purge_cache.py ${{ env.CACHE_TIMESTAMP }} "${{ env.SCONS_CACHE }}"
+      - name: Save SCons cache
+        if: always() && steps.build.outcome != 'skipped'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.SCONS_CACHE }}
+          key: scons-${{ matrix.platform }}-${{ github.ref_name }}-${{ github.sha }}
       - name: Native engine integration tests
         run: python tools/test_engine.py
       - uses: actions/upload-artifact@v7.0.2

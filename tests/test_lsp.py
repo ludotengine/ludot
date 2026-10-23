@@ -13,7 +13,9 @@ from ludot_lsp.__main__ import Server, byte_column, utf16_column
 class LspTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        # The server reports canonical paths: macOS temp folders live under /private, and
+        # Windows expands short names such as RUNNER~1.
+        self.root = Path(self.temp.name).resolve()
         suffix = '.exe' if sys.platform == 'win32' else ''
         self.server = Server(ROOT / 'build/luau' / ('luau-analyze' + suffix), ROOT / 'build' / ('ludot-shader' + suffix))
         self.messages = []

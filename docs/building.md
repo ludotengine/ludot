@@ -47,6 +47,28 @@ python tools/test_engine.py engine/bin/ludot.linuxbsd.editor.x86_64
 A development build adds `.dev` to the filename. The test intentionally attempts
 invalid script and shader edits, so those diagnostics are expected.
 
+### Clean build timing
+
+On 2026-10-23, a full editor C/C++ rebuild compiled 3,077 source files in
+609.75 seconds of wall time on an Intel Core i9-11900F with 16 GB RAM:
+
+```sh
+.venv/bin/scons -C engine platform=linuxbsd target=editor use_llvm=yes linker=lld optimize=none debug_symbols=no module_mono_enabled=no extra_suffix=fastbuild -j8
+python tools/test_engine.py engine/bin/ludot.linuxbsd.editor.x86_64.llvm.fastbuild
+```
+
+The build used a fresh output suffix without a compiler cache. Existing generated
+headers were present, and other desktop applications were running. All default
+editor features remained enabled except Mono. The headless integration regression
+passed. This is one measurement, not a controlled comparison against GCC or the
+documented build command.
+
+This configuration did not meet a 200-second target for a threefold reduction
+from a 10-minute build. `optimize=none` also reduces runtime performance, so it is
+not the recommended default. Increasing parallelism, changing the compiler, and
+using LLD together were insufficient in this experiment. Compiler caching can help
+repeat builds but does not shorten the first build with an empty cache.
+
 ## Standalone LSP
 
 ```sh
