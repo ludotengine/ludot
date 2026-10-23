@@ -140,14 +140,27 @@ public:
     HashMap<String, Profile> profile_frame;
     HashMap<String, Profile> profile_last_frame;
     struct ProfileCall {
+        String signature;
+        // Luau frames record their thread and call depth. Engine boundary calls use nullptr.
+        lua_State *state = nullptr;
+        int depth = -1;
+        bool native = false;
         uint64_t start = 0;
+        // Time from earlier intervals, before a coroutine yielded.
+        uint64_t active = 0;
         uint64_t children = 0;
-        uint64_t native = 0;
+        uint64_t native_time = 0;
     };
-    // One entry per active profiled call, recording time spent in nested profiled calls.
+    // Innermost call last. Frames of suspended coroutines move to profile_suspended.
     LocalVector<ProfileCall> profile_calls;
-    void profile_enter();
-    void profile_exit(const String &p_signature, bool p_native);
+    HashMap<lua_State *, LocalVector<ProfileCall>> profile_suspended;
+    HashMap<const void *, String> profile_signatures;
+    void profile_enter(const String &p_signature, bool p_native = false, lua_State *p_state = nullptr, int p_depth = -1);
+    // Closes the innermost boundary call, and any Luau frames an error unwound past it.
+    void profile_exit();
+    void profile_close();
+    // Closes frames of p_state at or below p_depth that ended without a RETURN, such as after an error.
+    void profile_unwind(lua_State *p_state, int p_depth);
     Error ensure_native_class(const StringName &p_name);
     Error load_chunk(const String &p_source, const String &p_path, lua_State *p_state = nullptr);
     Dictionary module_aliases(const String &p_from) const;

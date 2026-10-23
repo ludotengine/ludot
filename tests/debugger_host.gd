@@ -129,11 +129,20 @@ func run() -> void:
     if failed: return
     var profiled_luau := false
     var profiled_native := false
-    while not profiled_luau or not profiled_native:
+    var profiled_nested := false
+    var profiled_coroutine := false
+    var profiled_pcall := false
+    while not profiled_luau or not profiled_native or not profiled_nested or not profiled_coroutine or not profiled_pcall:
         var signature := await receive("servers:function_signature")
         if failed: return
         var name := str(signature[2][0])
-        profiled_luau = profiled_luau or (name.begins_with("res://DebuggerProbe.luau::") and name.ends_with("::DebuggerProbe.profiled"))
+        if name.begins_with("native/"):
+            fail("Generated native bindings appear as profiled Luau functions: " + name)
+            return
+        profiled_luau = profiled_luau or (name.begins_with("res://DebuggerProbe.luau::") and name.ends_with("::profiled"))
+        profiled_pcall = profiled_pcall or (name.begins_with("res://DebuggerProbe.luau::") and name.ends_with("::guarded"))
+        profiled_coroutine = profiled_coroutine or (name.begins_with("res://DebuggerProbe.luau::") and name.ends_with("::worker"))
+        profiled_nested = profiled_nested or (name.begins_with("res://DebuggerProbe.luau::") and name.ends_with("::profiledHelper"))
         profiled_native = profiled_native or name == "res://DebuggerProbe.luau::0::Node.getChildCount"
     print("LUDOT_DEBUGGER_TESTS_PASSED")
     quit()

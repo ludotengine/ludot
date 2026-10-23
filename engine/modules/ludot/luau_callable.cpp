@@ -48,19 +48,10 @@ public:
         lua_State *L = language->active_state != nullptr ? language->active_state : language->state;
         const int top = lua_gettop(L);
         lua_getref(L, reference);
-        const bool profiled = language->profiling;
-        String signature;
-        if (profiled) {
-            lua_Debug info = {};
-            lua_getinfo(L, -1, "sn", &info);
-            const String source = info.source != nullptr ? String::utf8(info.source).trim_prefix("@") : String();
-            const String name = info.name != nullptr ? String::utf8(info.name) : String("<anonymous>");
-            signature = source + "::" + itos(info.linedefined) + "::" + name;
-            language->profile_enter();
-        }
         for (int i = 0; i < p_count; ++i) LuauLanguage::push_variant(L, *p_args[i]);
         const int status = lua_pcall(L, p_count, 1, 0);
-        if (profiled) language->profile_exit(signature, false);
+        // Close profiled frames that an error unwound without reaching RETURN.
+        if (language->profiling) language->profile_unwind(L, lua_stackdepth(L) + 1);
         if (status == LUA_OK && LuauLanguage::try_variant(L, -1, r_result)) {
             r_error.error = Callable::CallError::CALL_OK;
         } else if (status == LUA_OK) {

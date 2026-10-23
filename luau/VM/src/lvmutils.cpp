@@ -90,6 +90,9 @@ static LUAU_FORCEINLINE void callTMluau(lua_State* L, StkId top, Closure* ccl, i
     if (p->exectarget != 0 && p->execdata)
         ci->flags |= LUA_CALLINFO_NATIVE;
 
+    if (LUAU_UNLIKELY(!!L->global->cb.debugenter))
+        L->global->cb.debugenter(L);
+
     luau_execute(L);
 
     // resume_continue is not handled here as metamethods are not yieldable

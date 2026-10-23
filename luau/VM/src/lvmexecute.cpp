@@ -3726,6 +3726,9 @@ reentry:
                     // target Luau function must return so that C continuation can be processed
                     L->ci->flags |= LUA_CALLINFO_RETURN;
 
+                    if (LUAU_UNLIKELY(!!L->global->cb.debugenter))
+                        L->global->cb.debugenter(L);
+
                     Closure* fcl = clvalue(L->ci->func);
                     Proto* p = L->ci->p;
 

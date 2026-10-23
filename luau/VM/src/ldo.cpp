@@ -261,6 +261,9 @@ static void performcall(lua_State* L, StkId func, int nresults, bool preparereen
     {                                        // is a Lua function?
         L->ci->flags |= LUA_CALLINFO_RETURN; // luau_execute will stop after returning from the stack frame
 
+        if (LUAU_UNLIKELY(!!L->global->cb.debugenter))
+            L->global->cb.debugenter(L);
+
         bool oldactive = L->isactive;
         L->isactive = true;
         luaC_threadbarrier(L);
@@ -573,6 +576,9 @@ static void resume(lua_State* L, void* ud)
 
             // mark to not return past the current Luau function frame
             L->ci->flags |= LUA_CALLINFO_RETURN;
+
+            if (LUAU_UNLIKELY(!!L->global->cb.debugenter))
+                L->global->cb.debugenter(L);
         }
     }
 

@@ -12,6 +12,7 @@
 #include "core/config/project_settings.h"
 #include "core/io/file_access.h"
 #include "core/os/os.h"
+#include "Luau/Bytecode.h"
 #include "core/io/dir_access.h"
 #include "core/io/json.h"
 #include "core/object/class_db.h"
@@ -208,8 +209,6 @@ int native_call(lua_State *L) {
     lua_State *previous = language->active_state;
     language->active_state = L;
     const bool profiled = language->profiling && language->profile_native_calls;
-    if (profiled) language->profile_enter();
-    self.callp(method, pointers.ptrw(), count, result, error);
     if (profiled) {
         // Attribute the call to the first script frame above the generated native bindings.
         String source;
@@ -218,9 +217,11 @@ int native_call(lua_State *L) {
             source = info.source != nullptr ? String::utf8(info.source).trim_prefix("@") : String();
             if (!source.begins_with("native/")) break;
         }
-        const String type = self.get_type() == Variant::OBJECT ? String(self.operator Object *()->get_class_name()) : Variant::get_type_name(self.get_type());
-        language->profile_exit(source + "::0::" + type + "." + LuauLanguage::api_name(method), true);
+        const String type = self.get_type() == Variant::OBJECT ? String(static_cast<Object *>(self)->get_class_name()) : Variant::get_type_name(self.get_type());
+        language->profile_enter(source + "::0::" + type + "." + LuauLanguage::api_name(method), true);
     }
+    self.callp(method, pointers.ptrw(), count, result, error);
+    if (profiled) language->profile_exit();
     language->active_state = previous;
     update_variant(L, 1, self);
     if (error.error != Callable::CallError::CALL_OK) luaL_error(L, "%s", Variant::get_call_error_text(method, pointers.ptrw(), count, error).utf8().get_data());
@@ -600,6 +601,7 @@ void debug_thread(lua_State *parent, lua_State *thread) {
     if (parent != nullptr) return;
     auto language = LuauLanguage::get_singleton();
     language->debug_cursors.erase(thread);
+    language->profile_suspended.erase(thread);
     if (language->stepping_state == thread) language->stepping_state = nullptr;
 }
 void debug_error(lua_State *L) {
@@ -628,37 +630,143 @@ bool LuauLanguage::try_variant(lua_State *L, int index, Variant &value) {
     lua_settop(L, top);
     return status == LUA_OK;
 }
-void LuauLanguage::profile_enter() {
+namespace {
+String proto_signature(const Proto *p_proto) {
+    auto language = LuauLanguage::get_singleton();
+    if (const String *cached = language->profile_signatures.getptr(p_proto)) return *cached;
+    const String source = p_proto->source != nullptr ? String::utf8(getstr(p_proto->source)).trim_prefix("@") : String();
+    // Generated native bindings are reported as native calls, not as Luau functions.
+    if (source.begins_with("native/")) {
+        language->profile_signatures.insert(p_proto, String());
+        return String();
+    }
+    const String name = p_proto->debugname != nullptr ? String::utf8(getstr(p_proto->debugname)) : String("<anonymous>");
+    const String signature = source + "::" + itos(p_proto->linedefined) + "::" + name;
+    language->profile_signatures.insert(p_proto, signature);
+    return signature;
+}
+// The interrupt runs right after the VM advances past CALL or RETURN, so savedpc[-1] is that instruction.
+void profile_interrupt(lua_State *L, int p_gc) {
+    if (p_gc >= 0 || L->ci->savedpc == nullptr) return;
+    auto language = LuauLanguage::get_singleton();
+    const Instruction instruction = L->ci->savedpc[-1];
+    const int depth = lua_stackdepth(L);
+    if (LUAU_INSN_OP(instruction) == LOP_CALL || LUAU_INSN_OP(instruction) == LOP_CALLFB) {
+        const TValue *function = L->base + LUAU_INSN_A(instruction);
+        if (!ttisfunction(function) || clvalue(function)->isC) return;
+        const String signature = proto_signature(clvalue(function)->l.p);
+        if (signature.is_empty()) return;
+        language->profile_unwind(L, depth + 1);
+        language->profile_enter(signature, false, L, depth + 1);
+    } else if (LUAU_INSN_OP(instruction) == LOP_RETURN) {
+        language->profile_unwind(L, depth + 1);
+        const auto &calls = language->profile_calls;
+        if (!calls.is_empty() && calls[calls.size() - 1].state == L && calls[calls.size() - 1].depth == depth) language->profile_close();
+    }
+}
+void profile_preresume(lua_State *L) {
+    auto language = LuauLanguage::get_singleton();
+    if (LocalVector<LuauLanguage::ProfileCall> *suspended = language->profile_suspended.getptr(L)) {
+        const uint64_t now = OS::get_singleton()->get_ticks_usec();
+        for (LuauLanguage::ProfileCall &call : *suspended) {
+            call.start = now;
+            language->profile_calls.push_back(call);
+        }
+        language->profile_suspended.erase(L);
+    }
+}
+// Frames entered from C, metamethods, pcall, and coroutine starts, which the CALL interrupt cannot see.
+void profile_debugenter(lua_State *L) {
+    auto language = LuauLanguage::get_singleton();
+    const String signature = proto_signature(L->ci->p);
+    if (signature.is_empty()) return;
+    const int depth = lua_stackdepth(L);
+    language->profile_unwind(L, depth);
+    language->profile_enter(signature, false, L, depth);
+}
+void profile_postresume(lua_State *L) {
+    auto language = LuauLanguage::get_singleton();
+    auto &calls = language->profile_calls;
+    if (lua_status(L) != LUA_YIELD) {
+        language->profile_unwind(L, 0);
+        return;
+    }
+    const uint64_t now = OS::get_singleton()->get_ticks_usec();
+    LocalVector<LuauLanguage::ProfileCall> suspended;
+    while (!calls.is_empty() && calls[calls.size() - 1].state == L) {
+        LuauLanguage::ProfileCall call = calls[calls.size() - 1];
+        calls.remove_at(calls.size() - 1);
+        const uint64_t interval = now - call.start;
+        call.active += interval;
+        if (!calls.is_empty()) calls[calls.size() - 1].children += interval;
+        suspended.push_back(call);
+    }
+    if (suspended.is_empty()) return;
+    suspended.invert();
+    language->profile_suspended.insert(L, suspended);
+}
+}
+void LuauLanguage::profile_enter(const String &p_signature, bool p_native, lua_State *p_state, int p_depth) {
     ProfileCall call;
+    call.signature = p_signature;
+    call.state = p_state;
+    call.depth = p_depth;
+    call.native = p_native;
     call.start = OS::get_singleton()->get_ticks_usec();
     profile_calls.push_back(call);
 }
-void LuauLanguage::profile_exit(const String &p_signature, bool p_native) {
+void LuauLanguage::profile_close() {
     const ProfileCall call = profile_calls[profile_calls.size() - 1];
     profile_calls.remove_at(profile_calls.size() - 1);
-    const uint64_t elapsed = OS::get_singleton()->get_ticks_usec() - call.start;
+    const uint64_t interval = OS::get_singleton()->get_ticks_usec() - call.start;
+    const uint64_t total = call.active + interval;
     if (!profile_calls.is_empty()) {
-        profile_calls[profile_calls.size() - 1].children += elapsed;
-        if (p_native) profile_calls[profile_calls.size() - 1].native += elapsed;
+        profile_calls[profile_calls.size() - 1].children += interval;
+        if (call.native) profile_calls[profile_calls.size() - 1].native_time += interval;
     }
     for (HashMap<String, Profile> *table : { &profile_accumulated, &profile_frame }) {
-        Profile &entry = (*table)[p_signature];
+        Profile &entry = (*table)[call.signature];
         entry.call_count++;
-        entry.total_time += elapsed;
-        entry.self_time += elapsed - call.children;
-        entry.internal_time += p_native ? elapsed : call.native;
+        entry.total_time += total;
+        entry.self_time += total - MIN(total, call.children);
+        entry.internal_time += call.native ? total : call.native_time;
     }
+}
+void LuauLanguage::profile_exit() {
+    while (!profile_calls.is_empty() && profile_calls[profile_calls.size() - 1].state != nullptr) profile_close();
+    profile_close();
+}
+void LuauLanguage::profile_unwind(lua_State *p_state, int p_depth) {
+    while (!profile_calls.is_empty() && profile_calls[profile_calls.size() - 1].state == p_state && profile_calls[profile_calls.size() - 1].depth >= p_depth) profile_close();
 }
 void LuauLanguage::profiling_start() {
     MutexLock lock(mutex);
     profile_accumulated.clear();
     profile_frame.clear();
     profile_last_frame.clear();
+    profile_signatures.clear();
     profiling = true;
+    if (state != nullptr) {
+        lua_callbacks(state)->interrupt = profile_interrupt;
+        lua_callbacks(state)->preresume = profile_preresume;
+        lua_callbacks(state)->postresume = profile_postresume;
+        lua_callbacks(state)->debugenter = profile_debugenter;
+    }
 }
 void LuauLanguage::profiling_stop() {
     MutexLock lock(mutex);
     profiling = false;
+    if (state != nullptr) {
+        lua_callbacks(state)->interrupt = nullptr;
+        lua_callbacks(state)->preresume = nullptr;
+        lua_callbacks(state)->postresume = nullptr;
+        lua_callbacks(state)->debugenter = nullptr;
+    }
+    // Luau frames stop receiving RETURN events. Boundary calls still close themselves.
+    LocalVector<ProfileCall> boundaries;
+    for (const ProfileCall &call : profile_calls) if (call.state == nullptr) boundaries.push_back(call);
+    profile_calls = boundaries;
+    profile_suspended.clear();
 }
 void LuauLanguage::profiling_set_save_native_calls(bool p_enable) {
     MutexLock lock(mutex);
@@ -775,6 +883,8 @@ Error LuauLanguage::load_chunk(const String &p_source, const String &p_path, lua
     // Optimization folds constant locals out of registers, hiding them from the debugger.
     options.optimizationLevel = EngineDebugger::is_active() ? 0 : 1;
     const std::string bytecode = Luau::compile(std::string(source.get_data(), source.length()), options);
+    // New prototypes can reuse the addresses of collected ones.
+    profile_signatures.clear();
     if (luau_load(L, ("@" + p_path).utf8().get_data(), bytecode.data(), bytecode.size(), 0) != 0) {
         last_error = String::utf8(lua_tostring(L, -1));
         lua_pop(L, 1);
@@ -1203,18 +1313,11 @@ Variant LuauScriptInstance::callp(const StringName &p_method, const Variant **p_
     const String method = script->methods.has(p_method) ? String(p_method) : LuauLanguage::api_name(p_method);
     lua_getref(L, object_ref);
     lua_getfield(L, -1, method.utf8().get_data());
-    const bool profiled = language->profiling;
-    String signature;
-    if (profiled) {
-        lua_Debug info = {};
-        lua_getinfo(L, -1, "s", &info);
-        signature = get_script()->get_path() + "::" + itos(info.linedefined) + "::" + String(script->class_name) + "." + method;
-        language->profile_enter();
-    }
     lua_pushvalue(L, -2);
     for (int i = 0; i < p_count; ++i) language->push_variant(L, *p_args[i]);
     const int status = lua_pcall(L, p_count + 1, 1, 0);
-    if (profiled) language->profile_exit(signature, false);
+    // Close profiled frames that an error unwound without reaching RETURN.
+    if (language->profiling) language->profile_unwind(L, lua_stackdepth(L) + 1);
     if (status != LUA_OK) {
         language->last_error = String::utf8(lua_tostring(L, -1));
         ERR_PRINT(get_script()->get_path() + ": " + language->last_error);
