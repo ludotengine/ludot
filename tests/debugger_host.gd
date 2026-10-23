@@ -39,7 +39,7 @@ func run() -> void:
     var args := PackedStringArray([
         "--headless", "--path", ProjectSettings.globalize_path("res://"),
         "--remote-debug", "tcp://127.0.0.1:" + str(server.get_local_port()),
-        "--breakpoints", "res://DebuggerProbe.luau:7,res://DebuggerProbe.luau:13", "--script", "../tests/debugger_target.gd"
+        "--breakpoints", "res://DebuggerProbe.luau:7,res://DebuggerProbe.luau:13,res://DebuggerProbe.luau:38", "--script", "../tests/debugger_target.gd"
     ])
     child = OS.create_process(OS.get_executable_path(), args)
     if child == -1:
@@ -123,6 +123,41 @@ func run() -> void:
     if failed: return
     if evaluated[2][3] != 15.0:
         fail("The debugger did not evaluate coroutine locals and upvalues: " + str(evaluated))
+        return
+    send("continue")
+    await receive("debug_exit")
+    if failed: return
+    entered = await receive("debug_enter")
+    if failed: return
+    var main_thread = stopped_thread
+    stopped_thread = entered[1]
+    if stopped_thread == main_thread:
+        fail("The worker thread breakpoint reported the main thread")
+        return
+    send("get_stack_dump")
+    stack = await receive("stack_dump")
+    if failed: return
+    if not str(stack[2]).contains("DebuggerProbe.luau"):
+        fail("The worker thread stack does not identify the Luau source")
+        return
+    send("evaluate", ["amount", 0])
+    evaluated = await receive("evaluation_return")
+    if failed: return
+    if evaluated[2][3] != 4.0:
+        fail("The debugger did not evaluate worker thread locals: " + str(evaluated))
+        return
+    var worker_thread = stopped_thread
+    send("next")
+    entered = await receive("debug_enter")
+    if failed: return
+    if entered[1] != worker_thread:
+        fail("Stepping left the worker thread")
+        return
+    send("evaluate", ["doubled + amount", 0])
+    evaluated = await receive("evaluation_return")
+    if failed: return
+    if evaluated[2][3] != 12.0:
+        fail("Stepping on the worker thread did not reach the next line: " + str(evaluated))
         return
     send("continue")
     await receive("debug_exit")

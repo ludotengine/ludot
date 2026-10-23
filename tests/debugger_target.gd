@@ -12,6 +12,13 @@ func _init() -> void:
         probe.free()
         quit(1)
         return
+    var worker := Thread.new()
+    worker.start(func(): return probe.call("threaded", 4.0))
+    var threaded_result = worker.wait_to_finish()
+    if threaded_result != 8.0:
+        probe.free()
+        quit(1)
+        return
     print("LUDOT_DEBUGGER_TARGET_PASSED")
     # Native call timing is the second option, after the frame function limit.
     EngineDebugger.profiler_enable("servers", true, [16, true])

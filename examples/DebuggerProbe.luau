@@ -34,4 +34,8 @@ class DebuggerProbe extends Node = {
         local _, zero = pcall(guarded)
         return self.Health + first + second - 3 + zero
     end
+    function threaded(amount: number): number
+        local doubled = amount * 2
+        return doubled
+    end
 }
