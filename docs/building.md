@@ -29,9 +29,16 @@ python -m venv .venv
 ```
 
 Rebuilds are much faster with a SCons cache, which reuses objects for unchanged files
-even after switching branches or cleaning. Add `cache_path=../.scons_cache` (or set
-`SCONS_CACHE`). On Linux, `linker=mold` cuts link time. Use every core with
-`-j$(nproc)`. CI uses the cache, all cores, and mold.
+even after switching branches or cleaning. Add `cache_path=../.scons_cache`.
+`SCONS_CACHE` is deprecated. On Linux, `linker=mold` cuts link time. Use every core
+with `-j$(nproc)`, provided there is enough RAM for the compiler processes. CI uses
+the cache, all runner cores, and mold on Linux. Its Linux editor also uses
+`scu_build=yes`, which combines source files to avoid parsing the same headers
+repeatedly. This keeps the default runtime optimization and editor features.
+
+For repeated language-tool builds, install ccache and configure CMake with
+`-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache`.
+CI restores this compiler cache on Linux and macOS. Windows uses MSVC directly.
 
 Use `platform=windows` with an MSVC developer environment on Windows and
 `platform=macos` on macOS. Ludot's module is desktop-only. GDScript stays enabled.
@@ -73,6 +80,13 @@ from a 10-minute build. `optimize=none` also reduces runtime performance, so it 
 not the recommended default. Increasing parallelism, changing the compiler, and
 using LLD together were insufficient in this experiment. Compiler caching can help
 repeat builds but does not shorten the first build with an empty cache.
+
+A separate Linux GCC build with `scu_build=yes`, default runtime optimization, and
+no compiler cache compiled 2,070 translation units in 16 minutes 52 seconds. The
+initial link failed because mold was unavailable in that environment. Relinking
+with the default linker took 18 seconds, and the headless engine regression passed.
+This run and the Clang measurement above use different optimization settings and
+are not a controlled timing comparison. No Windows or macOS SCU result is claimed.
 
 ## Standalone LSP
 
@@ -135,5 +149,13 @@ preset. Template builds include the Luau VM and compiler, without the editor ana
 
 `.github/workflows/desktop.yml` builds language tools and the editor on Linux,
 Windows, and macOS. It runs the language, shader, and LSP regressions before
-uploading binaries. A configured workflow is not evidence that every platform
-has passed. Consult the workflow runs for actual results.
+the engine build, then the engine, remote debugger, and exported-pack regressions
+through `python tools/test_desktop.py`. Pass an editor binary path to that command
+when multiple builds are present locally. It also packages the standalone LSP,
+checks its stdio protocol from an unrelated project directory, and uploads a
+separate archive for each platform. A configured workflow is not evidence that
+every platform has passed. Consult the workflow runs for actual results.
+
+Pushes to one branch share a concurrency group. The running build finishes and
+saves its cache; only the newest pending run waits behind it. This avoids losing
+an almost-complete engine build each time another fix is pushed.
