@@ -1080,7 +1080,7 @@ Dictionary LuauLanguage::module_aliases(const String &p_from) const {
     }
     return aliases;
 }
-String LuauLanguage::resolve_module(const String &p_requested, const String &p_from) const {
+String LuauLanguage::resolve_module(const String &p_requested, const String &p_from, const String &p_extension) const {
     String path;
     if (p_requested.begins_with("@")) {
         const int slash = p_requested.find("/");
@@ -1095,9 +1095,9 @@ String LuauLanguage::resolve_module(const String &p_requested, const String &p_f
     else return "";
     path = path.simplify_path();
     if (!path.begins_with("res://")) return "";
-    if (FileAccess::exists(path) && path.get_extension() == "luau") return path;
-    if (FileAccess::exists(path + ".luau")) return path + ".luau";
-    if (FileAccess::exists(path.path_join("init.luau"))) return path.path_join("init.luau");
+    if (FileAccess::exists(path) && path.get_extension() == p_extension) return path;
+    if (FileAccess::exists(path + "." + p_extension)) return path + "." + p_extension;
+    if (FileAccess::exists(path.path_join("init." + p_extension))) return path.path_join("init." + p_extension);
     return "";
 }
 Error LuauLanguage::ensure_native_class(const StringName &p_name) {

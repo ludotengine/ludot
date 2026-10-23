@@ -167,7 +167,7 @@ public:
     Error ensure_native_class(const StringName &p_name);
     Error load_chunk(const String &p_source, const String &p_path, lua_State *p_state = nullptr);
     Dictionary module_aliases(const String &p_from) const;
-    String resolve_module(const String &p_requested, const String &p_from) const;
+    String resolve_module(const String &p_requested, const String &p_from, const String &p_extension = "luau") const;
     String get_name() const override { return "Luau"; }
     String get_type() const override { return "LuauScript"; }
     String get_extension() const override { return "luau"; }

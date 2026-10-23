@@ -2,15 +2,27 @@
 #include "scene/resources/shader.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/templates/hash_set.h"
 
 class LuauShader : public Shader {
     GDCLASS(LuauShader, Shader);
     String source;
     String diagnostics;
+    // Libraries ("shader include") produce no shader code of their own.
+    bool library = false;
+    // Kept loaded so editor reloads reach them, which then recompile this shader.
+    Vector<Ref<LuauShader>> includes;
+    // The resource path is assigned after loading, so the loader provides it for import resolution.
+    String load_path;
+    static HashSet<LuauShader *> live_shaders;
 protected:
     static void _bind_methods();
 public:
     Error compile_source(const String &p_source);
+    void set_load_path(const String &p_path) { load_path = p_path; }
+    bool is_library() const { return library; }
+    LuauShader() { live_shaders.insert(this); }
+    ~LuauShader() override { live_shaders.erase(this); }
     void set_source(const String &p_source) { compile_source(p_source); }
     String get_source() const { return source; }
     String get_diagnostics() const { return diagnostics; }

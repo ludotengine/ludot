@@ -17,9 +17,19 @@ struct Helper {
 };
 struct Generator {
     ShaderResult result;
+    // The compiled shader type, or "include" when a library is compiled on its own.
     std::string kind;
     std::set<std::string> uniforms;
     std::map<std::string, std::string> uniformHints;
+    // Types of top-level declarations, which other files reference as globals.
+    std::map<std::string, std::string> globalTypes;
+    // Top-level names declared by each included library, for checking named imports.
+    std::map<std::string, std::set<std::string>> libraryNames;
+    std::vector<std::string> includeStack;
+    const ShaderIncludeResolver* resolver = nullptr;
+    std::string currentPath;
+    // While compiling an include, generated lines map to the importing line of the compiled file.
+    int lineOverride = -1;
     std::map<const Luau::AstLocal*, std::string> localTypes;
     std::map<std::string, Helper> helpers;
     std::string returnType = "void";
@@ -27,11 +37,16 @@ struct Generator {
     const std::set<std::string> functions = {"mix", "clamp", "normalize", "texture", "textureLod", "textureSize", "texelFetch", "dot", "cross", "length", "distance", "reflect", "refract", "faceforward", "min", "max", "abs", "sign", "floor", "ceil", "round", "trunc", "fract", "mod", "step", "smoothstep", "sqrt", "inversesqrt", "pow", "exp", "exp2", "log", "log2", "sin", "cos", "tan", "asin", "acos", "atan", "radians", "degrees", "dFdx", "dFdy", "fwidth", "transpose", "determinant", "inverse", "outerProduct", "matrixCompMult", "lessThan", "greaterThan", "equal", "any", "all", "not"};
     const std::map<std::string, std::string> builtins = {{"Color","COLOR"},{"Texture","TEXTURE"},{"Vertex","VERTEX"},{"Normal","NORMAL"},{"Position","POSITION"},{"Time","TIME"},{"Albedo","ALBEDO"},{"Alpha","ALPHA"},{"Roughness","ROUGHNESS"},{"Metallic","METALLIC"},{"Emission","EMISSION"},{"Light","LIGHT"},{"LightColor","LIGHT_COLOR"},{"LightEnergy","LIGHT_ENERGY"},{"PointSize","POINT_SIZE"},{"UV","UV"},{"UV2","UV2"},{"ScreenUV","SCREEN_UV"},{"TexturePixelSize","TEXTURE_PIXEL_SIZE"},{"ModelMatrix","MODEL_MATRIX"},{"ViewMatrix","VIEW_MATRIX"},{"ProjectionMatrix","PROJECTION_MATRIX"},{"Velocity","VELOCITY"},{"Transform","TRANSFORM"},{"Active","ACTIVE"},{"Custom","CUSTOM"},{"Lifetime","LIFETIME"},{"Delta","DELTA"},{"Index","INDEX"},{"Number","NUMBER"},{"RandomSeed","RANDOM_SEED"}};
     [[noreturn]] void fail(const Luau::AstNode* node, const std::string& message) {
-        result.diagnostics.push_back({node->location.begin.line, node->location.begin.column, message});
+        result.diagnostics.push_back({node->location.begin.line, node->location.begin.column, message, currentPath == includeStack.front() ? "" : currentPath});
         throw std::runtime_error(message);
+    }
+    std::string marker(const Luau::AstNode* node) const {
+        return "// ludot:" + std::to_string(lineOverride >= 0 ? unsigned(lineOverride) : node->location.begin.line) + "\n";
     }
     std::string type(Luau::AstType* annotation, const Luau::AstNode* node) {
         auto ref = annotation ? annotation->as<Luau::AstTypeReference>() : nullptr;
+        if (ref && !ref->prefix && (std::string(ref->name.value) == "flat" || std::string(ref->name.value) == "smooth"))
+            fail(node, "Interpolation qualifiers are only allowed on top-level varyings");
         if (!ref || ref->prefix || ref->parameters.size != 0 || types.count(ref->name.value) == 0)
             fail(node, "A shader declaration requires a scalar, vector, matrix, or sampler type");
         std::string name = ref->name.value;
@@ -73,6 +88,7 @@ struct Generator {
         if (expr->is<AstExprConstantNumber>()) return "float";
         if (expr->is<AstExprConstantBool>()) return "bool";
         if (auto n = expr->as<AstExprLocal>()) { auto it = localTypes.find(n->local); return it == localTypes.end() ? "" : it->second; }
+        if (auto n = expr->as<AstExprGlobal>()) { auto it = globalTypes.find(n->name.value); return it == globalTypes.end() ? "" : it->second; }
         if (auto n = expr->as<AstExprGroup>()) return typeOf(n->expr);
         if (auto n = expr->as<AstExprUnary>()) return n->op == AstExprUnary::Op::Not ? "bool" : typeOf(n->expr);
         if (auto n = expr->as<AstExprIfElse>()) { auto t = typeOf(n->trueExpr); return t.empty() || number(n->trueExpr) ? typeOf(n->falseExpr) : t; }
@@ -168,7 +184,7 @@ struct Generator {
         using namespace Luau;
         std::string code;
         for (auto stat : body->body) {
-            code += "// ludot:" + std::to_string(stat->location.begin.line) + "\n";
+            code += marker(stat);
             if (auto n = stat->as<AstStatAssign>()) {
                 if (n->vars.size != n->values.size) fail(stat, "Shader assignments require one value per target");
                 for (size_t i = 0; i < n->vars.size; ++i) code += expression(n->vars.data[i]) + " = " + expression(n->values.data[i], typeOf(n->vars.data[i])) + ";\n";
@@ -242,6 +258,7 @@ struct Generator {
         if (fn->attributes.size || fn->vararg || fn->generics.size || fn->genericPacks.size) fail(stat, "Shader functions cannot use attributes, varargs, or generics");
         const bool entry = kind == "particles" ? (name == "start" || name == "process") : (name == "vertex" || name == "fragment" || name == "light");
         const bool reserved = name == "vertex" || name == "fragment" || name == "light" || name == "start" || name == "process";
+        if (reserved && includeStack.size() > 1) fail(stat, "Shader includes cannot declare entry points");
         if (reserved && !entry) fail(stat, "Entry point '" + name + "' is not supported for " + kind);
         if (functions.count(name) || types.count(name) || builtins.count(name) || helpers.count(name)) fail(stat, "Shader function '" + name + "' is already defined");
         if (entry) {
@@ -274,38 +291,84 @@ struct Generator {
     }
 };
 }
-ShaderResult compileShader(const std::string& source) {
+namespace {
+struct Import {
+    std::string requested;
+    std::vector<std::string> names;
+    Luau::Location location;
+};
+// Compiles one file into gen.result.code. Returns false after recording a diagnostic.
+bool unit(Generator& gen, const std::string& source, const std::string& path, bool library, std::vector<std::string>& renderModes) {
     using namespace Luau;
-    Generator gen;
+    auto diagnose = [&](const Location& location, const std::string& message) {
+        gen.result.diagnostics.push_back({location.begin.line, location.begin.column, message, library ? path : ""});
+        return false;
+    };
     Allocator allocator;
     AstNameTable names(allocator);
     Lexer lexer(source.data(), source.size(), names);
     lexer.next();
     if (lexer.current().type != Lexeme::Name || std::string(lexer.current().name) != "shader")
-        return {"", {{0, 0, "Expected 'shader canvas_item', 'shader spatial', or 'shader particles'"}}};
+        return diagnose(lexer.current().location, "Expected 'shader canvas_item', 'shader spatial', 'shader particles', or 'shader include'");
     lexer.next();
     if (lexer.current().type != Lexeme::Name)
-        return {"", {{0, 0, "Expected shader type"}}};
-    gen.kind = lexer.current().name;
-    if (gen.kind != "canvas_item" && gen.kind != "spatial" && gen.kind != "particles")
-        return {"", {{0, 0, "Unsupported shader type '" + gen.kind + "'"}}};
+        return diagnose(lexer.current().location, "Expected shader type");
+    const std::string kind = lexer.current().name;
+    if (library && kind != "include")
+        return diagnose(lexer.current().location, "An imported shader file must start with 'shader include'");
+    if (!library) {
+        if (kind != "canvas_item" && kind != "spatial" && kind != "particles" && kind != "include")
+            return diagnose(lexer.current().location, "Unsupported shader type '" + kind + "'");
+        gen.kind = kind;
+    }
+    const bool isInclude = kind == "include";
     auto headerEnd = lexer.current().location.end;
     std::vector<size_t> lines{0};
     for (size_t i = 0; i < source.size(); ++i) if (source[i] == '\n') lines.push_back(i + 1);
     std::string lowered = source;
     auto offset = [&](const Position& position) { return lines[position.line] + position.column; };
     auto blank = [&](size_t from, size_t to) { for (size_t i = from; i < to; ++i) if (lowered[i] != '\n' && lowered[i] != '\r') lowered[i] = ' '; };
+    auto key = [&](const Position& position) { return path + ":" + std::to_string(position.line) + ":" + std::to_string(position.column); };
     blank(0, offset(headerEnd));
-    // Replace only lexical export tokens, leaving comments and strings untouched. Editor range
-    // hints after an export ("in 0 to 1 step 0.1") become hint_range and are removed from the Luau source.
+    // Lexical pass. Imports become includes, export tokens become locals marked as uniforms, and
+    // editor range hints after an export ("in 0 to 1 step 0.1") become hint_range. Comments and
+    // strings are untouched.
     lexer.next();
     std::string exportKey;
     unsigned exportLine = 0;
+    bool declared = false;
+    std::vector<Import> imports;
     while (lexer.current().type != Lexeme::Eof) {
         const Lexeme token = lexer.current();
+        if (token.type == Lexeme::Name && std::string(token.name) == "import") {
+            if (declared) return diagnose(token.location, "Shader imports must come before other declarations");
+            Import entry;
+            entry.location = token.location;
+            lexer.next();
+            if (lexer.current().type == '(') return diagnose(lexer.current().location, "Shader imports cannot rename declarations");
+            if (lexer.current().type == Lexeme::Name && std::string(lexer.current().name) == "type") return diagnose(lexer.current().location, "Shader imports have no types");
+            while (lexer.current().type == Lexeme::Name) {
+                entry.names.push_back(lexer.current().name);
+                lexer.next();
+                if (lexer.current().type != ',') break;
+                lexer.next();
+            }
+            if (!entry.names.empty()) {
+                if (lexer.current().type != Lexeme::Name || std::string(lexer.current().name) != "from") return diagnose(lexer.current().location, "Expected 'from' in shader import");
+                lexer.next();
+            }
+            if (lexer.current().type != Lexeme::QuotedString) return diagnose(lexer.current().location, "Expected a quoted path in shader import");
+            entry.requested = std::string(lexer.current().data, lexer.current().getLength());
+            blank(offset(token.location.begin), offset(lexer.current().location.end));
+            lexer.next();
+            if (lexer.current().type == Lexeme::Name && std::string(lexer.current().name) == "as") return diagnose(lexer.current().location, "Shader imports cannot use namespaces");
+            imports.push_back(entry);
+            continue;
+        }
+        declared = true;
         if (token.type == Lexeme::Name && std::string(token.name) == "export") {
             lowered.replace(offset(token.location.begin), 6, "local ");
-            exportKey = std::to_string(token.location.begin.line) + ":" + std::to_string(token.location.begin.column);
+            exportKey = key(token.location.begin);
             exportLine = token.location.begin.line;
             gen.uniforms.insert(exportKey);
         } else if (token.type == Lexeme::ReservedIn && !exportKey.empty() && token.location.begin.line == exportLine) {
@@ -324,8 +387,7 @@ ShaderResult compileShader(const std::string& source) {
             auto word = [&](const char* expected) { return lexer.current().type == Lexeme::Name && std::string(lexer.current().name) == expected; };
             bool valid = readNumber() && word("to") && readNumber();
             if (valid && word("step")) valid = readNumber();
-            if (!valid)
-                return {"", {{token.location.begin.line, token.location.begin.column, "Expected 'in <min> to <max>' with an optional 'step <value>' using numeric literals"}}};
+            if (!valid) return diagnose(token.location, "Expected 'in <min> to <max>' with an optional 'step <value>' using numeric literals");
             blank(offset(token.location.begin), end);
             gen.uniformHints[exportKey] = " : hint_range(" + values[0] + ", " + values[1] + (values.size() > 2 ? ", " + values[2] : "") + ")";
             exportKey.clear();
@@ -333,36 +395,80 @@ ShaderResult compileShader(const std::string& source) {
         }
         lexer.next();
     }
+    for (const Import& entry : imports) {
+        if (gen.resolver == nullptr || !*gen.resolver) return diagnose(entry.location, "Shader imports need a file path to resolve against");
+        std::string error;
+        const auto include = (*gen.resolver)(entry.requested, path, error);
+        if (!include) return diagnose(entry.location, error.empty() ? "Cannot resolve shader import '" + entry.requested + "'" : error);
+        if (std::find(gen.includeStack.begin(), gen.includeStack.end(), include->path) != gen.includeStack.end())
+            return diagnose(entry.location, "Cyclic shader import of '" + include->path + "'");
+        if (gen.libraryNames.count(include->path) == 0) {
+            // Each library is included once, at its first import.
+            gen.libraryNames[include->path];
+            const int previousOverride = gen.lineOverride;
+            if (gen.lineOverride < 0) gen.lineOverride = int(entry.location.begin.line);
+            gen.includeStack.push_back(include->path);
+            const bool included = unit(gen, include->source, include->path, true, renderModes);
+            gen.includeStack.pop_back();
+            gen.lineOverride = previousOverride;
+            gen.currentPath = path;
+            if (!included) return diagnose(entry.location, "The shader include '" + include->path + "' has errors");
+            gen.result.includes.push_back(include->path);
+        }
+        for (const std::string& name : entry.names)
+            if (gen.libraryNames[include->path].count(name) == 0)
+                return diagnose(entry.location, "'" + include->path + "' does not declare '" + name + "'");
+    }
+    gen.currentPath = path;
     auto parsed = Parser::parse(lowered.data(), lowered.size(), names, allocator);
-    for (const auto& error : parsed.errors) gen.result.diagnostics.push_back({error.getLocation().begin.line, error.getLocation().begin.column, error.what()});
-    if (!parsed.errors.empty()) return gen.result;
+    for (const auto& error : parsed.errors) gen.result.diagnostics.push_back({error.getLocation().begin.line, error.getLocation().begin.column, error.what(), library ? path : ""});
+    if (!parsed.errors.empty()) return false;
+    std::set<std::string>& exported = gen.libraryNames[path];
     try {
-        std::string header = "shader_type " + gen.kind + ";\n";
-        std::vector<std::string> renderModes;
         std::set<std::string> entries;
         for (auto stat : parsed.root->body) {
-            gen.result.code += "// ludot:" + std::to_string(stat->location.begin.line) + "\n";
+            gen.result.code += gen.marker(stat);
             if (auto decl = stat->as<AstStatLocal>()) {
-                auto key = std::to_string(stat->location.begin.line) + ":" + std::to_string(stat->location.begin.column);
-                if (gen.uniforms.count(key) == 0) {
+                const std::string declarationKey = key(stat->location.begin);
+                if (gen.uniforms.count(declarationKey) == 0) {
                     // Top-level locals with values are constants; without values they are varyings.
                     for (size_t i = 0; i < decl->vars.size; ++i) {
-                        const std::string declared = gen.type(decl->vars.data[i]->annotation, stat);
-                        gen.localTypes[decl->vars.data[i]] = declared;
+                        AstType* annotation = decl->vars.data[i]->annotation;
+                        std::string qualifier;
+                        auto reference = annotation ? annotation->as<AstTypeReference>() : nullptr;
+                        if (reference && !reference->prefix && (std::string(reference->name.value) == "flat" || std::string(reference->name.value) == "smooth")) {
+                            if (decl->values.size != 0) gen.fail(stat, "Interpolation qualifiers are only allowed on varyings");
+                            if (reference->parameters.size != 1 || reference->parameters.data[0].type == nullptr) gen.fail(stat, "Write the qualifier as flat<type> or smooth<type>");
+                            qualifier = reference->name.value;
+                            annotation = reference->parameters.data[0].type;
+                        }
+                        const std::string declaredType = gen.type(annotation, stat);
+                        const std::string name = decl->vars.data[i]->name.value;
+                        gen.localTypes[decl->vars.data[i]] = declaredType;
+                        gen.globalTypes[name] = declaredType;
+                        exported.insert(name);
                         if (decl->values.size == 0) {
                             if (gen.kind == "particles") gen.fail(stat, "Varyings are only available in canvas_item and spatial shaders");
-                            gen.result.code += "varying " + declared + " " + decl->vars.data[i]->name.value + ";\n";
+                            // Integer varyings cannot be interpolated, so they are always flat.
+                            if (!Generator::scalar(declaredType).empty() || declaredType.rfind("bool", 0) == 0 || declaredType.rfind("bvec", 0) == 0) {
+                                if (qualifier == "smooth") gen.fail(stat, "Integer and boolean varyings cannot be smooth");
+                                qualifier = "flat";
+                            }
+                            gen.result.code += "varying " + (qualifier.empty() ? "" : qualifier + " ") + declaredType + " " + name + ";\n";
                         } else if (i < decl->values.size) {
-                            gen.result.code += "const " + declared + " " + decl->vars.data[i]->name.value + " = " + gen.expression(decl->values.data[i], declared) + ";\n";
+                            gen.result.code += "const " + declaredType + " " + name + " = " + gen.expression(decl->values.data[i], declaredType) + ";\n";
                         } else gen.fail(stat, "Each shader constant needs a value");
                     }
                     continue;
                 }
                 if (decl->vars.size != 1 || decl->values.size > 1) gen.fail(stat, "Export one uniform per declaration");
                 const std::string uniformType = gen.type(decl->vars.data[0]->annotation, stat);
+                const std::string name = decl->vars.data[0]->name.value;
                 gen.localTypes[decl->vars.data[0]] = uniformType;
-                gen.result.code += "uniform " + uniformType + " " + decl->vars.data[0]->name.value;
-                if (auto hint = gen.uniformHints.find(key); hint != gen.uniformHints.end()) {
+                gen.globalTypes[name] = uniformType;
+                exported.insert(name);
+                gen.result.code += "uniform " + uniformType + " " + name;
+                if (auto hint = gen.uniformHints.find(declarationKey); hint != gen.uniformHints.end()) {
                     if (uniformType != "float" && uniformType != "int") gen.fail(stat, "Range hints are only available on number and int uniforms");
                     gen.result.code += hint->second;
                 }
@@ -377,9 +483,12 @@ ShaderResult compileShader(const std::string& source) {
                 auto name = fn->name->as<AstExprGlobal>();
                 if (!name) gen.fail(stat, "Shader functions need simple names");
                 gen.function(stat, name->name.value, fn->func, entries);
+                exported.insert(name->name.value);
             } else if (auto fn = stat->as<AstStatLocalFunction>()) {
                 gen.function(stat, fn->name->name.value, fn->func, entries);
+                exported.insert(fn->name->name.value);
             } else if (auto expr = stat->as<AstStatExpr>(); expr && expr->expr->is<AstExprCall>() && expr->expr->as<AstExprCall>()->func->is<AstExprGlobal>() && std::string(expr->expr->as<AstExprCall>()->func->as<AstExprGlobal>()->name.value) == "renderMode") {
+                if (isInclude) gen.fail(stat, "Shader includes cannot set render modes");
                 auto call = expr->expr->as<AstExprCall>();
                 if (call->args.size == 0) gen.fail(stat, "renderMode() needs at least one mode");
                 for (auto arg : call->args) {
@@ -388,15 +497,35 @@ ShaderResult compileShader(const std::string& source) {
                     if (text.empty() || text.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_") != std::string::npos) gen.fail(arg, "Render modes are lowercase string literals such as \"unshaded\"");
                     renderModes.push_back(text);
                 }
-            } else gen.fail(stat, "Only uniforms, varyings, constants, functions, and renderMode() are allowed at top level");
+            } else gen.fail(stat, "Only imports, uniforms, varyings, constants, functions, and renderMode() are allowed at top level");
         }
+    } catch (const std::runtime_error&) {
+        return false;
+    }
+    return true;
+}
+}
+ShaderResult compileShader(const std::string& source, const std::string& path, const ShaderIncludeResolver& resolver) {
+    Generator gen;
+    gen.resolver = &resolver;
+    gen.currentPath = path;
+    gen.includeStack.push_back(path);
+    std::vector<std::string> renderModes;
+    if (!unit(gen, source, path, false, renderModes)) {
+        gen.result.code.clear();
+        gen.result.sourceLines.clear();
+        return gen.result;
+    }
+    std::string header;
+    if (gen.kind != "include") {
+        header = "shader_type " + gen.kind + ";\n";
         if (!renderModes.empty()) {
             header += "render_mode ";
             for (size_t i = 0; i < renderModes.size(); ++i) header += (i ? ", " : "") + renderModes[i];
             header += ";\n";
         }
-        gen.result.code = header + gen.result.code;
-    } catch (const std::runtime_error&) { gen.result.code.clear(); }
+    }
+    gen.result.code = header + gen.result.code;
     std::istringstream generated(gen.result.code);
     std::string line;
     unsigned sourceLine = 0;
@@ -411,7 +540,7 @@ std::vector<std::string> shaderCompletions() {
     std::set<std::string> words = gen.types;
     words.insert(gen.functions.begin(), gen.functions.end());
     for (const auto& item : gen.builtins) words.insert(item.first);
-    for (const char* word : {"shader", "canvas_item", "spatial", "particles", "export", "function", "vertex", "fragment", "light", "start", "process", "local", "const", "if", "then", "else", "elseif", "end", "return", "for", "while", "do", "break", "continue", "in", "to", "step", "discard", "renderMode"}) words.insert(word);
+    for (const char* word : {"shader", "canvas_item", "spatial", "particles", "export", "function", "vertex", "fragment", "light", "start", "process", "local", "const", "if", "then", "else", "elseif", "end", "return", "for", "while", "do", "break", "continue", "in", "to", "step", "discard", "renderMode", "import", "from", "include", "flat", "smooth"}) words.insert(word);
     return {words.begin(), words.end()};
 }
 }

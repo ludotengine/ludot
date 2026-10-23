@@ -53,6 +53,31 @@ Top-level declarations:
   appear before their callers and cannot recurse.
 - `renderMode("mode", ...)` sets render modes. Modes are lowercase string literals,
   and the engine validates them for the shader type.
+- A varying can request interpolation with `flat<type>` or `smooth<type>`, for example
+  `local Normal: flat<vec3>`. Integer and boolean varyings are always `flat`.
+
+## Includes
+
+A file that starts with `shader include` is a library. It holds uniforms, varyings,
+constants, and helper functions, but no entry points or render modes. Other shaders
+import it before their other declarations:
+
+```lua
+shader canvas_item
+import tinted from "./shaders/tint_common"
+import "@shaders/noise"
+```
+
+`import "path"` includes the library. `import a, b from "path"` also checks that the
+library declares `a` and `b`. All of the library's declarations are visible either
+way. Paths start with `./`, `../`, or an `@alias`, and the `.lushader` extension is
+optional. Aliases come from the same project setting and `.luaurc` files as Luau
+modules. Libraries can import other libraries. Each one is included once, and cyclic
+imports are errors.
+
+Editing a library, on disk or in the editor, recompiles every loaded shader that
+includes it. Errors inside a library are reported in the library and at the importing
+line.
 
 ## Statements and expressions
 
@@ -76,13 +101,15 @@ spelling.
 
 ## Diagnostics
 
-Tables, strings outside `renderMode`, dynamic calls, imports, classes, coroutines,
+Tables, strings outside `renderMode` and imports, dynamic calls, classes, coroutines,
 `repeat` loops, generic `for` loops, multiple returns, and recursion produce
-compile-time errors with source positions. Shader includes are not implemented.
+compile-time errors with source positions.
 
 The native engine validates GPU types after lowering, and maps the engine's
 diagnostics back to `.lushader` lines. The standalone `ludot-shader` tool checks the
-Luau subset and emits shader source. It does not validate GPU types itself.
+Luau subset and emits shader source. It does not validate GPU types itself. It resolves
+imports relative to the file, or to the path given with `--origin`, which the LSP uses
+to check unsaved buffers.
 
 ## Editing and hot reload
 

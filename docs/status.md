@@ -15,18 +15,23 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   API (methods, properties, signals, static methods, constants, Luau functions as
   `Callable`s, and collection indexing, length, and iteration).
 - Direct native property access with a per-class member cache.
-- Hot reload of scripts and modules. Live instances keep their identity and the
-  fields whose type is unchanged. Dependent scripts and derived classes reload. A
-  failed edit keeps the previous version running.
+- Hot reload of scripts and modules. Live instances keep their identity and their
+  field values, converted when a declared type changes. Functions created before the
+  reload, such as connected callbacks, run the new code. Dependent scripts and derived
+  classes reload. A failed edit keeps the previous version running.
 - Native editor checking and completion using Luau Analysis and reflected engine
   signatures, including alias-aware import and `require` path completion. Project
   setting `luau/editor/require_autocomplete` turns path completion off.
 - Remote debugger support: breakpoints, stepping, stack frames, locals, members,
-  globals, Luau expression evaluation, coroutine frames, and runtime error breaks.
-- Script profiler data for Luau functions called from the engine, Luau callables, and
-  native calls made from Luau.
+  globals, Luau expression evaluation, coroutine frames, worker threads, and runtime
+  error breaks.
+- Script profiler rows for every Luau function, including calls between Luau
+  functions, `pcall` targets, metamethods, and coroutine bodies, plus native calls
+  made from Luau.
 - `.lushader` compiler for canvas, spatial, and particle shaders with uniforms, range
-  hints, varyings, constants, helper functions, loops, `discard()`, and render modes.
+  hints, varyings with interpolation qualifiers, constants, helper functions, loops,
+  `discard()`, render modes, and `shader include` libraries imported by path or alias.
+  Editing a library recompiles the shaders that include it.
   A dedicated editor provides delayed validation and completion, and GPU diagnostics
   map back to source lines.
 - Standalone stdio LSP with a persistent analyzer session, the complete engine API,
@@ -38,29 +43,28 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 
 ## Known limits
 
-- Profiling times engine-to-Luau and Luau-to-native boundaries. Luau functions called
-  directly from other Luau code are included in their caller's time. They do not get
-  their own rows.
-- Closures created before a reload, such as callbacks already connected to signals,
-  keep running the code they were created with until they are reconnected.
-- Fields whose declared type changes reset to the new default on reload.
-- Shader includes and custom interpolation qualifiers are not implemented. Shader
-  type checking beyond the Luau subset happens in the engine, after lowering.
-- Debugger stepping and breakpoints run on the main Luau state. Scripts executing on
-  other threads are not covered.
+- All Luau code shares one VM. Calls from different threads run one at a time, and a
+  thread stopped at a breakpoint blocks other threads that call into Luau.
+- A function keeps its old code after a reload while it is running, or when the
+  variables it captures changed. Field values that cannot convert to a new type reset
+  to the new default.
+- Shader type checking beyond the Luau subset happens in the engine, after lowering.
 - Mobile and web targets inherited from Godot are not supported.
 
 ## Verification
 
 Local Linux results:
 
-- `ctest`: language (12 tests), shader (13), and LSP (15) suites pass.
+- `ctest`: language (12 tests), shader (18), and LSP (16) suites pass.
 - `tools/test_engine.py` passes with the development editor build. It covers scripts,
-  exports, inheritance, native API casing, reloads, module invalidation, shaders
-  (including loops, helpers, varyings, and render modes validated by the engine
-  shader compiler), checker diagnostics, and native completion.
+  exports, inheritance, native API casing, reloads (including field type changes and
+  callbacks connected before the reload), module invalidation, shaders (loops,
+  helpers, interpolated varyings, render modes, and includes, validated by the engine
+  shader compiler, plus recompiling when an include changes), checker diagnostics,
+  and native completion.
 - `tools/test_debugger.py` passes. It drives the remote debugger protocol through
-  breakpoints, stepping, evaluation, coroutine frames, and the scripts profiler.
+  breakpoints, stepping, evaluation, coroutine frames, worker threads, and the scripts
+  profiler (including nested Luau calls, `pcall` targets, and coroutine bodies).
 - `tools/test_export.py` passes, both with the editor binary and with a Linux
   `template_release` build running the exported pack the way a shipped game does
   (pack beside the executable, scene selected through `override.cfg`).

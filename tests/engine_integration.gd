@@ -94,21 +94,36 @@ func _init() -> void:
     check(shader != null, "Luau shader loads as an engine resource")
     if shader != null:
         var generated: String = shader.get_code()
+        var valid_source: String = shader.get_source()
         shader.set_source("shader canvas_item\nfunction fragment() local t = {} end")
         check(shader.get_code() == generated, "Invalid shader edit retains the previous program")
         check(not shader.get_diagnostics().is_empty(), "Shader diagnostics are available")
+        shader.set_source(valid_source)
+        check(generated.contains("vec4 tinted(vec4 color)") and generated.contains("uniform vec4 Tint"), "A shader include reaches the generated code")
+        var library = load("res://shaders/tint_common.lushader")
+        check(library != null and library.is_library(), "A shader include loads as a library")
+        if library != null:
+            var library_source: String = library.get_source()
+            library.set_source(library_source.replace("color * Tint", "color * Tint * 2.0"))
+            check(shader.get_code().contains("((color * Tint) * 2.0)"), "Editing a shader include recompiles its dependents: " + shader.get_code())
+            library.set_source(library_source)
+            check(not shader.get_code().contains("2.0"), "Restoring a shader include recompiles its dependents")
         var spatial := LuauShader.new()
         spatial.set_source("""shader spatial
 renderMode("unshaded", "cull_disabled")
 export Cutoff: number = 0.5 in 0 to 1 step 0.05
 export Steps: int = 3 in 1 to 8
 local Height: number
+local Tint: flat<vec3>
+local Id: int
 local Scale: number = 2
 local function wave(x: number): number
     return sin(x * Scale)
 end
 function vertex()
     Height = wave(Vertex.y + Time)
+    Tint = vec3(1)
+    Id = 1
 end
 function fragment()
     local total: number = 0

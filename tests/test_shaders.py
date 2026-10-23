@@ -114,4 +114,68 @@ function fragment() Albedo = brighten(Tint, 1.5) end""")
                 self.assertIn(message, r.stderr)
         r = self.compile('shader particles\nlocal Shared: vec3\nfunction process() end')
         self.assertIn('only available in canvas_item and spatial', r.stderr)
+    def compile_project(self, files, main='main.lushader', origin=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            for name, text in files.items():
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                (root / name).write_text(text)
+            command = [str(BIN)]
+            if origin:
+                command += ['--origin', str(root / origin)]
+            return subprocess.run(command + [str(root / main)], capture_output=True, text=True)
+    def test_includes(self):
+        noise = 'shader include\nimport "./common"\nexport Scale: number = 2\nlocal function wave(x: number): number\n    return sin(x * Scale) * Half\nend'
+        common = 'shader include\nlocal Half: number = 0.5'
+        r = self.compile_project({
+            'main.lushader': 'shader canvas_item\nimport wave from "./lib/noise"\nimport "@shaders/common"\nfunction fragment() Color = vec4(wave(Time) * Half) end',
+            'lib/noise.lushader': noise,
+            'lib/common.lushader': common,
+            '.luaurc': '{"aliases": {"shaders": "./lib"}}',
+        })
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.count('const float Half = 0.5;'), 1, r.stdout)
+        self.assertIn('uniform float Scale = 2.0;', r.stdout)
+        self.assertIn('float wave(float x) {', r.stdout)
+        self.assertLess(r.stdout.index('const float Half'), r.stdout.index('float wave('))
+        self.assertIn('COLOR = vec4((wave(TIME) * Half));', r.stdout)
+    def test_include_origin(self):
+        r = self.compile_project({
+            'unsaved.lushader': 'shader canvas_item\nimport "./lib"\nfunction fragment() Color = vec4(Half) end',
+            'real/lib.lushader': 'shader include\nlocal Half: number = 0.5',
+        }, main='unsaved.lushader', origin='real/main.lushader')
+        self.assertEqual(r.returncode, 0, r.stderr)
+    def test_include_errors(self):
+        cases = [
+            ({'main.lushader': 'shader canvas_item\nimport missing from "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include\nlocal Half: number = 0.5'}, 'does not declare'),
+            ({'main.lushader': 'shader canvas_item\nimport "./a"\nfunction fragment() end', 'a.lushader': 'shader include\nimport "./b"', 'b.lushader': 'shader include\nimport "./a"'}, 'Cyclic shader import'),
+            ({'main.lushader': 'shader canvas_item\nimport "./absent"\nfunction fragment() end'}, 'Cannot find shader include'),
+            ({'main.lushader': 'shader canvas_item\nimport "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include\nfunction fragment() end'}, 'cannot declare entry points'),
+            ({'main.lushader': 'shader canvas_item\nimport "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include\nrenderMode("unshaded")'}, 'cannot set render modes'),
+            ({'main.lushader': 'shader canvas_item\nimport "./lib"\nfunction fragment() end', 'lib.lushader': 'shader canvas_item\nfunction fragment() end'}, "must start with 'shader include'"),
+            ({'main.lushader': 'shader canvas_item\nlocal Half: number = 1\nimport "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include'}, 'must come before'),
+            ({'main.lushader': 'shader canvas_item\nimport (a as b) from "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include'}, 'cannot rename'),
+            ({'main.lushader': 'shader canvas_item\nimport "lib"\nfunction fragment() end'}, './, ../, or @alias'),
+        ]
+        for files, message in cases:
+            with self.subTest(message=message):
+                r = self.compile_project(files)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn(message, r.stderr)
+                self.assertEqual(r.stdout, '')
+    def test_include_diagnostic_path(self):
+        r = self.compile_project({'main.lushader': 'shader canvas_item\nimport "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include\nlocal function f(x: number): number\n    local t = {}\n    return x\nend'})
+        self.assertNotEqual(r.returncode, 0)
+        self.assertRegex(r.stderr, r'lib\.lushader:3:')
+    def test_interpolation(self):
+        r = self.compile('shader spatial\nlocal Tint: flat<vec3>\nlocal Coord: smooth<vec2>\nlocal Id: int\nfunction vertex() Tint = vec3(1) Coord = UV Id = 2 end\nfunction fragment() Albedo = Tint end')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('varying flat vec3 Tint;', r.stdout)
+        self.assertIn('varying smooth vec2 Coord;', r.stdout)
+        self.assertIn('varying flat int Id;', r.stdout)
+        for source, message in [('local Id: smooth<int>', 'cannot be smooth'), ('export Tint: flat<vec3>', 'only allowed on top-level varyings'), ('local Tint: flat<vec3> = vec3(1)', 'only allowed on varyings'), ('function fragment() local t: flat<vec3> = vec3(1) end', 'only allowed on top-level varyings')]:
+            with self.subTest(source=source):
+                r = self.compile('shader spatial\n' + source)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn(message, r.stderr)
 if __name__ == '__main__': unittest.main()

@@ -1,0 +1,6 @@
+shader include
+export Tint: vec4 = vec4(1, 1, 1, 1)
+
+local function tinted(color: vec4): vec4
+    return color * Tint
+end

@@ -118,6 +118,17 @@ class LspTests(unittest.TestCase):
         self.server.documents[uri] = {'version': 2, 'text': 'shader canvas_item\n-- 😀\nfunction fragment() local unsupported = {} end'}
         self.server.publish(uri)
         self.assertTrue(self.messages[-1]['params']['diagnostics'])
+    def test_shader_include_diagnostics(self):
+        (self.root / 'shared.lushader').write_text('shader include\nlocal Half: number = 0.5\n')
+        uri = self.open('shader canvas_item\nimport "./shared"\nfunction fragment() Color = vec4(Half) end', 'includes.lushader')
+        self.server.publish(uri)
+        self.assertEqual(self.messages[-1]['params']['diagnostics'], [])
+        (self.root / 'shared.lushader').write_text('shader include\nlocal Half = {}\n')
+        self.server.publish(uri)
+        diagnostics = self.messages[-1]['params']['diagnostics']
+        self.assertEqual(len(diagnostics), 1)
+        self.assertEqual(diagnostics[0]['range']['start']['line'], 1)
+        self.assertIn('shared.lushader', diagnostics[0]['message'])
     def test_hover(self):
         uri = self.open('--!strict\nlocal score: number = 1\nprint(score)')
         result = self.server.request({'method': 'textDocument/hover', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 2, 'character': 8}}})

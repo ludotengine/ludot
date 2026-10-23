@@ -105,8 +105,12 @@ class Server:
                 with tempfile.TemporaryDirectory(prefix='ludot-shader-') as directory:
                     source = Path(directory) / 'shader.lushader'
                     source.write_text(document['text'], encoding='utf-8')
-                    result = subprocess.run([str(self.shader), str(source)], capture_output=True, text=True, timeout=10)
+                    # Imports resolve against the document's real location, not the temporary copy.
+                    result = subprocess.run([str(self.shader), '--origin', str(path), str(source)], capture_output=True, text=True, timeout=10)
                     for line in result.stderr.splitlines():
+                        # Errors inside included files also produce one at the importing line.
+                        if not line.startswith(str(source) + ':'):
+                            continue
                         match = re.match(r'^.*?:(\d+):(\d+): (.*)$', line)
                         if match:
                             row, column = int(match[1]) - 1, int(match[2]) - 1
