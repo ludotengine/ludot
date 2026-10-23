@@ -28,7 +28,7 @@ LUAU_FASTFLAGVARIABLE(LuauExportValueSyntax)
 LUAU_FLAGVERSION(LuauExportValueSyntax, 5)
 
 LUAU_FASTFLAGVARIABLE(DebugLuauNoInline)
-LUAU_FASTFLAGVARIABLE(DebugLuauUserDefinedClasses)
+namespace FFlag { Luau::FValue<bool> DebugLuauUserDefinedClasses("DebugLuauUserDefinedClasses", true, false); }
 LUAU_FASTFLAGVARIABLE(LuauAllowGlobalDeclarationToBeCalledClass)
 LUAU_FASTFLAGVARIABLE(LuauSingleTypeOptionalPackReturnsAttributeParens)
 LUAU_FASTFLAGVARIABLE(DebugLuauParseExactTables)
@@ -311,6 +311,7 @@ ParseNodeResult<AstType> Parser::parseType(const char* buffer, size_t bufferSize
 
 Parser::Parser(const char* buffer, size_t bufferSize, AstNameTable& names, Allocator& allocator, const ParseOptions& options)
     : options(options)
+    , nameTable(names)
     , lexer(buffer, bufferSize, names, options.parseFragment ? options.parseFragment->resumePosition : Position(0, 0))
     , allocator(allocator)
     , recursionCounter(0)
@@ -325,10 +326,10 @@ Parser::Parser(const char* buffer, size_t bufferSize, AstNameTable& names, Alloc
     functionStack.reserve(8);
     functionStack.push_back(top);
 
-    nameSelf = names.getOrAdd("self");
-    nameNumber = names.getOrAdd("number");
-    nameError = names.getOrAdd(kParseNameError);
-    nameNil = names.getOrAdd("nil"); // nil is a reserved keyword
+    nameSelf = nameTable.getOrAdd("self");
+    nameNumber = nameTable.getOrAdd("number");
+    nameError = nameTable.getOrAdd(kParseNameError);
+    nameNil = nameTable.getOrAdd("nil"); // nil is a reserved keyword
 
     matchRecoveryStopOnToken.assign(Lexeme::Type::Reserved_END, 0);
     matchRecoveryStopOnToken[Lexeme::Type::Eof] = 1;
@@ -414,7 +415,13 @@ AstStatBlock* Parser::parseBlockNoScope()
             stat->location.end = lexer.previousLocation().end;
         }
 
-        body.push_back(stat);
+        if (auto expansion = stat->as<AstStatBlock>(); expansion && expansion->isImportExpansion)
+        {
+            for (AstStat* imported : expansion->body)
+                body.push_back(imported);
+        }
+        else
+            body.push_back(stat);
 
         if (isStatLast(stat))
             break;
@@ -442,6 +449,13 @@ AstStatBlock* Parser::parseBlockNoScope()
 // laststat ::= return [explist] | break
 AstStat* Parser::parseStat()
 {
+    if (lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "import")
+    {
+        Location start = lexer.current().location;
+        nextLexeme();
+        return parseImport(start);
+    }
+
     // guess the type from the token type
     switch (lexer.current().type)
     {
@@ -490,6 +504,9 @@ AstStat* Parser::parseStat()
 
     // we know this isn't a call or an assignment; therefore it must be a context-sensitive keyword such as `type` or `continue`
     AstName ident = getIdentifier(expr);
+
+    if (ident == "import")
+        return parseImport(start);
 
     if (ident == "type")
         return parseTypeAlias(expr->location, /* exported= */ false, expr->location.begin);
@@ -573,6 +590,92 @@ AstStat* Parser::parseStat()
         nextLexeme();
 
     return reportStatError(expr->location, copy({expr}), {}, "Incomplete statement: expected assignment or a function call");
+}
+
+// Ludot imports lower to existing require/type AST nodes, keeping source locations.
+AstStat* Parser::parseImport(const Location& start)
+{
+    bool typeOnly = lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "type";
+    if (typeOnly)
+        nextLexeme();
+
+    std::vector<std::pair<Name, Name>> bindings;
+    bool namespaceImport = lexer.current().type == Lexeme::QuotedString || lexer.current().type == Lexeme::RawString;
+    if (!namespaceImport)
+    {
+        do
+        {
+            bool renamed = lexer.current().type == '(';
+            if (renamed)
+                nextLexeme();
+            Name imported = parseName("imported name");
+            Name binding = imported;
+            if (renamed)
+            {
+                if (lexer.current().type != Lexeme::Name || AstName(lexer.current().name) != "as")
+                    report(lexer.current().location, "Expected 'as' in renamed import");
+                else
+                    nextLexeme();
+                binding = parseName("import binding");
+                expectAndConsume(')', "renamed import");
+            }
+            bindings.emplace_back(imported, binding);
+            if (lexer.current().type != ',')
+                break;
+            nextLexeme();
+        } while (lexer.current().type != Lexeme::Eof);
+        if (lexer.current().type != Lexeme::Name || AstName(lexer.current().name) != "from")
+            report(lexer.current().location, "Expected 'from' after imported names");
+        else
+            nextLexeme();
+    }
+    if (lexer.current().type != Lexeme::QuotedString && lexer.current().type != Lexeme::RawString)
+        return reportStatError(lexer.current().location, {}, {}, "Expected a string module path");
+
+    AstExpr* path = parseString();
+    AstExpr* require = allocator.alloc<AstExprGlobal>(start, nameTable.getOrAdd("require"));
+    AstExpr* call = allocator.alloc<AstExprCall>(Location(start, path->location), require, copy(&path, 1), false, false,
+        AstArray<AstTypeOrPack>{}, path->location);
+
+    if (namespaceImport && !(lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "as"))
+    {
+        if (typeOnly)
+            report(start, "A type namespace import requires 'as' and a namespace name");
+        return allocator.alloc<AstStatExpr>(Location(start, path->location), call);
+    }
+
+    Name namespaceName(nameTable.getOrAdd(format("__ludot_import_%u_%u", start.begin.line, start.begin.column).c_str()), start);
+    if (namespaceImport)
+    {
+        nextLexeme(); // as
+        namespaceName = parseName("import namespace");
+    }
+    AstLocal* ns = pushLocal(Binding(namespaceName, nullptr, {0, 0}, true));
+    ns->isTypeImport = typeOnly;
+    auto nsStat = allocator.alloc<AstStatLocal>(Location(start, path->location), copy(&ns, 1), copy(&call, 1), std::nullopt, true);
+    nsStat->isTypeImport = typeOnly;
+    std::vector<AstStat*> stats{nsStat};
+    for (const auto& [imported, binding] : bindings)
+    {
+        if (typeOnly)
+        {
+            auto reference = allocator.alloc<AstTypeReference>(imported.location, ns->name, imported.name,
+                namespaceName.location, imported.location, false, AstArray<AstTypeOrPack>{}, ns);
+            stats.push_back(allocator.alloc<AstStatTypeAlias>(binding.location, binding.name, binding.location,
+                AstArray<AstGenericType*>{}, AstArray<AstGenericTypePack*>{}, reference, false));
+        }
+        else
+        {
+            AstExpr* source = allocator.alloc<AstExprLocal>(binding.location, ns, false);
+            AstExpr* value = allocator.alloc<AstExprIndexName>(binding.location, source, imported.name,
+                imported.location, binding.location.begin, '.');
+            AstLocal* local = pushLocal(Binding(binding, nullptr, {0, 0}, true));
+            stats.push_back(allocator.alloc<AstStatLocal>(binding.location, copy(&local, 1), copy(&value, 1), std::nullopt, true));
+        }
+    }
+    auto expansion = allocator.alloc<AstStatBlock>(Location(start, lexer.previousLocation()), copy(stats.data(), stats.size()));
+    expansion->isImportExpansion = true;
+    return expansion;
 }
 
 // if exp then block {elseif exp then block} [else block] end
@@ -1554,6 +1657,13 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
         super = parseClassRefExpr();
     }
 
+    bool braces = lexer.current().type == '=';
+    if (braces)
+    {
+        open = true;
+        nextLexeme();
+        expectAndConsume('{', "class body");
+    }
     TempVector<AstClassMember> declarations(scratchClassDeclarations);
 
     // TODO: This does not seem particularly performant, but we need to
@@ -1569,10 +1679,17 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
     // slightly more performant here (e.g.: a "scratch" set).
     DenseHashSet<AstName> classMemberNamespace;
 
-    while (lexer.current().type != Lexeme::ReservedEnd && lexer.current().type != Lexeme::Eof)
+    while (lexer.current().type != (braces ? Lexeme::Type('}') : Lexeme::ReservedEnd) && lexer.current().type != Lexeme::Eof)
     {
+        if (lexer.current().type == ';' || lexer.current().type == ',')
+        {
+            nextLexeme();
+            continue;
+        }
+        bool exportedProperty = lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "export";
+        bool privateProperty = lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "private";
         std::optional<Location> qualifierLocation;
-        if (lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "public")
+        if (lexer.current().type == Lexeme::Name && (AstName(lexer.current().name) == "public" || exportedProperty || privateProperty))
         {
             qualifierLocation = lexer.current().location;
             nextLexeme();
@@ -1596,6 +1713,33 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
                 propType = parseType();
             }
 
+            AstExpr* defaultValue = nullptr;
+            AstExpr* rangeMin = nullptr;
+            AstExpr* rangeMax = nullptr;
+            AstExpr* rangeStep = nullptr;
+            if (lexer.current().type == '=')
+            {
+                nextLexeme();
+                defaultValue = parseExpr();
+            }
+            if (lexer.current().type == Lexeme::ReservedIn)
+            {
+                if (!exportedProperty)
+                    report(lexer.current().location, "Editor range hints are only allowed on exported properties");
+                nextLexeme();
+                rangeMin = parseExpr();
+                if (lexer.current().type != Lexeme::Name || AstName(lexer.current().name) != "to")
+                    report(lexer.current().location, "Expected 'to' in export range");
+                else
+                    nextLexeme();
+                rangeMax = parseExpr();
+                if (lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "step")
+                {
+                    nextLexeme();
+                    rangeStep = parseExpr();
+                }
+            }
+
             if (strncmp(propName->name.value, "__", 2) == 0)
                 report(propName->location, "Class properties cannot start with '__'");
             else if (classMemberNamespace.contains(propName->name))
@@ -1613,6 +1757,12 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
                         propName->location,
                         typeColonLocation,
                         propType,
+                        defaultValue,
+                        exportedProperty,
+                        privateProperty,
+                        rangeMin,
+                        rangeMax,
+                        rangeStep,
                     }
                 );
             }
@@ -1637,7 +1787,14 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
             // the class' print. That would be `self.print`.
             matchRecoveryStopOnToken[Lexeme::ReservedEnd]++;
 
-            auto [body, _] = parseFunctionBody(false, matchFunction, name.name, nullptr, {});
+            auto [body, _] = parseFunctionBody(braces, matchFunction, name.name, nullptr, {});
+            if (braces)
+            {
+                std::vector<AstLocal*> args{body->self};
+                args.insert(args.end(), body->args.begin(), body->args.end());
+                body->args = copy(args.data(), args.size());
+                body->self = nullptr;
+            }
 
             matchRecoveryStopOnToken[Lexeme::ReservedEnd]--;
 
@@ -1684,7 +1841,47 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
     // are treating "class" as a contextual keyword (and we must as we also)
     // plan to add a `class` library.
     Location end = lexer.current().location;
-    expectAndConsume(Lexeme::ReservedEnd, "class");
+    expectAndConsume(braces ? Lexeme::Type('}') : Lexeme::ReservedEnd, "class");
+
+    // Default expressions execute for each new instance, before the constructor body.
+    if (braces)
+    {
+        AstExprFunction* constructor = nullptr;
+        for (auto& member : declarations)
+            if (auto method = get_if<AstClassMethod>(&member); method && method->functionName == "__init")
+                constructor = method->function;
+        if (!constructor)
+        {
+            auto self = allocator.alloc<AstLocal>(nameSelf, start, nullptr, functionStack.size(), 0, nullptr);
+            auto body = allocator.alloc<AstStatBlock>(start, AstArray<AstStat*>{});
+            constructor = allocator.alloc<AstExprFunction>(start, AstArray<AstAttr*>{}, AstArray<AstGenericType*>{},
+                AstArray<AstGenericTypePack*>{}, nullptr, copy(&self, 1), false, start, body,
+                functionStack.size(), nameTable.getOrAdd("__init"), nullptr);
+            declarations.push_back(AstClassMethod{std::nullopt, start, nameTable.getOrAdd("__init"), start, constructor});
+        }
+        std::vector<AstStat*> initializers;
+        for (auto& member : declarations)
+            if (auto prop = get_if<AstClassProperty>(&member); prop && prop->defaultValue)
+            {
+                AstExpr* self = allocator.alloc<AstExprLocal>(prop->nameLocation, constructor->args.data[0], false);
+                AstExpr* target = allocator.alloc<AstExprIndexName>(prop->nameLocation, self, prop->name,
+                    prop->nameLocation, prop->nameLocation.begin, '.');
+                struct CaptureDefaults : AstVisitor
+                {
+                    size_t depth;
+                    explicit CaptureDefaults(size_t depth) : depth(depth) {}
+                    bool visit(AstExprLocal* expr) override
+                    {
+                        if (expr->local->functionDepth < depth) expr->upvalue = true;
+                        return false;
+                    }
+                } capture(constructor->functionDepth);
+                prop->defaultValue->visit(&capture);
+                initializers.push_back(allocator.alloc<AstStatAssign>(prop->nameLocation, copy(&target, 1), copy(&prop->defaultValue, 1)));
+            }
+        initializers.insert(initializers.end(), constructor->body->body.begin(), constructor->body->body.end());
+        constructor->body->body = copy(initializers.data(), initializers.size());
+    }
     Location location{start, end};
 
     // We only allow classes at the top level: we can make use of the
@@ -3740,6 +3937,8 @@ AstExpr* Parser::parseNameExpr(const char* context)
         if (local->functionDepth < typeFunctionDepth)
             return reportExprError(lexer.current().location, {}, "Type function cannot reference outer local '%s'", local->name.value);
 
+        if (local->isTypeImport)
+            report(name->location, "Type-only import '%s' cannot be used as a value", name->name.value);
         return allocator.alloc<AstExprLocal>(name->location, local, local->functionDepth != functionStack.size() - 1);
     }
 

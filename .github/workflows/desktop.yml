@@ -1,0 +1,51 @@
+name: Desktop builds
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linuxbsd
+          - os: windows-2022
+            platform: windows
+          - os: macos-14
+            platform: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      - uses: ilammy/msvc-dev-cmd@v1.13.0
+        if: runner.os == 'Windows'
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libudev-dev
+      - run: python -m pip install scons==4.11.1
+      - name: Configure language tools
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUAU_BUILD_TESTS=OFF
+      - name: Build language tools
+        run: cmake --build build --target Luau.Repl.CLI Luau.Analyze.CLI Luau.Compile.CLI ludot-shader -j 2
+      - name: Language, shader, and LSP tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Build editor
+        working-directory: engine
+        run: scons platform=${{ matrix.platform }} target=editor debug_symbols=no module_mono_enabled=no -j2
+      - name: Native engine integration tests
+        run: python tools/test_engine.py
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ludot-${{ matrix.platform }}
+          path: |
+            engine/bin/ludot.*
+            build/ludot-shader*
+            build/luau/luau*
+            tools/ludot_lsp/*.py
+            tools/ludot-lsp

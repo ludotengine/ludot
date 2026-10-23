@@ -1,0 +1,6 @@
+shader canvas_item
+export Tint: vec4 = vec4(1, 1, 1, 1)
+
+function fragment()
+    Color = texture(Texture, UV) * Tint
+end

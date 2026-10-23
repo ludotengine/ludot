@@ -77,6 +77,7 @@ struct AstLocal
     bool isConst;
     // exported is only a property set after construction
     bool isExported = false;
+    bool isTypeImport = false;
 
     AstType* annotation;
 
@@ -730,6 +731,7 @@ public:
 class AstStatBlock : public AstStat
 {
 public:
+    bool isImportExpansion = false;
     LUAU_RTTI(AstStatBlock)
 
     AstStatBlock(const Location& location, const AstArray<AstStat*>& body, bool hasEnd = true);
@@ -893,6 +895,7 @@ public:
 
     bool isConst = false;
     bool isExported = false;
+    bool isTypeImport = false;
 
     // if the StatLocal is being exported, this is the location of `const` or `local`
     std::optional<Location> keywordLocation;
@@ -1148,6 +1151,12 @@ struct AstClassProperty
     Location nameLocation;
     std::optional<Location> typeColonLocation = std::nullopt;
     AstType* ty = nullptr;
+    AstExpr* defaultValue = nullptr;
+    bool isExported = false;
+    bool isPrivate = false;
+    AstExpr* rangeMin = nullptr;
+    AstExpr* rangeMax = nullptr;
+    AstExpr* rangeStep = nullptr;
 };
 
 struct AstClassMethod

@@ -118,6 +118,7 @@ private:
     // local namelist [`=' explist]
     // laststat ::= return [explist] | break
     AstStat* parseStat();
+    AstStat* parseImport(const Location& start);
 
     // if exp then block {elseif exp then block} [else block] end
     AstStat* parseIf();
@@ -539,6 +540,7 @@ private:
 
     ParseOptions options;
 
+    AstNameTable& nameTable;
     Lexer lexer;
     Allocator& allocator;
 

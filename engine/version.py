@@ -1,9 +1,9 @@
-short_name = "godot"
-name = "Godot Engine"
+short_name = "ludot"
+name = "Ludot Engine"
 major = 4
 minor = 7
 patch = 2
-status = "stable"
+status = "dev"
 module_config = ""
-website = "https://godotengine.org"
+website = "https://github.com/ludotengine/ludot"
 docs = "4.7"

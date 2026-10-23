@@ -1,5 +1,9 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/BuiltinDefinitions.h"
+#include "Luau/Autocomplete.h"
+#include "Luau/AstQuery.h"
+#include "Luau/JsonEmitter.h"
+#include "Luau/ToString.h"
 #include "Luau/Config.h"
 #include "Luau/Frontend.h"
 #include "Luau/LuauConfig.h"
@@ -158,6 +162,8 @@ struct LuauConfigInterruptInfo
     std::string module;
 };
 
+static std::unordered_map<std::string, std::string> ludotOverlays;
+
 struct CliFileResolver : Luau::FileResolver
 {
     std::optional<Luau::SourceCode> readSource(const Luau::ModuleName& name) override
@@ -173,7 +179,8 @@ struct CliFileResolver : Luau::FileResolver
         }
         else
         {
-            source = readFile(name);
+            auto overlay = ludotOverlays.find(name);
+            source = overlay != ludotOverlays.end() ? std::optional<std::string>(overlay->second) : readFile(name);
             sourceType = Luau::SourceCode::Module;
         }
 
@@ -410,6 +417,9 @@ int main(int argc, char** argv)
     ReportFormat format = ReportFormat::Default;
     Luau::Mode mode = Luau::Mode::Nonstrict;
     bool annotate = false;
+    bool ludotQuery = false;
+    unsigned queryLine = 0, queryColumn = 0;
+    std::string ludotDefinitions;
     int threadCount = 0;
     std::string basePath = "";
     Luau::SolverMode solverMode = Luau::SolverMode::New;
@@ -419,7 +429,29 @@ int main(int argc, char** argv)
         if (argv[i][0] != '-')
             continue;
 
-        if (strcmp(argv[i], "--formatter=plain") == 0)
+        if (strncmp(argv[i], "--ludot-query=", 14) == 0)
+        {
+            ludotQuery = true;
+            if (sscanf(argv[i] + 14, "%u,%u", &queryLine, &queryColumn) != 2)
+                return 2;
+        }
+        else if (strncmp(argv[i], "--ludot-definitions=", 20) == 0)
+            ludotDefinitions = argv[i] + 20;
+        else if (strncmp(argv[i], "--ludot-overlays=", 17) == 0)
+        {
+            auto manifest = readFile(argv[i] + 17);
+            if (!manifest) return 2;
+            size_t pos = 0;
+            while (pos < manifest->size())
+            {
+                size_t pathEnd = manifest->find('\0', pos);
+                size_t sourceEnd = pathEnd == std::string::npos ? std::string::npos : manifest->find('\0', pathEnd + 1);
+                if (sourceEnd == std::string::npos) return 2;
+                ludotOverlays[manifest->substr(pos, pathEnd - pos)] = manifest->substr(pathEnd + 1, sourceEnd - pathEnd - 1);
+                pos = sourceEnd + 1;
+            }
+        }
+        else if (strcmp(argv[i], "--formatter=plain") == 0)
             format = ReportFormat::Luacheck;
         else if (strcmp(argv[i], "--formatter=gnu") == 0)
             format = ReportFormat::Gnu;
@@ -458,7 +490,7 @@ int main(int argc, char** argv)
 #endif
 
     Luau::FrontendOptions frontendOptions;
-    frontendOptions.retainFullTypeGraphs = annotate;
+    frontendOptions.retainFullTypeGraphs = annotate || ludotQuery;
     frontendOptions.runLintChecks = true;
 
     CliFileResolver fileResolver;
@@ -486,6 +518,40 @@ int main(int argc, char** argv)
     }
 
     Luau::registerBuiltinGlobals(frontend, frontend.globals);
+    if (!ludotDefinitions.empty())
+    {
+        auto definitions = readFile(ludotDefinitions);
+        if (!definitions) return 2;
+        auto loaded = frontend.loadDefinitionFile(frontend.globals, frontend.globals.globalScope, *definitions, "ludot", false);
+        if (!loaded.success) {
+            for (const auto& error : loaded.parseResult.errors)
+                fprintf(stderr, "%u:%u: %s\n", error.getLocation().begin.line + 1, error.getLocation().begin.column + 1, error.what());
+            if (loaded.module)
+                for (const auto& error : loaded.module->errors) fprintf(stderr, "%u:%u: %s\n", error.location.begin.line + 1, error.location.begin.column + 1, Luau::toString(error).c_str());
+            fprintf(stderr, "Invalid Ludot API definitions\n");
+            return 2;
+        }
+        // Native engine types are both type names and extensible class values.
+        auto& arena = frontend.globals.globalTypes;
+        auto scope = frontend.globals.globalScope;
+        for (const auto& [name, definition] : scope->exportedTypeBindings)
+        {
+            auto instance = Luau::getMutable<Luau::ExternType>(Luau::follow(definition.type));
+            if (!instance || instance->definitionModuleName != "ludot") continue;
+            auto constructor = arena.addType(Luau::FunctionType{
+                arena.addTypePack({}, arena.addTypePack(Luau::VariadicTypePack{frontend.builtinTypes->anyType})),
+                arena.addTypePack({definition.type})});
+            auto metatable = arena.addType(Luau::TableType{{{"__call", Luau::Property::readonly(constructor)}}, std::nullopt,
+                Luau::TypeLevel{}, scope.get(), Luau::TableState::Sealed});
+            auto classType = arena.addType(Luau::ExternType{name, {}, frontend.builtinTypes->classType, metatable,
+                {}, nullptr, "ludot", std::nullopt, true});
+            Luau::getMutable<Luau::ExternType>(classType)->relation = Luau::Obj{definition.type};
+            instance->relation = Luau::Klass{classType};
+            auto binding = frontend.globals.globalNames.names->getOrAdd(name.c_str());
+            // Singleton globals retain their instance type.
+            if (scope->bindings.find(binding) == scope->bindings.end()) scope->bindings[binding] = Luau::Binding{classType, Luau::Location()};
+        }
+    }
     Luau::freeze(frontend.globals.globalTypes);
 
 #ifdef CALLGRIND
@@ -536,6 +602,59 @@ int main(int argc, char** argv)
 
         // Internal compile errors get their own exit code.
         return 2;
+    }
+
+    if (ludotQuery)
+    {
+        Luau::Json::JsonEmitter json;
+        json.writeRaw("{\"diagnostics\":[");
+        bool first = true;
+        for (const auto& name : checkedModules)
+        {
+            auto checked = frontend.getCheckResult(name, false);
+            if (!checked) continue;
+            for (const auto& error : checked->errors)
+            {
+                if (!first) json.writeRaw(',');
+                first = false;
+                auto object = json.writeObject();
+                object.writePair("path", error.moduleName);
+                object.writePair("line", error.location.begin.line);
+                object.writePair("column", error.location.begin.column);
+                object.writePair("endLine", error.location.end.line);
+                object.writePair("endColumn", error.location.end.column);
+                object.writePair("message", Luau::toString(error, Luau::TypeErrorToStringOptions{frontend.fileResolver}));
+            }
+        }
+        json.writeRaw("],\"completions\":[");
+        first = true;
+        if (!files.empty())
+        {
+            auto completions = Luau::autocomplete(frontend, files.front(), {queryLine, queryColumn}, {});
+            for (const auto& [name, entry] : completions.entryMap)
+            {
+                if (!first) json.writeRaw(',');
+                first = false;
+                auto object = json.writeObject();
+                object.writePair("label", name);
+                object.writePair("kind", entry.kind == Luau::AutocompleteEntryKind::Type ? 7 : entry.kind == Luau::AutocompleteEntryKind::Keyword ? 14 : 6);
+                if (entry.type) object.writePair("detail", Luau::toString(*entry.type));
+                if (entry.insertText) object.writePair("insertText", *entry.insertText);
+            }
+        }
+        json.writeRaw("],\"hover\":");
+        std::string hover;
+        if (!files.empty())
+        {
+            auto module = frontend.moduleResolver.getModule(files.front());
+            auto source = frontend.getSourceModule(files.front());
+            if (module && source)
+                if (auto ty = Luau::findTypeAtPosition(*module, *source, {queryLine, queryColumn})) hover = Luau::toString(*ty);
+        }
+        Luau::Json::write(json, hover);
+        json.writeRaw('}');
+        printf("%s\n", json.str().c_str());
+        return 0;
     }
 
     int failed = 0;

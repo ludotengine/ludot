@@ -4963,7 +4963,8 @@ struct Compiler
                     checkExportedLocal(local, stat->location);
                 }
             }
-            compileStatLocal(stat);
+            if (!stat->isTypeImport)
+                compileStatLocal(stat);
         }
         else if (AstStatFor* stat = node->as<AstStatFor>())
         {

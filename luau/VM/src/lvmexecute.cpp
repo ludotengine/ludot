@@ -18,7 +18,7 @@
 
 #include <string.h>
 
-LUAU_FASTFLAGVARIABLE(DebugLuauUserDefinedClassesRuntime)
+namespace FFlag { Luau::FValue<bool> DebugLuauUserDefinedClassesRuntime("DebugLuauUserDefinedClassesRuntime", true, false); }
 LUAU_FASTFLAGVARIABLE(LuauPromoteProto)
 LUAU_FASTFLAG(LuauFastpcall)
 LUAU_FASTFLAGVARIABLE(LuauFastpcallInterrupt)

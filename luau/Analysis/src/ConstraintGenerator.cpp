@@ -1253,6 +1253,8 @@ void ConstraintGenerator::prototypeClass(const ScopePtr& scope, AstStatClass* cl
                     // yet to define, then we'll ICE or misbehave.
                     p = Property::rw(propertyType);
                     p.location = classProp.nameLocation;
+                    if (classProp.isPrivate)
+                        p.tags.push_back("ludot.private|" + module->name + "|" + declName);
 
                     // We make the default constructor take read-only args. This is true, in that we do not write to the table you pass for
                     // constructing an object.

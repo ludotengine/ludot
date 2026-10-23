@@ -88,6 +88,7 @@ struct TypeChecker2
     TypeContext typeContext = TypeContext::Default;
     std::vector<NotNull<Scope>> stack;
     std::vector<TypeId> functionDeclStack;
+    std::vector<const AstStatClass*> ludotClassAccess;
 
     DenseHashSet<TypeId> seenTypeFunctionInstances;
     TypeFunctionAbsenceCache typeFunctionAbsenceCache;

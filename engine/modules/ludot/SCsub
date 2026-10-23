@@ -1,0 +1,25 @@
+#!/usr/bin/env python
+Import('env')
+Import('env_modules')
+from pathlib import Path
+ludot = env_modules.Clone()
+root = Path(Dir('#').abspath).parent
+ludot.Append(CPPPATH=[str(root / 'language/include')])
+for component in ['Common', 'Ast', 'Bytecode', 'Inliner', 'Compiler', 'VM']:
+    ludot.Append(CPPPATH=[str(root / 'luau' / component / 'include')])
+ludot.Append(CPPPATH=[str(root / 'luau/VM/src'), str(root / 'luau/Bytecode/src')])
+if env['platform'] == 'windows' and not env['use_mingw']:
+    ludot.Append(CCFLAGS=['/EHsc'])
+else:
+    ludot.Append(CXXFLAGS=['-fexceptions'])
+if env.editor_build:
+    for component in ['Analysis', 'Config']:
+        ludot.Append(CPPPATH=[str(root / 'luau' / component / 'include')])
+        for source in sorted((root / 'luau' / component / 'src').glob('*.cpp')):
+            env.modules_sources.append(ludot.Object(target='generated/' + component + '/' + source.stem, source=str(source)))
+ludot.add_source_files(env.modules_sources, '*.cpp')
+for component in ['Common', 'Ast', 'Bytecode', 'Inliner', 'Compiler', 'VM']:
+    for source in sorted((root / 'luau' / component / 'src').glob('*.cpp')):
+        obj = ludot.Object(target='generated/' + component + '/' + source.stem, source=str(source))
+        env.modules_sources.append(obj)
+env.modules_sources.append(ludot.Object(target='generated/shader', source=str(root / 'language/src/shader.cpp')))

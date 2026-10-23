@@ -1580,6 +1580,7 @@ void TypeChecker2::checkExtendsClause(AstStatClass* stat)
 
 void TypeChecker2::visit(AstStatClass* stat)
 {
+    ludotClassAccess.push_back(stat);
     LUAU_ASSERT(FFlag::DebugLuauUserDefinedClasses);
 
     if (stat->super)
@@ -1612,6 +1613,7 @@ void TypeChecker2::visit(AstStatClass* stat)
         else
             LUAU_ASSERT(!"Unknown class member!");
     }
+    ludotClassAccess.pop_back();
 }
 
 void TypeChecker2::checkMemberOverrides(AstStatClass* stat)
@@ -2498,6 +2500,20 @@ void TypeChecker2::visitExprName(AstExpr* expr, Location location, const std::st
 {
     visit(expr, ValueContext::RValue);
     TypeId leftType = stripFromNilAndReport(lookupType(expr), location);
+    for (auto cls = get<ExternType>(follow(leftType)); cls != nullptr; cls = cls->parent ? get<ExternType>(follow(*cls->parent)) : nullptr)
+    {
+        auto property = cls->props.find(propName);
+        if (property == cls->props.end()) continue;
+        for (const auto& tag : property->second.tags)
+        {
+            if (tag.rfind("ludot.private|", 0) != 0) continue;
+            bool allowed = false;
+            for (const auto* owner : ludotClassAccess)
+                if (tag == "ludot.private|" + module->name + "|" + owner->name->name.value) allowed = true;
+            if (!allowed) reportError(GenericError{"Cannot access private member '" + propName + "' outside its declaring class"}, location);
+        }
+        break;
+    }
     checkIndexTypeFromType(leftType, propName, context, location, astIndexExprTy);
 }
 
