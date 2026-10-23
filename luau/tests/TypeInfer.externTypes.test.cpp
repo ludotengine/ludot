@@ -15,6 +15,7 @@ using namespace Luau;
 using std::nullopt;
 
 LUAU_FASTFLAG(DebugLuauForceOldSolver)
+LUAU_FASTFLAG(DebugLuauUserDefinedClasses)
 
 TEST_SUITE_BEGIN("TypeInferExternTypes");
 
@@ -1263,6 +1264,33 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "extern_type_intersection_with_table_type_2")
     LUAU_CHECK_NO_ERRORS(result);
 
     CHECK_EQ("Instance & { brushes: Instance }", toString(requireTypeAtPosition({2, 18})));
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "extern_union_shape_extension_does_not_hide_missing_property")
+{
+    ScopedFastFlag sffs[] = {
+        {FFlag::DebugLuauForceOldSolver, false},
+        {FFlag::DebugLuauUserDefinedClasses, true},
+    };
+
+    loadDefinition(R"(
+        declare extern type WithBrushes with
+            brushes: string
+        end
+
+        declare extern type WithoutBrushes with
+            name: string
+        end
+    )");
+
+    CheckResult result = check(R"(
+        function take(thing: (WithBrushes | WithoutBrushes) & { label: string })
+            print(thing.brushes)
+        end
+    )");
+
+    LUAU_REQUIRE_ERROR_COUNT(1, result);
+    CHECK(get<MissingUnionProperty>(result.errors[0]));
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "table_intersected_against_extern_type_1")

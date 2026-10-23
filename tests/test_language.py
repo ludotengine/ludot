@@ -105,6 +105,16 @@ return {a, b, c, d}
         result = self.run_luau('--!strict\ntype Box<T> = {value: T}\nlocal box: Box<number> = {value = "wrong"}\nreturn box', 'luau-analyze')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('TypeError', result.stderr)
+    def test_native_class_intersection_fields(self):
+        api = Path(__file__).resolve().parents[1] / 'types/engine.api'
+        path = self.write('main.luau', '--!strict\nlocal function read(node: Node & {Extra: number}): number\n    return node.Extra\nend\nreturn read')
+        command = [str(BIN / ('luau-analyze' + SUFFIX)), '--ludot-api=' + str(api), str(path)]
+        result = subprocess.run(command, capture_output=True, text=True, cwd=self.root)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        path.write_text('--!strict\nlocal function read(node: (Node2D | Resource) & {Extra: number})\n    return node.Position\nend\nreturn read')
+        result = subprocess.run(command, capture_output=True, text=True, cwd=self.root)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('TypeError', result.stderr)
     def test_private_access_is_checked(self):
         result = self.run_luau('--!strict\nclass Counter = { private Value: number = 1 }\nlocal c = Counter()\nprint(c.Value)', 'luau-analyze')
         self.assertNotEqual(result.returncode, 0)

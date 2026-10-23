@@ -4285,6 +4285,7 @@ PropertyTypes TypeChecker2::lookupProp(
     if (normValid)
         fetch(norm->booleans);
 
+    const size_t missingExternBegin = typesMissingTheProp.size();
     if (FFlag::DebugLuauUserDefinedClasses)
     {
         if (normValid)
@@ -4297,6 +4298,8 @@ PropertyTypes TypeChecker2::lookupProp(
             }
         }
     }
+
+    const size_t missingExternEnd = typesMissingTheProp.size();
 
     // TODO: the subsequent code here is basically proof that this broader approach to doing indexing isn't quite right.
     // we _should_ be leveraging one unified implementation of indexing here, shared with e.g. the `index` type function.
@@ -4331,6 +4334,7 @@ PropertyTypes TypeChecker2::lookupProp(
                 localTypesOfProp.emplace_back(*res.result);
         }
 
+        bool shapeHasProperty = false;
         for (TypeId ty : norm->externTypes.shapeExtensions)
         {
             NormalizationResult result = normalizer.isInhabited(ty);
@@ -4349,8 +4353,16 @@ PropertyTypes TypeChecker2::lookupProp(
             }
 
             if (res.present == NormalizationResult::True && res.result)
+            {
+                shapeHasProperty = true;
                 localTypesOfProp.emplace_back(*res.result);
+            }
         }
+
+        // Shape extensions intersect every extern alternative. A field provided
+        // by a shape is therefore valid even when a native class lacks it.
+        if (shapeHasProperty)
+            typesMissingTheProp.erase(typesMissingTheProp.begin() + missingExternBegin, typesMissingTheProp.begin() + missingExternEnd);
 
         if (!localTypesOfProp.empty())
             typesOfProp.insert(typesOfProp.end(), localTypesOfProp.begin(), localTypesOfProp.end());

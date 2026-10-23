@@ -10,6 +10,8 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   exported fields, private field checking, and export range metadata.
 - Named, renamed, namespace, side-effect, generic, and erased type imports. Legacy
   `require` uses the same project and nested `.luaurc` aliases.
+- Native class types support structural table intersections. A field supplied by
+  the table shape is accepted; a field missing from a union alternative is rejected.
 - Native engine module: Luau script and shader resources, inspector exports, script
   inheritance between Luau resources, global class discovery, and Luau-cased engine
   API (methods, properties, signals, static methods, constants, Luau functions as
@@ -57,7 +59,8 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 
 Local Linux results:
 
-- `ctest`: language (12 tests), shader (18), and LSP (16) suites pass.
+- `ctest`: language (13 tests), shader (18), and LSP (16) suites pass.
+- The upstream Luau unit suite passes all 5,573 cases and 35,369 assertions.
 - `tools/test_engine.py` passes with the development editor build. It covers scripts,
   exports, inheritance, native API casing, reloads (including field type changes and
   callbacks connected before the reload), module invalidation, shaders (loops,
@@ -79,6 +82,8 @@ A loop of 100,000 iterations, each reading a `Vector2` field, reading a `Timer`
 property, and calling a `Timer` method, took about 0.57 s in the unoptimized
 development build. It took about 61.6 s before the member cache.
 
-The GitHub workflow builds and tests Linux, Windows, and macOS. Its results are on
-the repository's Actions page. Only the Linux results above were checked locally.
-No Windows or macOS success is claimed from Linux compilation.
+The macOS editor build and native engine integration suite passed in GitHub Actions
+at `7ebd0c7` ([run](https://github.com/ludotengine/ludot/actions/runs/40034285979)).
+Windows still needs validation of the MSVC floating-point mode fix in `4c08027`
+or later. The workflow's debugger, exported-pack, and standalone-package checks are
+newer than that macOS result; only their Linux results are verified above.

@@ -17,6 +17,14 @@ ctest --test-dir build --output-on-failure
 The binaries live in `build/luau/` and `build/ludot-shader`. On Windows, append
 `.exe`. The Luau CLI filenames remain recognizable while the dialect evolves.
 
+To run the upstream parser, compiler, and type-checker unit suite as well:
+
+```sh
+cmake -S . -B build -DLUAU_BUILD_TESTS=ON
+cmake --build build --target Luau.UnitTest -j4
+build/luau/Luau.UnitTest
+```
+
 ## Editor
 
 Godot's platform dependencies still apply. Install SCons 4.11.1 into a virtual
