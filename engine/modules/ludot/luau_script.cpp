@@ -11,6 +11,7 @@
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
 #include "core/io/file_access.h"
+#include "core/os/os.h"
 #include "core/io/dir_access.h"
 #include "core/io/json.h"
 #include "core/object/class_db.h"
@@ -139,20 +140,6 @@ int native_static_call(lua_State *L) {
     LuauLanguage::push_variant(L, result);
     return 1;
 }
-struct VariantConversion { int index; Variant value; };
-void convert_value(lua_State *L, void *context) {
-    auto conversion = static_cast<VariantConversion *>(context);
-    conversion->value = LuauLanguage::to_variant(L, conversion->index);
-}
-bool try_variant(lua_State *L, int index, Variant &value) {
-    const int top = lua_gettop(L);
-    VariantConversion conversion{lua_absindex(L, index), Variant()};
-    const int status = lua_rawrunprotected(L, convert_value, &conversion);
-    if (status == LUA_OK) value = conversion.value;
-    else LuauLanguage::get_singleton()->last_error = String::utf8(lua_tostring(L, -1));
-    lua_settop(L, top);
-    return status == LUA_OK;
-}
 int native_length(lua_State *L) {
     Variant self = variant_at(L, 1);
     if (!self.is_array() && self.get_type() != Variant::DICTIONARY) luaL_error(L, "Only native collections have a length");
@@ -220,12 +207,57 @@ int native_call(lua_State *L) {
     auto language = LuauLanguage::get_singleton();
     lua_State *previous = language->active_state;
     language->active_state = L;
+    const bool profiled = language->profiling && language->profile_native_calls;
+    if (profiled) language->profile_enter();
     self.callp(method, pointers.ptrw(), count, result, error);
+    if (profiled) {
+        // Attribute the call to the first script frame above the generated native bindings.
+        String source;
+        lua_Debug info = {};
+        for (int level = 1; lua_getinfo(L, level, "s", &info); ++level) {
+            source = info.source != nullptr ? String::utf8(info.source).trim_prefix("@") : String();
+            if (!source.begins_with("native/")) break;
+        }
+        const String type = self.get_type() == Variant::OBJECT ? String(self.operator Object *()->get_class_name()) : Variant::get_type_name(self.get_type());
+        language->profile_exit(source + "::0::" + type + "." + LuauLanguage::api_name(method), true);
+    }
     language->active_state = previous;
     update_variant(L, 1, self);
     if (error.error != Callable::CallError::CALL_OK) luaL_error(L, "%s", Variant::get_call_error_text(method, pointers.ptrw(), count, error).utf8().get_data());
     LuauLanguage::push_variant(L, result);
     return 1;
+}
+LuauLanguage::NativeMember *find_native_member(const Variant &p_self, const String &p_requested) {
+    auto language = LuauLanguage::get_singleton();
+    const Variant::Type type = p_self.get_type();
+    const StringName key = type == Variant::OBJECT ? static_cast<Object *>(p_self)->get_class_name() : StringName(Variant::get_type_name(type));
+    HashMap<String, LuauLanguage::NativeMember> *members = language->native_members.getptr(key);
+    if (members == nullptr) {
+        members = &language->native_members.insert(key, {})->value;
+        // Later kinds win, matching the property, signal, method lookup order of the dynamic scan.
+        if (type == Variant::OBJECT) {
+            List<MethodInfo> methods;
+            ClassDB::get_method_list(key, &methods);
+            for (const MethodInfo &method : methods) (*members)[LuauLanguage::api_name(method.name)] = { LuauLanguage::NativeMember::METHOD, method.name };
+            List<MethodInfo> signals;
+            ClassDB::get_signal_list(key, &signals);
+            for (const MethodInfo &signal : signals) (*members)[LuauLanguage::api_name(signal.name, true)] = { LuauLanguage::NativeMember::SIGNAL, signal.name };
+            List<PropertyInfo> properties;
+            ClassDB::get_property_list(key, &properties);
+            for (const PropertyInfo &property : properties) {
+                if (property.usage & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_CATEGORY)) continue;
+                (*members)[LuauLanguage::api_name(property.name, true)] = { LuauLanguage::NativeMember::PROPERTY, property.name, property.type };
+            }
+        } else {
+            List<StringName> methods;
+            Variant::get_builtin_method_list(type, &methods);
+            for (const StringName &method : methods) (*members)[LuauLanguage::api_name(method)] = { LuauLanguage::NativeMember::METHOD, method };
+            List<StringName> properties;
+            Variant::get_member_list(type, &properties);
+            for (const StringName &property : properties) (*members)[LuauLanguage::api_name(property, true)] = { LuauLanguage::NativeMember::PROPERTY, property, Variant::get_member_type(type, property) };
+        }
+    }
+    return members->getptr(p_requested);
 }
 int native_index(lua_State *L) {
     Variant self = variant_at(L, 1);
@@ -241,6 +273,28 @@ int native_index(lua_State *L) {
     if (self.get_type() == Variant::DICTIONARY && Dictionary(self).has(requested)) {
         LuauLanguage::push_variant(L, Dictionary(self)[requested]);
         return 1;
+    }
+    if (self.get_type() == Variant::OBJECT && static_cast<Object *>(self) == nullptr) luaL_error(L, "The native object has been freed");
+    if (LuauLanguage::NativeMember *member = find_native_member(self, requested)) {
+        switch (member->kind) {
+            case LuauLanguage::NativeMember::PROPERTY: {
+                bool valid;
+                LuauLanguage::push_variant(L, self.get_named(member->name, valid));
+                return 1;
+            }
+            case LuauLanguage::NativeMember::SIGNAL:
+                LuauLanguage::push_variant(L, Signal(static_cast<Object *>(self), member->name));
+                return 1;
+            case LuauLanguage::NativeMember::METHOD:
+                if (member->method_ref != LUA_NOREF) {
+                    lua_getref(L, member->method_ref);
+                    return 1;
+                }
+                lua_pushstring(L, String(member->name).utf8().get_data());
+                lua_pushcclosure(L, native_call, "native method", 1);
+                member->method_ref = lua_ref(L, -1);
+                return 1;
+        }
     }
     List<PropertyInfo> properties;
     self.get_property_list(&properties);
@@ -286,6 +340,14 @@ int native_newindex(lua_State *L) {
         return 0;
     }
     const String requested = String::utf8(luaL_checkstring(L, 2));
+    if (self.get_type() == Variant::OBJECT && static_cast<Object *>(self) == nullptr) luaL_error(L, "The native object has been freed");
+    if (const LuauLanguage::NativeMember *member = find_native_member(self, requested); member != nullptr && member->kind == LuauLanguage::NativeMember::PROPERTY) {
+        bool valid;
+        self.set_named(member->name, native_argument(L, 3, member->type), valid);
+        if (!valid) luaL_error(L, "Invalid native property assignment");
+        update_variant(L, 1, self);
+        return 0;
+    }
     List<PropertyInfo> properties;
     self.get_property_list(&properties);
     for (const PropertyInfo &property : properties) {
@@ -550,6 +612,87 @@ void debug_error(lua_State *L) {
     language->debug_state = nullptr;
 }
 }
+namespace {
+struct VariantConversion { int index; Variant value; };
+void convert_value(lua_State *L, void *context) {
+    auto conversion = static_cast<VariantConversion *>(context);
+    conversion->value = LuauLanguage::to_variant(L, conversion->index);
+}
+}
+bool LuauLanguage::try_variant(lua_State *L, int index, Variant &value) {
+    const int top = lua_gettop(L);
+    VariantConversion conversion{lua_absindex(L, index), Variant()};
+    const int status = lua_rawrunprotected(L, convert_value, &conversion);
+    if (status == LUA_OK) value = conversion.value;
+    else LuauLanguage::get_singleton()->last_error = String::utf8(lua_tostring(L, -1));
+    lua_settop(L, top);
+    return status == LUA_OK;
+}
+void LuauLanguage::profile_enter() {
+    ProfileCall call;
+    call.start = OS::get_singleton()->get_ticks_usec();
+    profile_calls.push_back(call);
+}
+void LuauLanguage::profile_exit(const String &p_signature, bool p_native) {
+    const ProfileCall call = profile_calls[profile_calls.size() - 1];
+    profile_calls.remove_at(profile_calls.size() - 1);
+    const uint64_t elapsed = OS::get_singleton()->get_ticks_usec() - call.start;
+    if (!profile_calls.is_empty()) {
+        profile_calls[profile_calls.size() - 1].children += elapsed;
+        if (p_native) profile_calls[profile_calls.size() - 1].native += elapsed;
+    }
+    for (HashMap<String, Profile> *table : { &profile_accumulated, &profile_frame }) {
+        Profile &entry = (*table)[p_signature];
+        entry.call_count++;
+        entry.total_time += elapsed;
+        entry.self_time += elapsed - call.children;
+        entry.internal_time += p_native ? elapsed : call.native;
+    }
+}
+void LuauLanguage::profiling_start() {
+    MutexLock lock(mutex);
+    profile_accumulated.clear();
+    profile_frame.clear();
+    profile_last_frame.clear();
+    profiling = true;
+}
+void LuauLanguage::profiling_stop() {
+    MutexLock lock(mutex);
+    profiling = false;
+}
+void LuauLanguage::profiling_set_save_native_calls(bool p_enable) {
+    MutexLock lock(mutex);
+    profile_native_calls = p_enable;
+}
+namespace {
+int write_profile(const HashMap<String, LuauLanguage::Profile> &p_table, ScriptLanguage::ProfilingInfo *p_info, int p_max) {
+    int count = 0;
+    for (const KeyValue<String, LuauLanguage::Profile> &entry : p_table) {
+        if (count >= p_max) break;
+        p_info[count].signature = entry.key;
+        p_info[count].call_count = entry.value.call_count;
+        p_info[count].total_time = entry.value.total_time;
+        p_info[count].self_time = entry.value.self_time;
+        p_info[count].internal_time = entry.value.internal_time;
+        count++;
+    }
+    return count;
+}
+}
+int LuauLanguage::profiling_get_accumulated_data(ProfilingInfo *p_info, int p_max) {
+    MutexLock lock(mutex);
+    return write_profile(profile_accumulated, p_info, p_max);
+}
+int LuauLanguage::profiling_get_frame_data(ProfilingInfo *p_info, int p_max) {
+    MutexLock lock(mutex);
+    return write_profile(profile_last_frame, p_info, p_max);
+}
+void LuauLanguage::frame() {
+    if (!profiling) return;
+    MutexLock lock(mutex);
+    profile_last_frame = profile_frame;
+    profile_frame.clear();
+}
 void LuauLanguage::init() {
     static uint64_t next_generation = 0;
     generation = ++next_generation;
@@ -619,6 +762,7 @@ void LuauLanguage::finish() {
     module_dependents.clear();
     module_dependencies.clear();
     native_classes.clear();
+    native_members.clear();
     debug_cursors.clear();
     stepping_state = nullptr;
     if (state != nullptr) { lua_State *closing = state; state = nullptr; lua_close(closing); }
@@ -1040,7 +1184,7 @@ bool LuauScriptInstance::get(const StringName &p_name, Variant &r_value) const {
     MutexLock lock(language->mutex);
     lua_getref(language->state, object_ref);
     lua_getfield(language->state, -1, String(p_name).utf8().get_data());
-    const bool converted = try_variant(language->state, -1, r_value);
+    const bool converted = LuauLanguage::try_variant(language->state, -1, r_value);
     lua_pop(language->state, 2);
     return converted;
 }
@@ -1059,16 +1203,26 @@ Variant LuauScriptInstance::callp(const StringName &p_method, const Variant **p_
     const String method = script->methods.has(p_method) ? String(p_method) : LuauLanguage::api_name(p_method);
     lua_getref(L, object_ref);
     lua_getfield(L, -1, method.utf8().get_data());
+    const bool profiled = language->profiling;
+    String signature;
+    if (profiled) {
+        lua_Debug info = {};
+        lua_getinfo(L, -1, "s", &info);
+        signature = get_script()->get_path() + "::" + itos(info.linedefined) + "::" + String(script->class_name) + "." + method;
+        language->profile_enter();
+    }
     lua_pushvalue(L, -2);
     for (int i = 0; i < p_count; ++i) language->push_variant(L, *p_args[i]);
-    if (lua_pcall(L, p_count + 1, 1, 0) != LUA_OK) {
+    const int status = lua_pcall(L, p_count + 1, 1, 0);
+    if (profiled) language->profile_exit(signature, false);
+    if (status != LUA_OK) {
         language->last_error = String::utf8(lua_tostring(L, -1));
         ERR_PRINT(get_script()->get_path() + ": " + language->last_error);
         lua_settop(L, top);
         return {};
     }
     Variant result;
-    if (!try_variant(L, -1, result)) {
+    if (!LuauLanguage::try_variant(L, -1, result)) {
         ERR_PRINT(get_script()->get_path() + ": " + language->last_error);
         lua_settop(L, top);
         r_error.error = Callable::CallError::CALL_ERROR_INVALID_ARGUMENT;

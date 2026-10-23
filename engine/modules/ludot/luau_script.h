@@ -112,11 +112,42 @@ public:
     HashMap<String, HashSet<String>> module_dependencies;
     HashSet<String> invalidate_modules(const String &p_path);
     HashSet<StringName> native_classes;
+    struct NativeMember {
+        enum Kind { PROPERTY, SIGNAL, METHOD };
+        Kind kind = PROPERTY;
+        StringName name;
+        Variant::Type type = Variant::NIL;
+        int method_ref = LUA_NOREF;
+    };
+    // Static members of native classes and builtin types, keyed by class or type name and then Luau name.
+    HashMap<StringName, HashMap<String, NativeMember>> native_members;
     String last_error;
     static LuauLanguage *get_singleton() { return singleton; }
     static String api_name(const String &p_name, bool p_property = false);
     static void push_variant(lua_State *L, const Variant &p_value);
     static Variant to_variant(lua_State *L, int p_index, int p_depth = 0);
+    // Converts without raising a Luau error. On failure last_error holds the reason.
+    static bool try_variant(lua_State *L, int p_index, Variant &r_value);
+    struct Profile {
+        uint64_t call_count = 0;
+        uint64_t total_time = 0;
+        uint64_t self_time = 0;
+        uint64_t internal_time = 0;
+    };
+    bool profiling = false;
+    bool profile_native_calls = false;
+    HashMap<String, Profile> profile_accumulated;
+    HashMap<String, Profile> profile_frame;
+    HashMap<String, Profile> profile_last_frame;
+    struct ProfileCall {
+        uint64_t start = 0;
+        uint64_t children = 0;
+        uint64_t native = 0;
+    };
+    // One entry per active profiled call, recording time spent in nested profiled calls.
+    LocalVector<ProfileCall> profile_calls;
+    void profile_enter();
+    void profile_exit(const String &p_signature, bool p_native);
     Error ensure_native_class(const StringName &p_name);
     Error load_chunk(const String &p_source, const String &p_path, lua_State *p_state = nullptr);
     Dictionary module_aliases(const String &p_from) const;
@@ -160,11 +191,12 @@ public:
     bool debug_evaluate_expression(int p_level, const String &p_expression, Variant &r_value, String &r_error) override;
     void debug_get_globals(List<String> *r_names, List<Variant> *r_values, int p_max_subitems, int p_max_depth) override;
     String debug_parse_stack_level_expression(int p_level, const String &p_expression, int p_max_subitems, int p_max_depth) override;
-    void profiling_start() override {}
-    void profiling_stop() override {}
-    void profiling_set_save_native_calls(bool p_enable) override {}
-    int profiling_get_accumulated_data(ProfilingInfo *p_info, int p_max) override { return 0; }
-    int profiling_get_frame_data(ProfilingInfo *p_info, int p_max) override { return 0; }
+    void profiling_start() override;
+    void profiling_stop() override;
+    void profiling_set_save_native_calls(bool p_enable) override;
+    int profiling_get_accumulated_data(ProfilingInfo *p_info, int p_max) override;
+    int profiling_get_frame_data(ProfilingInfo *p_info, int p_max) override;
+    void frame() override;
     LuauLanguage();
     ~LuauLanguage() override { singleton = nullptr; }
 };

@@ -17,4 +17,7 @@ class DebuggerProbe extends Node = {
         assert(success)
         return result
     end
+    function profiled(): number
+        return self:getChildCount() + self.Health
+    end
 }

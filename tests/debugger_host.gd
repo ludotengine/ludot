@@ -127,5 +127,13 @@ func run() -> void:
     send("continue")
     await receive("debug_exit")
     if failed: return
+    var profiled_luau := false
+    var profiled_native := false
+    while not profiled_luau or not profiled_native:
+        var signature := await receive("servers:function_signature")
+        if failed: return
+        var name := str(signature[2][0])
+        profiled_luau = profiled_luau or (name.begins_with("res://DebuggerProbe.luau::") and name.ends_with("::DebuggerProbe.profiled"))
+        profiled_native = profiled_native or name == "res://DebuggerProbe.luau::0::Node.getChildCount"
     print("LUDOT_DEBUGGER_TESTS_PASSED")
     quit()

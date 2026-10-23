@@ -48,10 +48,24 @@ public:
         lua_State *L = language->active_state != nullptr ? language->active_state : language->state;
         const int top = lua_gettop(L);
         lua_getref(L, reference);
+        const bool profiled = language->profiling;
+        String signature;
+        if (profiled) {
+            lua_Debug info = {};
+            lua_getinfo(L, -1, "sn", &info);
+            const String source = info.source != nullptr ? String::utf8(info.source).trim_prefix("@") : String();
+            const String name = info.name != nullptr ? String::utf8(info.name) : String("<anonymous>");
+            signature = source + "::" + itos(info.linedefined) + "::" + name;
+            language->profile_enter();
+        }
         for (int i = 0; i < p_count; ++i) LuauLanguage::push_variant(L, *p_args[i]);
-        if (lua_pcall(L, p_count, 1, 0) == LUA_OK) {
-            r_result = LuauLanguage::to_variant(L, -1);
+        const int status = lua_pcall(L, p_count, 1, 0);
+        if (profiled) language->profile_exit(signature, false);
+        if (status == LUA_OK && LuauLanguage::try_variant(L, -1, r_result)) {
             r_error.error = Callable::CallError::CALL_OK;
+        } else if (status == LUA_OK) {
+            ERR_PRINT(language->last_error);
+            r_error.error = Callable::CallError::CALL_ERROR_INVALID_ARGUMENT;
         } else {
             language->last_error = String::utf8(lua_tostring(L, -1));
             ERR_PRINT(language->last_error);
