@@ -1282,7 +1282,8 @@ Error LuauLanguage::complete_code(const String &p_code, const String &p_path, Ob
         if (cursor >= 0) {
             const String line = p_code.substr(0, cursor).get_slice("\n", p_code.substr(0, cursor).get_slice_count("\n") - 1);
             const int quote = MAX(line.rfind("\""), line.rfind("'"));
-            if (quote >= 0) {
+            // An even quote count means the cursor follows a closed string rather than sitting inside one.
+            if (quote >= 0 && line.count(line.substr(quote, 1)) % 2 == 1) {
                 const String before = line.substr(0, quote).strip_edges();
                 if (before.begins_with("import ") || before.ends_with("from") || before.ends_with("require(")) {
                     const String requested = line.substr(quote + 1);

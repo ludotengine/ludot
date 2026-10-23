@@ -60,25 +60,49 @@ hover, and alias-aware import/require completion. It converts LSP UTF-16 positio
 to Luau UTF-8 byte columns. Set `ludot.requireAutocomplete` to false to turn off
 module path completion.
 
-The standalone LSP loads `types/core.d.luau` by default. It covers common runtime
-classes and built-in value types. Extend that subset by generating declarations
-from this fork's extension API, then pass the file with `--definitions`:
+The standalone LSP loads the complete engine API from `types/engine.api` directly into
+the checker. Regenerate it after changing engine classes:
 
 ```sh
 engine/bin/ludot.linuxbsd.editor.x86_64 --headless --dump-extension-api
-python tools/generate_api_types.py extension_api.json types/custom.d.luau --classes Node,CharacterBody2D,SceneTree,Resource,Input
-python tools/ludot-lsp --definitions types/custom.d.luau
+python tools/generate_api_manifest.py extension_api.json types/engine.api
 ```
 
-Generating the entire engine API currently exceeds the definition checker's
-complexity limits. Use a class subset with its ancestors. References to classes
-outside the selected subset become `any`. Full standalone engine API coverage
-remains unfinished.
+`--definitions` adds a Luau declaration file on top of the engine API.
+
+One analyzer process stays alive for the whole session. It reuses type information
+and module dependencies, so editing an unsaved import updates the diagnostics of
+files that depend on it. The server also supports request cancellation,
+go-to-definition (including through imports), references, rename, and signature
+help.
 
 The native editor derives its signatures directly from ClassDB and Variant
-reflection. It does not need this declaration file. The standalone LSP currently
-starts a checker process per request. Incremental native LSP sessions, cancellation,
-go-to-definition, rename, and signature help remain unfinished.
+reflection. It does not use `engine.api`.
+
+To package the server as a self-contained directory, with Python, `luau-analyze`,
+`ludot-shader`, and the API data, install PyInstaller into the virtual environment
+and run:
+
+```sh
+.venv/bin/pip install pyinstaller
+.venv/bin/python tools/package_lsp.py
+```
+
+The script writes `dist/ludot-lsp/` plus an archive, and then runs the packaged server
+through a protocol check from an unrelated directory.
+
+## Export templates
+
+Godot's official export templates do not contain the Luau module, so the export
+template manager does not offer downloads. Build templates from this tree:
+
+```sh
+.venv/bin/scons -C engine platform=linuxbsd target=template_release module_mono_enabled=no -j4
+.venv/bin/scons -C engine platform=linuxbsd target=template_debug module_mono_enabled=no -j4
+```
+
+Select the resulting binaries in `engine/bin/` as custom templates in the export
+preset. Template builds include the Luau VM and compiler, without the editor analyzer.
 
 ## Continuous integration
 

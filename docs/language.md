@@ -33,10 +33,11 @@ Privacy is a type-checking rule, not a sandbox against reflective engine access 
 unchecked bytecode. Editor range hints are permitted only on exported properties.
 No new decorators are introduced.
 
-An attached engine script currently needs a direct native engine base, such as
-`Node`, `CharacterBody2D`, or `Resource`. General Luau modules can return tables,
-functions, or classes. Script-to-script inheritance in attached resources remains
-unfinished.
+An attached engine script extends a native engine class, such as `Node`,
+`CharacterBody2D`, or `Resource`, or another Luau script class imported from its
+module. Derived scripts inherit fields, defaults, and methods, and reloading a base
+script reloads its live derived instances. General Luau modules can return tables,
+functions, or classes.
 
 ## Imports
 
@@ -78,7 +79,10 @@ example, `move_and_slide` becomes `moveAndSlide`, `velocity` becomes `Velocity`,
 and `_physics_process` becomes `_physicsProcess`. `_ready` keeps its spelling.
 GDScript and engine internals keep the original Godot names.
 
-The current native binding reflects methods and properties. Complete support for
-static methods, constants, signal callbacks, typed collection conversion, and
-reference-counted object lifetime needs further work. Native property synchronization
-currently occurs at script callback boundaries. It is not yet a direct property proxy.
+The native binding reflects methods, properties, signals, static methods, and
+constants. Property reads and writes go straight to the engine object, so
+`self.Name = "x"` is visible to `self:getName()` on the next line. Member lookups use
+a per-class cache built from ClassDB. Scripted and dynamic properties fall back to a
+reflective scan. Luau functions convert to engine `Callable` values, so
+`timer.Timeout:connect(onTimeout)` works. Arrays, dictionaries, and packed arrays
+support indexing (from 1), `#`, and iteration.

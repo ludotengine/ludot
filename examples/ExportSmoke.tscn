@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://cstsv5jfjiu1d" path="res://ExportSmoke.gd" id="1"]
+
+[node name="ExportSmoke" type="Node"]
+script = ExtResource("1")

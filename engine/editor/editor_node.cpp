@@ -3928,14 +3928,14 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 			OS::get_singleton()->shell_open("https://forum.godotengine.org/");
 		} break;
 		case HELP_REPORT_A_BUG: {
-			OS::get_singleton()->shell_open("https://github.com/godotengine/godot/issues");
+			OS::get_singleton()->shell_open("https://github.com/ludotengine/ludot/issues");
 		} break;
 		case HELP_COPY_SYSTEM_INFO: {
 			String info = _get_system_info();
 			DisplayServer::get_singleton()->clipboard_set(info);
 		} break;
 		case HELP_SUGGEST_A_FEATURE: {
-			OS::get_singleton()->shell_open("https://github.com/godotengine/godot-proposals#readme");
+			OS::get_singleton()->shell_open("https://github.com/ludotengine/ludot/issues");
 		} break;
 		case HELP_SEND_DOCS_FEEDBACK: {
 			OS::get_singleton()->shell_open("https://github.com/godotengine/godot-docs/issues");

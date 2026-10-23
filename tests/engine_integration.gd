@@ -97,12 +97,45 @@ func _init() -> void:
         shader.set_source("shader canvas_item\nfunction fragment() local t = {} end")
         check(shader.get_code() == generated, "Invalid shader edit retains the previous program")
         check(not shader.get_diagnostics().is_empty(), "Shader diagnostics are available")
+        var spatial := LuauShader.new()
+        spatial.set_source("""shader spatial
+renderMode("unshaded", "cull_disabled")
+export Cutoff: number = 0.5 in 0 to 1 step 0.05
+export Steps: int = 3 in 1 to 8
+local Height: number
+local Scale: number = 2
+local function wave(x: number): number
+    return sin(x * Scale)
+end
+function vertex()
+    Height = wave(Vertex.y + Time)
+end
+function fragment()
+    local total: number = 0
+    for i = 1, Steps do
+        if i % 2 == 0 then continue end
+        total += Height / float(i)
+    end
+    local k: int = 0
+    while k < 4 do k += 1 end
+    if total < Cutoff then discard() elseif k > 3 then Albedo = vec3(total) else Albedo = vec3(0) end
+end""")
+        check(spatial.get_diagnostics().is_empty(), "Shader loops, helpers, varyings and render modes pass engine validation: " + str(spatial.get_diagnostics()))
+        check(spatial.get_code().contains("render_mode unshaded, cull_disabled;"), "Shader render modes reach the engine")
     script.set_source_code('class Checker extends Node = { private Health: number = 1 function _ready() self.Health = "wrong" end }')
     var type_errors: Array = script.get_diagnostics()
     check(not type_errors.is_empty(), "Native editor type checker reports type errors")
     print("Native type diagnostics: ", type_errors)
     var completions: PackedStringArray = script.get_completions("class Checker extends Node = { function _ready() self:" + String.chr(0xffff) + " end }")
     check(completions.has("getChildCount"), "Native editor completion includes typed engine methods")
+    completions = script.get_completions('import add from "@hel' + String.chr(0xffff))
+    check(completions.has("@helpers"), "Native import completion lists aliases: " + str(completions))
+    completions = script.get_completions('import add from "@helpers/' + String.chr(0xffff))
+    check(completions.has("@helpers/mathutils"), "Native import completion lists alias modules: " + str(completions))
+    completions = script.get_completions('local m = require("@helpers/' + String.chr(0xffff))
+    check(completions.has("@helpers/mathutils"), "Native require completion uses aliases")
+    completions = script.get_completions('import add from "@helpers/mathutils" ' + String.chr(0xffff))
+    check(not completions.has("@helpers/mathutils"), "Path completion stops after a closed import string")
     var ref_script = ClassDB.instantiate("LuauScript")
     ref_script.set_source_code("class Owned extends RefCounted = { private Value: number = 1 }")
     check(ref_script.reload() == OK, "RefCounted script compiles")

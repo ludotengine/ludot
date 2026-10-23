@@ -66,28 +66,10 @@ void ExportTemplateManager::_request_mirrors() {
 	mirrors_empty = true;
 	_update_install_button();
 
-	// Downloadable export templates are only available for stable and official alpha/beta/RC builds
-	// (which always have a number following their status, e.g. "alpha1").
-	// Therefore, don't display download-related features when using a development version
-	// (whose builds aren't numbered).
-	if (!strcmp(GODOT_VERSION_STATUS, "dev") || !strcmp(GODOT_VERSION_STATUS, "beta") || !strcmp(GODOT_VERSION_STATUS, "rc")) {
-		_set_empty_mirror_list();
-		mirrors_list->set_tooltip_text(TTRC("Official export templates aren't available for development builds."));
-#ifdef REAL_T_IS_DOUBLE
-	} else if (true) {
-		_set_empty_mirror_list();
-		mirrors_list->set_tooltip_text(TTRC("Official export templates aren't available for double-precision builds."));
-#endif
-	} else if (!_is_online()) {
-		mirrors_list->set_tooltip_text(TTRC("Template downloading is disabled in offline mode."));
-	} else {
-		mirrors_list->set_tooltip_text(String());
-	}
-
-	if (mirrors_list->get_tooltip_text().is_empty()) {
-		const String mirrors_metadata_url = vformat("https://godotengine.org/mirrorlist/%s.json", GODOT_VERSION_FULL_CONFIG);
-		mirrors_requester->request(mirrors_metadata_url);
-	}
+	// Ludot does not publish downloadable templates. Godot's official templates lack the Luau
+	// module, so templates must be built from this source tree and installed from a file.
+	_set_empty_mirror_list();
+	mirrors_list->set_tooltip_text(TTRC("Ludot export templates are built from source. Use \"Install from File\" with templates built as described in docs/building.md."));
 }
 
 void ExportTemplateManager::_mirrors_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body) {
