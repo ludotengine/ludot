@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix='ludot-export-') as directory:
     pack = Path(directory) / 'game.pck'
     export = subprocess.run([engine, '--headless', '--editor', '--path', str(root / 'examples'), '--export-pack', 'Desktop test', str(pack)], capture_output=True, text=True, timeout=120)
     if export.returncode != 0 or not pack.is_file():
-        raise SystemExit(export.stdout + export.stderr)
+        raise SystemExit(f'Export failed: exit {export.returncode}, pack exists: {pack.is_file()}\n' + export.stdout + export.stderr)
     if args.template:
         # Release templates ignore --main-pack, --script, and scene arguments. Ship the pack beside
         # the executable and select the smoke scene through override.cfg, as a deployed game would.
@@ -29,4 +29,4 @@ with tempfile.TemporaryDirectory(prefix='ludot-export-') as directory:
     run = subprocess.run(command, capture_output=True, text=True, timeout=30, cwd=directory)
     print(run.stdout, end='')
     if run.returncode != 0 or 'LUDOT_EXPORT_TESTS_PASSED' not in run.stdout or 'SCRIPT ERROR:' in run.stderr:
-        raise SystemExit(run.stdout + run.stderr)
+        raise SystemExit(f'Exported game failed: exit {run.returncode}\n' + run.stdout + run.stderr)

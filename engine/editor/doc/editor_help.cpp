@@ -3093,6 +3093,13 @@ static void _load_script_doc_cache(bool p_changes) {
 }
 
 void EditorHelp::load_script_doc_cache() {
+	// Native documentation workers defer this callback to the main thread. During
+	// command-line exports it can reach the queue after the editor has shut down.
+	// Starting a new worker then would access the destroyed EditorFileSystem tree.
+	if (EditorNode::get_singleton() == nullptr) {
+		return;
+	}
+
 	if (!ProjectSettings::get_singleton()->is_project_loaded()) {
 		print_verbose("Skipping loading script doc cache since no project is open.");
 		return;

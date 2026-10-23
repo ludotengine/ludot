@@ -40,6 +40,8 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   script builds a self-contained distribution.
 - Ludot product name, logo, and issue links. The upstream update check and official
   template downloads are disabled, since Godot builds lack the Luau module.
+- Deferred documentation-cache loads are cancelled after editor shutdown, so a
+  command-line export cannot start a documentation worker on the freed filesystem.
 
 ## Known limits
 
@@ -69,6 +71,9 @@ Local Linux results:
   `template_release` build running the exported pack the way a shipped game does
   (pack beside the executable, scene selected through `override.cfg`).
 - `tools/package_lsp.py` builds the standalone LSP and passes its protocol check.
+- The optimized Linux SCU editor passes the engine, debugger, and exported-pack
+  suites. Five fresh-cache editor startup/shutdown checks pass after the deferred
+  documentation callback fix.
 
 A loop of 100,000 iterations, each reading a `Vector2` field, reading a `Timer`
 property, and calling a `Timer` method, took about 0.57 s in the unoptimized
