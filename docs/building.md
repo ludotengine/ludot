@@ -42,6 +42,9 @@ CI restores this compiler cache on Linux and macOS. Windows uses MSVC directly.
 
 Use `platform=windows` with an MSVC developer environment on Windows and
 `platform=macos` on macOS. Ludot's module is desktop-only. GDScript stays enabled.
+Luau sources use MSVC's `/fp:precise` mode, since their VM arithmetic pragmas cannot
+compile with the floating-point exception mode enabled by Godot's `/fp:strict`.
+Godot and the native binding keep their existing compilation settings.
 The fork includes mobile and web source inherited from Godot, but Ludot does not
 support or build those targets.
 

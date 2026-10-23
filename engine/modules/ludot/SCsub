@@ -15,11 +15,22 @@ else:
 if env.editor_build:
     for component in ['Analysis', 'Config']:
         ludot.Append(CPPPATH=[str(root / 'luau' / component / 'include')])
+
+luau_build = ludot.Clone()
+if env['platform'] == 'windows' and not env['use_mingw']:
+    # Godot uses /fp:strict, which enables FP exceptions. Luau temporarily turns
+    # precise arithmetic off for selected VM operations, incompatible with those
+    # exceptions. Use MSVC's default precise mode for Luau sources only.
+    luau_build['CCFLAGS'] = [flag for flag in luau_build['CCFLAGS'] if not flag.startswith('/fp:')]
+    luau_build.Append(CCFLAGS=['/fp:precise'])
+
+if env.editor_build:
+    for component in ['Analysis', 'Config']:
         for source in sorted((root / 'luau' / component / 'src').glob('*.cpp')):
-            env.modules_sources.append(ludot.Object(target='generated/' + component + '/' + source.stem, source=str(source)))
+            env.modules_sources.append(luau_build.Object(target='generated/' + component + '/' + source.stem, source=str(source)))
 ludot.add_source_files(env.modules_sources, '*.cpp')
 for component in ['Common', 'Ast', 'Bytecode', 'Inliner', 'Compiler', 'VM']:
     for source in sorted((root / 'luau' / component / 'src').glob('*.cpp')):
-        obj = ludot.Object(target='generated/' + component + '/' + source.stem, source=str(source))
+        obj = luau_build.Object(target='generated/' + component + '/' + source.stem, source=str(source))
         env.modules_sources.append(obj)
 env.modules_sources.append(ludot.Object(target='generated/shader', source=str(root / 'language/src/shader.cpp')))
