@@ -46,7 +46,8 @@ repeatedly. This keeps the default runtime optimization and editor features.
 
 For repeated language-tool builds, install ccache and configure CMake with
 `-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache`.
-CI restores this compiler cache on Linux and macOS. Windows uses MSVC directly.
+CI restores this compiler cache on Linux and macOS. Windows uses sccache with MSVC
+and GitHub's cache backend, configured through the same CMake launcher options.
 
 Use `platform=windows` with an MSVC developer environment on Windows and
 `platform=macos` on macOS. Ludot's module is desktop-only. GDScript stays enabled.
@@ -98,6 +99,13 @@ initial link failed because mold was unavailable in that environment. Relinking
 with the default linker took 18 seconds, and the headless engine regression passed.
 This run and the Clang measurement above use different optimization settings and
 are not a controlled timing comparison. No Windows or macOS SCU result is claimed.
+
+A cache-backed macOS CI editor rebuild at `a25fa13` took 57.08 seconds. The complete
+job, including language tools, standalone packaging, and all desktop regressions,
+took 6 minutes 23 seconds
+([job](https://github.com/ludotengine/ludot/actions/runs/40037145384/job/120701010724)).
+This measures a rebuild using saved objects, rather than a clean build with an
+empty cache.
 
 ## Standalone LSP
 

@@ -25,6 +25,8 @@ for source, destination, kind in [
     (root / 'types/engine.api', 'share/ludot', 'data'),
     (root / 'LICENSE', 'share/licenses/ludot', 'data'),
     (root / 'luau/LICENSE.txt', 'share/licenses/luau', 'data'),
+    (root / 'luau/lua_LICENSE.txt', 'share/licenses/luau', 'data'),
+    (root / 'engine/LICENSE.txt', 'share/licenses/godot', 'data'),
 ]:
     command += ['--add-' + kind, str(source) + ':' + destination]
 license_paths = [Path(sys.base_prefix) / 'LICENSE.txt', Path('/usr/share/licenses/python/LICENSE'), Path('/usr/share/doc/libstdc++6/copyright'), Path('/usr/share/licenses/gcc-libs/COPYING.RUNTIME'), Path('/usr/share/licenses/gcc-libs/COPYING3')]

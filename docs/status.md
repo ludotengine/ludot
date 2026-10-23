@@ -39,7 +39,7 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 - Standalone stdio LSP with a persistent analyzer session, the complete engine API,
   diagnostics, completion, hover, definitions, references, rename, signature help,
   cancellation, unsaved-buffer overlays, and UTF-16 position conversion. A packaging
-  script builds a self-contained distribution.
+  script builds a self-contained distribution with runtime and upstream license notices.
 - Ludot product name, logo, and issue links. The upstream update check and official
   template downloads are disabled, since Godot builds lack the Luau module.
 - Deferred documentation-cache loads are cancelled after editor shutdown, so a
@@ -82,8 +82,8 @@ A loop of 100,000 iterations, each reading a `Vector2` field, reading a `Timer`
 property, and calling a `Timer` method, took about 0.57 s in the unoptimized
 development build. It took about 61.6 s before the member cache.
 
-The macOS editor build and native engine integration suite passed in GitHub Actions
-at `7ebd0c7` ([run](https://github.com/ludotengine/ludot/actions/runs/40034285979)).
+The macOS editor, language/shader/LSP suites, standalone package, debugger, and
+exported-pack checks passed in GitHub Actions at `a25fa13`
+([job](https://github.com/ludotengine/ludot/actions/runs/40037145384/job/120701010724)).
 Windows still needs validation of the MSVC floating-point mode fix in `4c08027`
-or later. The workflow's debugger, exported-pack, and standalone-package checks are
-newer than that macOS result; only their Linux results are verified above.
+or later. The latest Linux CI build is also pending; its local results are above.

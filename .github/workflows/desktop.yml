@@ -14,6 +14,7 @@ env:
   CACHE_DIRECTORY: ${{ github.workspace }}/.scons_cache/
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   CCACHE_MAXSIZE: 500M
+  SCCACHE_GHA_ENABLED: 'true'
 jobs:
   desktop:
     strategy:
@@ -38,6 +39,11 @@ jobs:
           python-version: '3.12'
       - uses: ilammy/msvc-dev-cmd@v1.13.0
         if: runner.os == 'Windows'
+      - name: Windows compiler cache
+        if: runner.os == 'Windows'
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: v0.18.0
       - name: Linux dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ccache mold libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libudev-dev
@@ -62,10 +68,20 @@ jobs:
           flags=()
           if [ "$RUNNER_OS" != "Windows" ]; then
             flags+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+          else
+            flags+=(-DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache)
           fi
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUAU_BUILD_TESTS=OFF "${flags[@]}"
       - name: Build language tools
         run: cmake --build build --target Luau.Repl.CLI Luau.Analyze.CLI Luau.Compile.CLI ludot-shader --parallel
+      - name: Compiler cache statistics
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            sccache --show-stats
+          else
+            ccache --show-stats
+          fi
       - name: Save language compiler cache
         if: always() && runner.os != 'Windows'
         uses: actions/cache/save@v6
