@@ -10,7 +10,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 env:
-  SCONS_CACHE: ${{ github.workspace }}/.scons_cache/
+  CACHE_DIRECTORY: ${{ github.workspace }}/.scons_cache/
 jobs:
   desktop:
     strategy:
@@ -23,7 +23,8 @@ jobs:
           - os: windows-2022
             platform: windows
             sconsflags: ''
-          - os: macos-14
+          # Godot 4.7 requires Apple Clang 16 or newer.
+          - os: macos-26
             platform: macos
             sconsflags: ''
     runs-on: ${{ matrix.os }}
@@ -52,7 +53,7 @@ jobs:
       - name: Restore SCons cache
         uses: actions/cache/restore@v6
         with:
-          path: ${{ env.SCONS_CACHE }}
+          path: ${{ env.CACHE_DIRECTORY }}
           key: scons-${{ matrix.platform }}-${{ github.ref_name }}-${{ github.sha }}
           restore-keys: |
             scons-${{ matrix.platform }}-${{ github.ref_name }}-
@@ -83,16 +84,16 @@ jobs:
         id: build
         working-directory: engine
         shell: bash
-        run: scons platform=${{ matrix.platform }} target=editor debug_symbols=no module_mono_enabled=no ${{ matrix.sconsflags }} ${{ steps.deps.outputs.flags }} -j$(python -c "import os; print(os.cpu_count())" | tr -d '\r')
+        run: scons platform=${{ matrix.platform }} target=editor debug_symbols=no module_mono_enabled=no cache_path="$CACHE_DIRECTORY" ${{ matrix.sconsflags }} ${{ steps.deps.outputs.flags }} -j$(python -c "import os; print(os.cpu_count())" | tr -d '\r')
       - name: Drop cache entries the build did not use
         if: always() && steps.build.outcome != 'skipped'
         working-directory: engine
-        run: python misc/scripts/purge_cache.py ${{ env.CACHE_TIMESTAMP }} "${{ env.SCONS_CACHE }}"
+        run: python misc/scripts/purge_cache.py ${{ env.CACHE_TIMESTAMP }} "${{ env.CACHE_DIRECTORY }}"
       - name: Save SCons cache
         if: always() && steps.build.outcome != 'skipped'
         uses: actions/cache/save@v6
         with:
-          path: ${{ env.SCONS_CACHE }}
+          path: ${{ env.CACHE_DIRECTORY }}
           key: scons-${{ matrix.platform }}-${{ github.ref_name }}-${{ github.sha }}
       - name: Native engine integration tests
         run: python tools/test_engine.py
