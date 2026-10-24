@@ -29,6 +29,11 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 - Attach Script offers empty, Node lifecycle, and CharacterBody2D/3D movement
   templates. Luau resources use the official Luau icon. Native completion includes
   function/type/property/signal icons, parentheses, parameter hints, and `:` triggers.
+- In the active editor scene, literal `self:getNode(...)` paths and `self:getParent()`
+  infer the target native/script type, including chained literal lookups. Script
+  class names in that scene can be used directly as instance annotations.
+  `getNodeOrNull` keeps a nullable type. Custom script method names retain their
+  original spelling when called through a node reference.
 - Native editor checking and completion using Luau Analysis and reflected engine
   signatures, including alias-aware import and `require` path completion. Project
   setting `luau/editor/require_autocomplete` turns path completion off.
@@ -67,6 +72,9 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   variables it captures changed. Field values that cannot convert to a new type reset
   to the new default.
 - Shader type checking beyond the Luau subset happens in the engine, after lowering.
+- Scene-based node inference currently uses the active native editor scene and
+  paths rooted at `self`. Dynamic paths, unrelated receiver variables, and standalone
+  LSP sessions use the general engine return type.
 - Mobile and web targets inherited from Godot are not supported.
 
 ## Verification
@@ -91,7 +99,10 @@ Local Linux results:
 - The optimized Linux SCU editor passes the engine, debugger, exported-pack, and
   native editor suites. The editor suite opens real Luau files, migrates a saved
   Plain Text choice, checks Unicode/interpolated/long-bracket coloring and typed
-  completion icons, and creates/type-checks all four built-in templates. Five fresh-cache editor startup/shutdown checks pass after the deferred
+  completion icons, and creates/type-checks all four built-in templates. It also
+  checks typed parent-script lookup, direct instance annotations, nullable narrowing,
+  and invalidation when a parent script changes. Runtime checks call a custom
+  parent method through a child node lookup. Five fresh-cache editor startup/shutdown checks pass after the deferred
   documentation callback fix.
 
 A loop of 100,000 iterations, each reading a `Vector2` field, reading a `Timer`

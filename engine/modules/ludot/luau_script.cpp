@@ -320,8 +320,11 @@ int native_index(lua_State *L) {
     }
     List<MethodInfo> methods;
     self.get_method_list(&methods);
+    Object *object = self.get_type() == Variant::OBJECT ? static_cast<Object *>(self) : nullptr;
+    ScriptInstance *script_instance = object != nullptr ? object->get_script_instance() : nullptr;
     for (const MethodInfo &method : methods) {
-        if (LuauLanguage::api_name(method.name) == requested) {
+        const bool exact_script_method = method.name == requested && script_instance != nullptr && script_instance->has_method(method.name);
+        if (exact_script_method || LuauLanguage::api_name(method.name) == requested) {
             lua_pushstring(L, String(method.name).utf8().get_data());
             lua_pushcclosure(L, native_call, "native method", 1);
             return 1;
@@ -1614,7 +1617,7 @@ Error LuauLanguage::complete_code(const String &p_code, const String &p_path, Ob
             }
         }
     }
-    return ludot_complete(p_code, p_path, r_options, r_call_hint);
+    return ludot_complete(p_code, p_path, r_options, r_call_hint, p_owner);
 #else
     return ERR_UNAVAILABLE;
 #endif

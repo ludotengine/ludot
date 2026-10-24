@@ -14,6 +14,9 @@ func _enter_tree() -> void:
 func run() -> void:
     for frame in range(8):
         await get_tree().process_frame
+    EditorInterface.open_scene_from_path("res://main.tscn")
+    for frame in range(4):
+        await get_tree().process_frame
     var script = load("res://Player.luau")
     EditorInterface.edit_script(script)
     for frame in range(3):
@@ -52,6 +55,31 @@ func run() -> void:
             check(option.kind == CodeEdit.KIND_FUNCTION, "Native methods use function completion icons")
             check(option.icon != null, "Native method completion includes an icon")
     check(found_method, "Typed native method completion reaches CodeEdit")
+    var original_source: String = script.source_code
+    var scene_source = 'class Player extends Node = { function _ready() const node = self:getNode("..") node:Start() end }'
+    script.source_code = scene_source
+    check(script.get_diagnostics().is_empty(), "Parent lookup infers attached script without a cast: " + str(script.get_diagnostics()))
+    var scene_completions = script.get_completions('class Player extends Node = { function _ready() const node = self:getNode("..") node:' + String.chr(0xffff) + ' end }')
+    check(scene_completions.has("Start"), "Parent lookup completion preserves custom script method names")
+    script.source_code = scene_source.replace('const node =', 'const node: NodeNode =')
+    check(script.get_diagnostics().is_empty(), "Script class names work directly as instance annotations")
+    script.source_code = scene_source.replace('node:Start()', 'node:Add("wrong")')
+    check(not script.get_diagnostics().is_empty(), "Inferred script methods retain their argument types")
+    script.source_code = scene_source.replace('node:Start()', 'node:MissingMethod()')
+    check(not script.get_diagnostics().is_empty(), "Inferred nodes reject unknown methods")
+    script.source_code = scene_source.replace('self:getNode("..")', 'self:getParent()')
+    check(script.get_diagnostics().is_empty(), "getParent infers the attached script")
+    script.source_code = scene_source.replace('self:getNode("..")', 'self:getNodeOrNull("..")')
+    check(not script.get_diagnostics().is_empty(), "getNodeOrNull retains its nullable result")
+    script.source_code = scene_source.replace('self:getNode("..")', 'self:getNodeOrNull("..")').replace('node:Start()', 'if node ~= nil then node:Start() end')
+    check(script.get_diagnostics().is_empty(), "Nullable node results narrow after a nil check")
+    var parent_script = EditorInterface.get_edited_scene_root().get_script()
+    var parent_source: String = parent_script.source_code
+    parent_script.source_code = parent_source.replace("function Start()", "function Begin()")
+    scene_completions = script.get_completions('class Player extends Node = { function _ready() const node = self:getNode("..") node:' + String.chr(0xffff) + ' end }')
+    check(scene_completions.has("Begin") and not scene_completions.has("Start"), "Changing the parent script invalidates inferred scene types")
+    parent_script.source_code = parent_source
+    script.source_code = original_source
     # Exercise the same ScriptCreateDialog used by Attach Script.
     var dialog = ClassDB.instantiate("ScriptCreateDialog")
     EditorInterface.get_base_control().add_child(dialog)

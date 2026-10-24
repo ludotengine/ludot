@@ -4,6 +4,11 @@
 #include "Luau/Autocomplete.h"
 #include "Luau/AstQuery.h"
 #include "Luau/TypePack.h"
+#include "Luau/Clone.h"
+#include "Luau/ConstraintSolver.h"
+#include "editor/editor_node.h"
+#include "core/os/thread.h"
+#include "scene/main/node.h"
 #include "Luau/BuiltinDefinitions.h"
 #include "Luau/Config.h"
 #include "Luau/Frontend.h"
@@ -36,12 +41,28 @@ struct Config : Luau::ConfigResolver {
     Config() { config.mode = Luau::Mode::Strict; }
     const Luau::Config &getConfig(const Luau::ModuleName &name, const Luau::TypeCheckLimits &limits) const override { return config; }
 };
+struct SceneNodeLookup : Luau::MagicFunction {
+    std::function<std::optional<Luau::TypeId>(const Luau::MagicFunctionCallContext &)> resolve;
+    explicit SceneNodeLookup(decltype(resolve) p_resolve) : resolve(std::move(p_resolve)) {}
+    std::optional<Luau::WithPredicate<Luau::TypePackId>> handleOldSolver(Luau::TypeChecker &, const std::shared_ptr<Luau::Scope> &, const Luau::AstExprCall &, Luau::WithPredicate<Luau::TypePackId>) override { return std::nullopt; }
+    bool infer(const Luau::MagicFunctionCallContext &context) override {
+        const auto type = resolve(context);
+        if (!type) return false;
+        context.solver->bind(context.constraint, context.result, context.solver->arena->addTypePack({*type}));
+        return true;
+    }
+};
 struct Session {
     Files files;
     Config configs;
     Luau::Frontend frontend;
     std::unordered_map<std::string, Luau::TypeId> instances;
     std::unordered_map<std::string, Luau::TypeId> classes;
+    String scene_fingerprint;
+    ObjectID scene_root;
+    ObjectID analysis_owner;
+    String primary_path;
+    std::unordered_map<std::string, Luau::TypeId> script_instances;
     explicit Session() : frontend(Luau::SolverMode::New, &files, &configs) {
         using namespace Luau;
         registerBuiltinGlobals(frontend, frontend.globals);
@@ -127,7 +148,91 @@ struct Session {
             const auto it = instances.find(utf8(entry.ptr->get_class_name()));
             if (it != instances.end()) scope->bindings[frontend.globals.globalNames.names->getOrAdd(utf8(entry.name).c_str())] = Binding{it->second, Location()};
         }
+        for (const char *method : {"getNode", "getNodeOrNull", "getParent"}) {
+            const auto node = getMutable<ExternType>(instances.at("Node"));
+            const auto fn = getMutable<FunctionType>(*node->props.at(method).readTy);
+            fn->magic = std::make_shared<SceneNodeLookup>([this](const MagicFunctionCallContext &context) { return scene_result(context); });
+        }
         freeze(arena);
+    }
+    Node *find_script_node(Node *node, const String &path) const {
+        if (node == nullptr) return nullptr;
+        const Ref<Script> script = node->get_script();
+        if (script.is_valid() && script->get_path() == path) return node;
+        for (int i = 0; i < node->get_child_count(); ++i) {
+            if (auto found = find_script_node(node->get_child(i), path)) return found;
+        }
+        return nullptr;
+    }
+    Node *resolve_scene_expression(Luau::AstExpr *expr, const String &path) const {
+        if (auto group = expr->as<Luau::AstExprGroup>()) return resolve_scene_expression(group->expr, path);
+        if (auto local = expr->as<Luau::AstExprLocal>(); local && local->local->name == "self") {
+            if (path == primary_path && analysis_owner.is_valid()) return Object::cast_to<Node>(ObjectDB::get_instance(analysis_owner));
+            return find_script_node(Object::cast_to<Node>(ObjectDB::get_instance(scene_root)), path);
+        }
+        const auto call = expr->as<Luau::AstExprCall>();
+        if (call == nullptr || !call->self) return nullptr;
+        const auto index = call->func->as<Luau::AstExprIndexName>();
+        if (index == nullptr) return nullptr;
+        auto receiver = resolve_scene_expression(index->expr, path);
+        if (receiver == nullptr) return nullptr;
+        if (index->index == "getParent" && call->args.size == 0) return receiver->get_parent();
+        if ((index->index == "getNode" || index->index == "getNodeOrNull") && call->args.size == 1) {
+            if (auto literal = call->args.data[0]->as<Luau::AstExprConstantString>())
+                return receiver->get_node_or_null(NodePath(String::utf8(literal->value.data, literal->value.size)));
+        }
+        return nullptr;
+    }
+    std::optional<Luau::TypeId> scene_result(const Luau::MagicFunctionCallContext &context) const {
+        if (!Thread::is_main_thread()) return std::nullopt;
+        const String module_path = String::utf8(context.constraint->moduleName->c_str());
+        auto target = resolve_scene_expression(const_cast<Luau::AstExprCall *>(context.callSite.get()), module_path);
+        if (target == nullptr) return std::nullopt;
+        auto type = instances.at(utf8(target->get_class_name()));
+        const Ref<Script> script = target->get_script();
+        if (script.is_valid()) {
+            const auto found = script_instances.find(utf8(script->get_path()));
+            if (found != script_instances.end()) type = found->second;
+            if (script->get_path() == module_path) {
+                if (auto own_type = context.constraint->scope->lookupType(utf8(script->get_global_name()))) type = own_type->type;
+            }
+        }
+        const auto index = context.callSite->func->as<Luau::AstExprIndexName>();
+        if (index && index->index == "getNodeOrNull") return context.solver->arena->addType(Luau::UnionType{{type, frontend.builtinTypes->nilType}});
+        return type;
+    }
+    void prepare_scene(Node *root, Node *owner, const String &path) {
+        scene_root = root != nullptr ? root->get_instance_id() : ObjectID();
+        analysis_owner = owner != nullptr ? owner->get_instance_id() : ObjectID();
+        primary_path = path;
+        if (root == nullptr) return;
+        Luau::FrontendOptions options;
+        options.retainFullTypeGraphs = true;
+        options.moduleTimeLimitSec = 2.0;
+        Luau::unfreeze(frontend.globals.globalTypes);
+        Luau::CloneState clones{frontend.builtinTypes};
+        for (const auto &[name, type] : instances) clones.seenTypes[type] = type;
+        for (const auto &[name, type] : classes) clones.seenTypes[type] = type;
+        std::function<void(Node *)> visit = [&](Node *node) {
+            const Ref<LuauScript> script = node->get_script();
+            if (script.is_valid() && script->get_path() != path && !script_instances.count(utf8(script->get_path()))) {
+                const auto name = update(script->get_source_code(), script->get_path());
+                frontend.check(name, options);
+                const auto module = frontend.moduleResolver.getModule(name);
+                if (module) {
+                    const auto type = module->getModuleScope()->lookupType(utf8(script->get_global_name()));
+                    if (type) {
+                        const auto copied = Luau::clone(type->type, frontend.globals.globalTypes, clones);
+                        script_instances[name] = copied;
+                        // Script classes can be named directly in instance annotations.
+                        frontend.globals.globalScope->exportedTypeBindings[utf8(script->get_global_name())] = Luau::TypeFun{{}, {}, copied};
+                    }
+                }
+            }
+            for (int i = 0; i < node->get_child_count(); ++i) visit(node->get_child(i));
+        };
+        visit(root);
+        Luau::freeze(frontend.globals.globalTypes);
     }
     Luau::TypeId type(const PropertyInfo &info) {
         const auto builtin = frontend.builtinTypes;
@@ -179,11 +284,30 @@ struct Session {
 };
 std::unique_ptr<Session> session;
 Mutex analysis_mutex;
-Session &get_session() { if (session == nullptr) session = std::make_unique<Session>(); return *session; }
+Session &get_session(const String &path, Object *owner = nullptr) {
+    Node *root = Thread::is_main_thread() && EditorNode::get_singleton() != nullptr ? EditorNode::get_singleton()->get_edited_scene() : nullptr;
+    String fingerprint = root != nullptr ? path : String();
+    std::function<void(Node *)> visit = [&](Node *node) {
+        fingerprint += String::num_uint64(node->get_instance_id()) + String(node->get_name()) + String(node->get_class_name());
+        const Ref<Script> script = node->get_script();
+        if (script.is_valid()) {
+            fingerprint += script->get_path();
+            if (script->get_path() != path) fingerprint += script->get_source_code();
+        }
+        for (int i = 0; i < node->get_child_count(); ++i) visit(node->get_child(i));
+    };
+    if (root != nullptr) visit(root);
+    if (session == nullptr || session->scene_fingerprint != fingerprint) {
+        session = std::make_unique<Session>();
+        session->scene_fingerprint = fingerprint;
+        session->prepare_scene(root, Object::cast_to<Node>(owner), path);
+    } else if (owner != nullptr) session->analysis_owner = owner->get_instance_id();
+    return *session;
+}
 }
 bool ludot_validate(const String &source, const String &path, List<ScriptLanguage::ScriptError> *errors) {
     MutexLock lock(analysis_mutex);
-    auto &analysis = get_session();
+    auto &analysis = get_session(path);
     const auto name = analysis.update(source, path);
     Luau::FrontendOptions options;
     options.retainFullTypeGraphs = true;
@@ -215,9 +339,9 @@ bool ludot_validate(const String &source, const String &path, List<ScriptLanguag
     }
     return checked.errors.empty();
 }
-Error ludot_complete(const String &source, const String &path, List<ScriptLanguage::CodeCompletionOption> *options, String &call_hint) {
+Error ludot_complete(const String &source, const String &path, List<ScriptLanguage::CodeCompletionOption> *options, String &call_hint, Object *owner) {
     MutexLock lock(analysis_mutex);
-    auto &analysis = get_session();
+    auto &analysis = get_session(path, owner);
     const int cursor = source.find(String::chr(0xffff));
     if (cursor < 0) return ERR_INVALID_PARAMETER;
     const String prefix = source.substr(0, cursor);
