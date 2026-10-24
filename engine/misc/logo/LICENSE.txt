@@ -3,3 +3,9 @@ Copyright (c) 2017 Andrea Calabró
 
 This work is licensed under the Creative Commons Attribution 4.0 International
 license (CC BY 4.0 International): https://creativecommons.org/licenses/by/4.0/
+
+Ludot modifications
+The distributed artwork combines a recolored, rotated Godot robot with the Luau
+square. The square uses the gradient and corner proportions of the Luau logo.
+Luau logo: Roblox Corporation, https://github.com/luau-lang/site/blob/master/logo.svg
+See luau/LICENSE.txt for the MIT license. Godot-derived artwork retains CC BY 4.0.

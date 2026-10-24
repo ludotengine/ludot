@@ -1614,15 +1614,69 @@ Error LuauLanguage::complete_code(const String &p_code, const String &p_path, Ob
             }
         }
     }
-    return ludot_complete(p_code, p_path, r_options);
+    return ludot_complete(p_code, p_path, r_options, r_call_hint);
 #else
     return ERR_UNAVAILABLE;
 #endif
 }
+Vector<ScriptLanguage::ScriptTemplate> LuauLanguage::get_built_in_templates(const StringName &p_object) {
+    Vector<ScriptTemplate> result;
+    ScriptTemplate entry;
+    entry.inherit = p_object;
+    if (p_object == "Object") {
+        entry.name = "Empty";
+        entry.description = "A Luau class with no callbacks.";
+        entry.content = "class _CLASS_ extends _BASE_ = {\n}\n";
+    } else if (p_object == "Node") {
+        entry.name = "Default";
+        entry.description = "Node lifecycle callbacks with typed parameters.";
+        entry.content = R"(class _CLASS_ extends _BASE_ = {
+_TS_-- Called when the node enters the scene tree.
+_TS_function _ready()
+_TS_end
+
+_TS_-- Called every frame. delta is the elapsed time in seconds.
+_TS_function _process(delta: number)
+_TS_end
+}
+)";
+    } else if (p_object == "CharacterBody2D" || p_object == "CharacterBody3D") {
+        entry.name = "Basic Movement";
+        entry.description = "Platform movement, gravity, and jumping using the built-in UI actions.";
+        entry.content = R"(class _CLASS_ extends _BASE_ = {
+_TS_export Speed: number = 300 in 0 to 1000 step 1
+_TS_export JumpVelocity: number = -400
+
+_TS_function _physicsProcess(delta: number)
+_TS__TS_local velocity = self.Velocity
+_TS__TS_if not self:isOnFloor() then
+_TS__TS__TS_velocity += self:getGravity() * delta
+_TS__TS_end
+_TS__TS_if Input:isActionJustPressed("ui_accept") and self:isOnFloor() then
+_TS__TS__TS_velocity.Y = self.JumpVelocity
+_TS__TS_end
+_TS__TS_local direction = Input:getAxis("ui_left", "ui_right")
+_TS__TS_velocity.X = direction * self.Speed
+_TS__TS_self.Velocity = velocity
+_TS__TS_self:moveAndSlide()
+_TS_end
+}
+)";
+        if (p_object == "CharacterBody3D") {
+            entry.content = entry.content.replace("= 300 in 0 to 1000 step 1", "= 5 in 0 to 100 step 0.1").replace("= -400", "= 4.5");
+        }
+    } else return result;
+    result.push_back(entry);
+    return result;
+}
 Ref<Script> LuauLanguage::make_template(const String &p_template, const String &p_class_name, const String &p_base_class_name) const {
     Ref<LuauScript> script;
     script.instantiate();
-    script->set_source_code("class " + p_class_name + " extends " + p_base_class_name + " = {\n    function _ready()\n        print(\"Ready!\")\n    end\n}\n");
+    String name = p_class_name.to_pascal_case().validate_unicode_identifier();
+    if (name.is_empty()) name = "NewScript";
+    if (name == p_base_class_name) name += "Script";
+    String content = p_template.is_empty() ? String("class _CLASS_ extends _BASE_ = {\n}\n") : p_template;
+    script->set_source_code(content.replace("_CLASS_", name).replace("_BASE_", p_base_class_name).replace("_TS_", "    "));
     return script;
 }
 int LuauLanguage::find_function(const String &p_function, const String &p_code) const {

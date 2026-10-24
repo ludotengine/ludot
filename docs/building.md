@@ -207,3 +207,13 @@ every platform has passed. Consult the workflow runs for actual results.
 Pushes to one branch share a concurrency group. The running build finishes and
 saves its cache; only the newest pending run waits behind it. This avoids losing
 an almost-complete engine build each time another fix is pushed.
+
+To regenerate desktop artwork after editing `logo.svg`, install Pillow in the
+build virtual environment and run `.venv/bin/python tools/generate_branding.py`.
+The generator also requires `rsvg-convert`. It writes the editor SVGs, application
+PNGs, splash images, Windows ICOs, and macOS application/document ICNS files.
+
+`python tools/test_editor.py <editor-binary>` runs the actual editor with a
+temporary project. It checks Luau highlighter registration and cache migration,
+Unicode and multiline coloring, completion kinds/icons, and template creation.
+This check also runs as part of `tools/test_desktop.py`.

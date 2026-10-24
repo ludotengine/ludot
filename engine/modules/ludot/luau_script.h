@@ -184,6 +184,8 @@ public:
     Error complete_code(const String &p_code, const String &p_path, Object *p_owner, List<CodeCompletionOption> *r_options, bool &r_force, String &r_call_hint) override;
     bool supports_builtin_mode() const override { return false; }
     ScriptNameCasing preferred_file_name_casing() const override { return SCRIPT_NAME_CASING_PASCAL_CASE; }
+    bool is_using_templates() override { return true; }
+    Vector<ScriptTemplate> get_built_in_templates(const StringName &p_object) override;
     Ref<Script> make_template(const String &p_template, const String &p_class_name, const String &p_base_class_name) const override;
     int find_function(const String &p_function, const String &p_code) const override;
     String make_function(const String &p_class, const String &p_name, const PackedStringArray &p_args) const override;

@@ -23,6 +23,12 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   field values, converted when a declared type changes. Functions created before the
   reload, such as connected callbacks, run the new code. Dependent scripts and derived
   classes reload. A failed edit keeps the previous version running.
+- Native Luau syntax highlighting uses the language lexer, including interpolated
+  strings, arbitrary long brackets, comments, and Unicode columns. Existing cached
+  Plain Text defaults migrate once; future explicit highlighter choices are kept.
+- Attach Script offers empty, Node lifecycle, and CharacterBody2D/3D movement
+  templates. Luau resources use the official Luau icon. Native completion includes
+  function/type/property/signal icons, parentheses, parameter hints, and `:` triggers.
 - Native editor checking and completion using Luau Analysis and reflected engine
   signatures, including alias-aware import and `require` path completion. Project
   setting `luau/editor/require_autocomplete` turns path completion off.
@@ -42,6 +48,9 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   diagnostics, completion, hover, definitions, references, rename, signature help,
   cancellation, unsaved-buffer overlays, and UTF-16 position conversion. A packaging
   script builds a self-contained distribution with runtime and upstream license notices.
+- Rounded Ludot logo with the Luau radial gradient, used by the project selector,
+  default project icon, title bar, splash, desktop application and document artwork.
+  `tools/generate_branding.py` regenerates desktop assets from `logo.svg`.
 - Ludot product name, logo, and issue links. The upstream update check and official
   template downloads are disabled, since Godot builds lack the Luau module.
 - Desktop distribution metadata uses Ludot names and identifiers. The macOS bundle
@@ -79,8 +88,10 @@ Local Linux results:
   `template_release` build running the exported pack the way a shipped game does
   (pack beside the executable, scene selected through `override.cfg`).
 - `tools/package_lsp.py` builds the standalone LSP and passes its protocol check.
-- The optimized Linux SCU editor passes the engine, debugger, and exported-pack
-  suites. Five fresh-cache editor startup/shutdown checks pass after the deferred
+- The optimized Linux SCU editor passes the engine, debugger, exported-pack, and
+  native editor suites. The editor suite opens real Luau files, migrates a saved
+  Plain Text choice, checks Unicode/interpolated/long-bracket coloring and typed
+  completion icons, and creates/type-checks all four built-in templates. Five fresh-cache editor startup/shutdown checks pass after the deferred
   documentation callback fix.
 
 A loop of 100,000 iterations, each reading a `Vector2` field, reading a `Timer`

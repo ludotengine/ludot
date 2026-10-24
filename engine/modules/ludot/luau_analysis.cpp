@@ -2,6 +2,8 @@
 #include "luau_analysis.h"
 #include "luau_script.h"
 #include "Luau/Autocomplete.h"
+#include "Luau/AstQuery.h"
+#include "Luau/TypePack.h"
 #include "Luau/BuiltinDefinitions.h"
 #include "Luau/Config.h"
 #include "Luau/Frontend.h"
@@ -162,7 +164,10 @@ struct Session {
         if ((method.flags & METHOD_FLAG_VARARG) != 0) tail = arena.addTypePack(VariadicTypePack{frontend.builtinTypes->anyType});
         TypePackId returns = method.return_val.type == ::Variant::NIL && (method.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) == 0 ? frontend.builtinTypes->emptyTypePack : arena.addTypePack({type(method.return_val)});
         auto result = arena.addType(FunctionType{arena.addTypePack(arguments, tail), returns});
-        getMutable<FunctionType>(result)->hasSelf = !is_static;
+        auto fn = getMutable<FunctionType>(result);
+        fn->hasSelf = !is_static;
+        if (!is_static) fn->argNames.push_back(FunctionArgument{"self", Location()});
+        for (const PropertyInfo &arg : method.arguments) fn->argNames.push_back(FunctionArgument{utf8(LuauLanguage::api_name(arg.name)), Location()});
         return result;
     }
     std::string update(const String &source, const String &path) {
@@ -210,7 +215,7 @@ bool ludot_validate(const String &source, const String &path, List<ScriptLanguag
     }
     return checked.errors.empty();
 }
-Error ludot_complete(const String &source, const String &path, List<ScriptLanguage::CodeCompletionOption> *options) {
+Error ludot_complete(const String &source, const String &path, List<ScriptLanguage::CodeCompletionOption> *options, String &call_hint) {
     MutexLock lock(analysis_mutex);
     auto &analysis = get_session();
     const int cursor = source.find(String::chr(0xffff));
@@ -231,7 +236,69 @@ Error ludot_complete(const String &source, const String &path, List<ScriptLangua
         return ERR_PARSE_ERROR;
     }
     const auto result = Luau::autocomplete(analysis.frontend, name, {line, column}, {});
-    for (const auto &[label, entry] : result.entryMap) options->push_back(ScriptLanguage::CodeCompletionOption(String::utf8(label.c_str()), entry.kind == Luau::AutocompleteEntryKind::Type ? ScriptLanguage::CODE_COMPLETION_KIND_CLASS : ScriptLanguage::CODE_COMPLETION_KIND_MEMBER));
+    const auto function_type = [](Luau::TypeId type) -> const Luau::FunctionType * {
+        type = Luau::follow(type);
+        if (auto fn = Luau::get<Luau::FunctionType>(type)) return fn;
+        if (auto overloads = Luau::get<Luau::IntersectionType>(type)) {
+            for (auto part : overloads->parts) if (auto fn = Luau::get<Luau::FunctionType>(Luau::follow(part))) return fn;
+        }
+        return nullptr;
+    };
+    for (const auto &[label, entry] : result.entryMap) {
+        auto kind = ScriptLanguage::CODE_COMPLETION_KIND_MEMBER;
+        if (entry.kind == Luau::AutocompleteEntryKind::Type) kind = ScriptLanguage::CODE_COMPLETION_KIND_CLASS;
+        else if (entry.kind == Luau::AutocompleteEntryKind::Keyword) kind = ScriptLanguage::CODE_COMPLETION_KIND_KEYWORD;
+        else if (entry.kind == Luau::AutocompleteEntryKind::Binding) kind = ScriptLanguage::CODE_COMPLETION_KIND_VARIABLE;
+        else if (entry.kind == Luau::AutocompleteEntryKind::RequirePath || entry.kind == Luau::AutocompleteEntryKind::Module) kind = ScriptLanguage::CODE_COMPLETION_KIND_FILE_PATH;
+        if (entry.type) {
+            auto type = Luau::follow(*entry.type);
+            if (function_type(type)) kind = ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION;
+            else if (auto external = Luau::get<Luau::ExternType>(type)) {
+                if (external->relation && external->relation->get_if<Luau::Obj>() != nullptr) kind = ScriptLanguage::CODE_COMPLETION_KIND_CLASS;
+                else if (external->name == "Signal") kind = ScriptLanguage::CODE_COMPLETION_KIND_SIGNAL;
+            }
+        }
+        ScriptLanguage::CodeCompletionOption option(String::utf8(label.c_str()), kind);
+        if (entry.insertText) option.insert_text = String::utf8(entry.insertText->c_str());
+        else if (entry.parens == Luau::ParenthesesRecommendation::CursorInside) option.insert_text += "(";
+        else if (entry.parens == Luau::ParenthesesRecommendation::CursorAfter) option.insert_text += "()";
+        options->push_back(option);
+    }
+    call_hint = "";
+    const auto module = analysis.frontend.moduleResolver.getModule(name);
+    const auto source_module = analysis.frontend.getSourceModule(name);
+    if (module && source_module) {
+        const Luau::Position position{line, column};
+        const auto ancestry = Luau::findAstAncestryOfPosition(*source_module, position, true);
+        for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it) {
+            const auto call = (*it)->as<Luau::AstExprCall>();
+            if (call == nullptr || call->func->location.contains(position)) continue;
+            const auto type = module->astTypes.find(call->func);
+            const auto fn = type != nullptr ? function_type(*type) : nullptr;
+            if (fn == nullptr) continue;
+            auto [args, tail] = Luau::flatten(fn->argTypes);
+            const size_t skip = call->self && fn->hasSelf ? 1 : 0;
+            unsigned active = 0;
+            for (auto arg : call->args) if (arg->location.end < position) ++active;
+            call_hint = "(";
+            for (size_t i = skip; i < args.size(); ++i) {
+                if (i != skip) call_hint += ", ";
+                if (i - skip == active) call_hint += String::chr(0xffff);
+                const std::string parameter = i < fn->argNames.size() && fn->argNames[i] ? fn->argNames[i]->name : "arg" + std::to_string(i - skip + 1);
+                call_hint += String::utf8(parameter.c_str()) + ": " + String::utf8(Luau::toString(args[i]).c_str());
+                if (i - skip == active) call_hint += String::chr(0xffff);
+            }
+            if (tail) {
+                const auto variadic = Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail));
+                if (!variadic || !variadic->hidden) {
+                    if (args.size() > skip) call_hint += ", ";
+                    call_hint += "...: " + String::utf8(Luau::toString(*tail).c_str());
+                }
+            }
+            call_hint += ") -> " + String::utf8(Luau::toString(fn->retTypes).c_str());
+            break;
+        }
+    }
     return OK;
 }
 void ludot_clear_analysis() { MutexLock lock(analysis_mutex); session.reset(); }

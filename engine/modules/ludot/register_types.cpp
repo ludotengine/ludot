@@ -7,7 +7,12 @@
 #include "editor/export/editor_export.h"
 #include "luau_export_plugin.h"
 #include "luau_shader_editor.h"
+#include "luau_highlighter.h"
+#include "editor/script/script_editor_plugin.h"
 static void initialize_luau_shader_editor() {
+    Ref<LuauSyntaxHighlighter> highlighter;
+    highlighter.instantiate();
+    ScriptEditor::get_singleton()->register_syntax_highlighter(highlighter);
     Ref<LuauShaderLanguagePlugin> plugin;
     plugin.instantiate();
     EditorShaderLanguagePlugin::register_shader_language(plugin);
@@ -23,7 +28,10 @@ static Ref<ResourceFormatLoaderLuauShader> shader_loader;
 static Ref<ResourceFormatSaverLuauShader> shader_saver;
 void initialize_ludot_module(ModuleInitializationLevel level) {
 #ifdef TOOLS_ENABLED
-    if (level == MODULE_INITIALIZATION_LEVEL_EDITOR) EditorNode::add_init_callback(initialize_luau_shader_editor);
+    if (level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+        GDREGISTER_CLASS(LuauSyntaxHighlighter);
+        EditorNode::add_init_callback(initialize_luau_shader_editor);
+    }
 #endif
     if (level == MODULE_INITIALIZATION_LEVEL_SERVERS) {
         GDREGISTER_CLASS(LuauScript);

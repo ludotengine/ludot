@@ -245,6 +245,11 @@ void ScriptTextEditor::set_edited_resource(const Ref<Resource> &p_res) {
 
 	Ref<Script> script = edited_res;
 	ERR_FAIL_COND(script.is_null());
+	if (script->get_language()->get_name() == "Luau") {
+		TypedArray<String> prefixes = code_editor->get_text_editor()->get_code_completion_prefixes();
+		prefixes.push_back(":");
+		code_editor->get_text_editor()->set_code_completion_prefixes(prefixes);
+	}
 	code_editor->get_text_editor()->set_text(script->get_source_code());
 
 	code_editor->get_text_editor()->clear_undo_history();
@@ -763,7 +768,12 @@ Variant ScriptTextEditor::get_edit_state() {
 	if (pending_state != Variant()) {
 		return pending_state;
 	}
-	return TextEditorBase::get_edit_state();
+	Dictionary state = TextEditorBase::get_edit_state();
+	Ref<Script> script = edited_res;
+	if (script.is_valid() && script->get_language()->get_name() == "Luau") {
+		state["luau_highlighting_version"] = 1;
+	}
+	return state;
 }
 
 void ScriptTextEditor::set_edit_state(const Variant &p_state) {
@@ -775,6 +785,10 @@ void ScriptTextEditor::set_edit_state(const Variant &p_state) {
 	}
 
 	Dictionary state = p_state;
+	Ref<Script> script = edited_res;
+	if (script.is_valid() && script->get_language()->get_name() == "Luau" && !state.has("luau_highlighting_version") && state.get("syntax_highlighter", "") == "Plain Text") {
+		state["syntax_highlighter"] = "Luau";
+	}
 	if (state.has("syntax_highlighter")) {
 		for (const Ref<EditorSyntaxHighlighter> &highlighter : highlighters) {
 			if (highlighter->_get_name() == String(state["syntax_highlighter"])) {
