@@ -17,6 +17,8 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   API (methods, properties, signals, static methods, constants, Luau functions as
   `Callable`s, and collection indexing, length, and iteration).
 - Direct native property access with a per-class member cache.
+- Native objects created in field initializers are separate instances. The engine's
+  existing owner is borrowed only for the script's own base constructor.
 - Hot reload of scripts and modules. Live instances keep their identity and their
   field values, converted when a declared type changes. Functions created before the
   reload, such as connected callbacks, run the new code. Dependent scripts and derived
@@ -85,12 +87,8 @@ A loop of 100,000 iterations, each reading a `Vector2` field, reading a `Timer`
 property, and calling a `Timer` method, took about 0.57 s in the unoptimized
 development build. It took about 61.6 s before the member cache.
 
-The macOS editor, language/shader/LSP suites, standalone package, debugger, and
-exported-pack checks passed in GitHub Actions at `a25fa13`
-([job](https://github.com/ludotengine/ludot/actions/runs/40037145384/job/120701010724)).
-Linux also passed the complete desktop job at `a25fa13`
-([job](https://github.com/ludotengine/ludot/actions/runs/40037145384/job/120701011145)).
-Windows still needs validation of the MSVC floating-point mode fix in `4c08027`
-or later.
-The newer macOS app-bundle generation and launch checks are not included in the
-raw-executable macOS result linked above.
+Linux, Windows, and macOS passed the complete desktop workflow at `8f2c635`
+([run](https://github.com/ludotengine/ludot/actions/runs/40043677812)). This includes
+language/shader/LSP tests, standalone packaging, native engine checks, debugging,
+and exported-pack checks. The macOS suites ran the executable selected by the
+generated app bundle's `Info.plist`.

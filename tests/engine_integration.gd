@@ -8,6 +8,19 @@ func check(condition: bool, message: String) -> void:
         push_error(message)
 
 func _init() -> void:
+    var nested_script = ClassDB.instantiate("LuauScript")
+    nested_script.set_source_code("""class NestedConstruction extends Node = {
+    private Child: Node = Node()
+    function child() return self.Child end
+}""")
+    check(nested_script.reload() == OK, "Nested native initializer compiles")
+    var parent := Node.new()
+    parent.set_script(nested_script)
+    var child = parent.call("child")
+    check(child is Node and child != parent, "A native field initializer creates a separate child object")
+    if child is Node and child != parent:
+        child.free()
+    parent.free()
     var script = load("res://Player.luau")
     check(script != null and script.can_instantiate(), "Luau script loads")
     script.set_source_code(script.get_source_code().replace("private Values", 'private Identity: {any} = {}\n    function identityStable(): boolean if self.Identity[1] == nil then self.Identity[1] = self end return self.Identity[1] == self end\n    private Values'))

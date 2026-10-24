@@ -421,7 +421,10 @@ int native_new(lua_State *L) {
     auto language = LuauLanguage::get_singleton();
     Object *object = language->construction_owner != nullptr ? language->construction_owner : ClassDB::instantiate(name);
     if (object == nullptr) luaL_error(L, "Cannot instantiate native class '%s'", String(name).utf8().get_data());
-    if (language->construction_owner != nullptr) push_owner(L, object);
+    if (language->construction_owner != nullptr) {
+        language->construction_owner = nullptr;
+        push_owner(L, object);
+    }
     else LuauLanguage::push_variant(L, object);
     return 1;
 }
