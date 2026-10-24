@@ -34,6 +34,12 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   class names in that scene can be used directly as instance annotations.
   `getNodeOrNull` keeps a nullable type. Custom script method names retain their
   original spelling when called through a node reference.
+- Native editor function hover cards for GDScript and Luau show typed signatures,
+  parameter and return sections, documentation comments, typed GDScript lambdas,
+  selected Luau overloads, and a fixed footer linking
+  documented Godot methods to their original API reference page. Luau names retain
+  their binding casing; GDScript functions include default argument values.
+  Native callback overrides retain their Godot documentation links.
 - Native editor checking and completion using Luau Analysis and reflected engine
   signatures, including alias-aware import and `require` path completion. Project
   setting `luau/editor/require_autocomplete` turns path completion off.
@@ -101,7 +107,10 @@ Local Linux results:
   Plain Text choice, checks Unicode/interpolated/long-bracket coloring and typed
   completion icons, and creates/type-checks all four built-in templates. It also
   checks typed parent-script lookup, direct instance annotations, nullable narrowing,
-  and invalidation when a parent script changes. Runtime checks call a custom
+  and invalidation when a parent script changes. Hover regressions inspect actual
+  popups for both languages and verify signatures, comments, defaults, and exact
+  native documentation URLs. A visible Linux run captures and checks compact card
+  layouts with the real renderer. Runtime checks call a custom
   parent method through a child node lookup. Five fresh-cache editor startup/shutdown checks pass after the deferred
   documentation callback fix.
 

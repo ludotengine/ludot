@@ -1193,6 +1193,7 @@ LuauScript::~LuauScript() {
 void LuauScript::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_diagnostics"), &LuauScript::get_diagnostics);
     ClassDB::bind_method(D_METHOD("get_completions", "code"), &LuauScript::get_completions);
+    ClassDB::bind_method(D_METHOD("get_symbol_help", "code", "symbol", "owner"), &LuauScript::get_symbol_help, DEFVAL(Variant()));
 }
 PackedStringArray LuauScript::get_completions(const String &p_code) const {
     List<ScriptLanguage::CodeCompletionOption> options;
@@ -1203,6 +1204,13 @@ PackedStringArray LuauScript::get_completions(const String &p_code) const {
     for (const auto &option : options) labels.push_back(option.display);
     labels.sort();
     return labels;
+}
+Dictionary LuauScript::get_symbol_help(const String &p_code, const String &p_symbol, Object *p_owner) const {
+#ifdef TOOLS_ENABLED
+    return ludot_symbol_help(p_code, get_path(), p_symbol, p_owner);
+#else
+    return {};
+#endif
 }
 Array LuauScript::get_diagnostics() const {
     List<ScriptLanguage::ScriptError> errors;

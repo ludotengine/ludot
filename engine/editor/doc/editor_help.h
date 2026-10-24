@@ -302,6 +302,7 @@ class EditorHelpBit : public VBoxContainer {
 		ArgumentData rest_argument;
 		String qualifiers;
 		String resource_path;
+		String documentation_url;
 	};
 
 	inline static HashMap<StringName, HelpData> doc_class_cache;
@@ -315,6 +316,7 @@ class EditorHelpBit : public VBoxContainer {
 
 	RichTextLabel *title = nullptr;
 	RichTextLabel *content = nullptr;
+	RichTextLabel *documentation = nullptr;
 
 	bool use_class_prefix = false;
 
@@ -352,6 +354,7 @@ public:
 	static String get_as_plain_text(const String &p_symbol, const String &p_prologue = String());
 
 	void parse_symbol(const String &p_symbol, const String &p_prologue = String());
+	String get_documentation_url() const { return help_data.documentation_url; }
 	void set_custom_text(const String &p_type, const String &p_name, const String &p_description);
 
 	void set_content_height_limits(float p_min, float p_max);

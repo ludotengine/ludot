@@ -1365,7 +1365,33 @@ void ScriptTextEditor::_show_symbol_tooltip(const String &p_symbol, int p_row, i
 	ScriptLanguage::LookupResult result;
 	String doc_symbol;
 	const String code_text = code_editor->get_text_editor()->get_text_with_cursor_char(p_row, p_column);
-	const Error lc_error = script->get_language()->lookup_code(code_text, p_symbol, script->get_path(), base, result);
+	// Languages with richer types can supply a structured function card without
+	// translating their type system into Godot's native MethodInfo types.
+	Dictionary function_help;
+	if (ClassDB::has_method(script->get_class_name(), "get_symbol_help")) function_help = script->call("get_symbol_help", code_text, p_symbol, base);
+	Error lc_error = ERR_UNAVAILABLE;
+	if (!function_help.is_empty()) {
+		// Script overrides of native callbacks retain their base API documentation.
+		if (!function_help.has("declaring_class") && function_help.get("is_method", false) && p_symbol.begins_with("_")) {
+			StringName native_class = script->get_instance_base_type();
+			while (native_class != StringName() && !function_help.has("declaring_class")) {
+				if (const auto doc = EditorHelp::get_doc(native_class)) {
+					for (const auto &method : doc->methods) {
+						const String display_name = script->get_language()->get_name() == "Luau" ? "_" + method.name.trim_prefix("_").to_camel_case() : method.name;
+						if (method.qualifiers.contains("virtual") && display_name == p_symbol) {
+							function_help["declaring_class"] = native_class;
+							function_help["native_member"] = method.name;
+							break;
+						}
+					}
+				}
+				native_class = ClassDB::get_parent_class(native_class);
+			}
+		}
+		doc_symbol = "function|" + String(function_help.get("declaring_class", "")) + "|" + String(function_help.get("native_member", p_symbol)) + "|" + JSON::stringify(function_help);
+	} else {
+		lc_error = script->get_language()->lookup_code(code_text, p_symbol, script->get_path(), base, result);
+	}
 	if (lc_error == OK) {
 		switch (result.type) {
 			case ScriptLanguage::LOOKUP_RESULT_CLASS: {

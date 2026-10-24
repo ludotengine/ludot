@@ -217,3 +217,8 @@ PNGs, splash images, Windows ICOs, and macOS application/document ICNS files.
 temporary project. It checks Luau highlighter registration and cache migration,
 Unicode and multiline coloring, completion kinds/icons, and template creation.
 This check also runs as part of `tools/test_desktop.py`.
+
+For visual hover-card checks on a desktop session, run
+`python tools/test_editor.py <editor-binary> --screenshots build/hover-cards`.
+This opens an isolated editor project, captures GDScript and Luau cards with the
+real renderer, and verifies their maximum height and fixed documentation footer.

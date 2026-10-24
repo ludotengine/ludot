@@ -118,3 +118,14 @@ The editor's scripts profiler shows every Luau function, whether the engine call
 or another Luau function did, including `pcall` targets, metamethods, and coroutine
 bodies. Coroutine time excludes the time spent suspended. With native call profiling
 on, engine methods called from Luau get their own rows.
+
+## Function hover help
+
+Hover over a function in the native editor to see its signature, parameters, return
+types, and documentation. Documented engine methods offer a link to the matching
+Godot API page. The link stays visible below the scrolling description. Luau
+binding names such as `getNode` link to the original `get_node` documentation.
+
+Put adjacent `---` comments above Luau functions to describe them in the card.
+GDScript uses its normal `##` documentation comments. Named script functions use
+the current editor source, including edits that have not been saved.

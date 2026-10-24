@@ -80,6 +80,67 @@ func run() -> void:
     check(scene_completions.has("Begin") and not scene_completions.has("Start"), "Changing the parent script invalidates inferred scene types")
     parent_script.source_code = parent_source
     script.source_code = original_source
+    var hover_source = 'class Player extends Node = { function _ready() self:getNo' + String.chr(0xffff) + 'de("..") end }'
+    var help: Dictionary = script.get_symbol_help(hover_source, "getNode", EditorInterface.get_edited_scene_root().get_child(0))
+    check(help.get("declaring_class") == "Node" and help.get("native_member") == "get_node", "Luau hover maps camelCase to the native documentation member")
+    check(help.get("return_type") == "Node" and help.parameters[0].name == "path", "Luau hover includes native parameter and return types")
+    var boundary_help = script.get_symbol_help(hover_source.replace("getNo" + String.chr(0xffff) + "de", "getNode" + String.chr(0xffff)), "getNode")
+    check(boundary_help.get("native_member") == "get_node", "Luau hover resolves the trailing edge of a function name")
+    var local_source = '--- Adds two numbers.\nconst function add(a: number, b: number): number\n    return a + b\nend\nclass Player extends Node = { function _ready() ad' + String.chr(0xffff) + 'd(1, 2) end }'
+    help = script.get_symbol_help(local_source, "add")
+    check(help.get("return_type") == "number" and help.parameters.size() == 2, "Local Luau function hover retains its full signature")
+    check("Adds two numbers" in help.get("description", ""), "Luau hover reads adjacent documentation comments")
+    check(not help.has("declaring_class"), "User functions have no fabricated Godot documentation link")
+    var overloaded_source = 'local overloaded = (function(value: any): any return value end) :: ((number) -> number) & ((string) -> string)\nlocal result = over' + String.chr(0xffff) + 'loaded("text")'
+    help = script.get_symbol_help(overloaded_source, "overloaded")
+    check(help.get("return_type") == "string", "Luau hover displays the overload selected for the actual call")
+    code.text = hover_source.replace(String.chr(0xffff), "")
+    code.symbol_hovered.emit("getNode", 0, code.text.find("getNode") + 3)
+    await get_tree().process_frame
+    await check_hover_card(code, "getNode", "path", "Node", true)
+    await close_hover_cards(code)
+    await get_tree().process_frame
+    code.text = local_source.replace(String.chr(0xffff), "")
+    code.symbol_hovered.emit("add", 4, code.get_line(4).find("add") + 1)
+    await get_tree().process_frame
+    await check_hover_card(code, "add", "a", "number", false)
+    await close_hover_cards(code)
+    await get_tree().process_frame
+    code.text = 'class Player extends Node = { function _ready() self:_ready() end }'
+    code.symbol_hovered.emit("_ready", 0, code.text.rfind("_ready") + 3)
+    await get_tree().process_frame
+    await check_hover_card(code, "_ready", "", "()", true, "https://docs.godotengine.org/en/latest/classes/class_node.html#class-node-private-method-ready")
+    await close_hover_cards(code)
+    await get_tree().process_frame
+    code.text = original_source
+    var gd_script = load("res://Hover.gd")
+    EditorInterface.edit_script(gd_script)
+    for frame in range(4): await get_tree().process_frame
+    var gd_code: CodeEdit = EditorInterface.get_script_editor().get_current_editor().get_base_editor()
+    var gd_source: String = gd_script.source_code
+    var gd_help = gd_script.get_symbol_help(gd_source.replace("add(1, 2)", "ad" + String.chr(0xffff) + "d(1, 2)"), "add")
+    check(gd_help.parameters[1].get("default") == "2", "GDScript hover includes default parameter values")
+    gd_help = gd_script.get_symbol_help(gd_source.replace("add(1, 2)", "ad" + String.chr(0xffff) + "d(1, 2)") + "\nvar pending =", "add")
+    check(gd_help.get("return_type") == "int", "GDScript function hover survives an incomplete edit elsewhere")
+    var lambda_source = 'extends Node\nfunc _ready():\n    var doubler = func(value: int) -> int: return value * 2\n    dou' + String.chr(0xffff) + 'bler(4)'
+    gd_help = gd_script.get_symbol_help(lambda_source, "doubler")
+    check(gd_help.get("return_type") == "int" and gd_help.get("parameters", []).size() == 1, "GDScript lambda hover preserves its inferred callable signature")
+    gd_code.symbol_hovered.emit("get_node", 5, 9)
+    await get_tree().process_frame
+    await check_hover_card(gd_code, "get_node", "path", "Node", true)
+    await close_hover_cards(gd_code)
+    await get_tree().process_frame
+    gd_code.symbol_hovered.emit("add", 6, 6)
+    await get_tree().process_frame
+    await check_hover_card(gd_code, "add", "a", "int", false)
+    await close_hover_cards(gd_code)
+    await get_tree().process_frame
+    gd_code.symbol_hovered.emit("_ready", 4, 8)
+    await get_tree().process_frame
+    await check_hover_card(gd_code, "_ready", "", "void", true, "https://docs.godotengine.org/en/latest/classes/class_node.html#class-node-private-method-ready")
+    await close_hover_cards(gd_code)
+    await get_tree().process_frame
+    EditorInterface.edit_script(script)
     # Exercise the same ScriptCreateDialog used by Attach Script.
     var dialog = ClassDB.instantiate("ScriptCreateDialog")
     EditorInterface.get_base_control().add_child(dialog)
@@ -140,3 +201,31 @@ func run() -> void:
     if failures.is_empty():
         print("LUDOT_EDITOR_TESTS_PASSED")
     get_tree().quit(0 if failures.is_empty() else 1)
+
+func check_hover_card(code: CodeEdit, name_text: String, parameter: String, return_type: String, native: bool, wiki_url: String = "https://docs.godotengine.org/en/latest/classes/class_node.html#class-node-method-get-node") -> void:
+    var found = false
+    for child in code.get_children():
+        if child is PopupPanel:
+            found = true
+            var screenshot_dir = OS.get_environment("LUDOT_HOVER_SCREENSHOTS")
+            if not screenshot_dir.is_empty():
+                await RenderingServer.frame_post_draw
+                check(child.size.y <= 480 * EditorInterface.get_editor_scale(), "Hover card stays compact with a fixed footer")
+                var language = "luau" if "class Player" in code.text else "gdscript"
+                child.get_texture().get_image().save_png(screenshot_dir.path_join(language + "-" + name_text + ".png"))
+            var text = ""
+            for label in child.find_children("*", "RichTextLabel", true, false):
+                text += label.get_parsed_text() + "\n"
+            check(name_text in text and (parameter.is_empty() or ("Parameters" in text and parameter in text)) and "Returns" in text and return_type in text, "Hover card displays signature, parameters, and returns for " + name_text + ": " + text)
+            check(("Open Godot documentation" in text) == native, "Only native documented methods offer Godot links")
+            if native:
+                var cards = child.find_children("*", "VBoxContainer", true, false)
+                var card = cards[0]
+                check(card.get_documentation_url() == wiki_url, "Hover links to the exact native member anchor")
+    check(found, "Hovering " + name_text + " opens a function card")
+
+func close_hover_cards(code: CodeEdit) -> void:
+    for child in code.get_children():
+        if child is PopupPanel:
+            child.queue_free()
+            await child.tree_exited

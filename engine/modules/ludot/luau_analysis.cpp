@@ -63,6 +63,7 @@ struct Session {
     ObjectID analysis_owner;
     String primary_path;
     std::unordered_map<std::string, Luau::TypeId> script_instances;
+    std::unordered_map<Luau::TypeId, std::pair<String, String>> function_docs;
     explicit Session() : frontend(Luau::SolverMode::New, &files, &configs) {
         using namespace Luau;
         registerBuiltinGlobals(frontend, frontend.globals);
@@ -271,6 +272,7 @@ struct Session {
         auto result = arena.addType(FunctionType{arena.addTypePack(arguments, tail), returns});
         auto fn = getMutable<FunctionType>(result);
         fn->hasSelf = !is_static;
+        if (auto owner_type = get<ExternType>(self)) function_docs[result] = {String::utf8(owner_type->name.c_str()), method.name};
         if (!is_static) fn->argNames.push_back(FunctionArgument{"self", Location()});
         for (const PropertyInfo &arg : method.arguments) fn->argNames.push_back(FunctionArgument{utf8(LuauLanguage::api_name(arg.name)), Location()});
         return result;
@@ -424,6 +426,110 @@ Error ludot_complete(const String &source, const String &path, List<ScriptLangua
         }
     }
     return OK;
+}
+Dictionary ludot_symbol_help(const String &source, const String &path, const String &symbol, Object *owner) {
+    MutexLock lock(analysis_mutex);
+    const int cursor = source.find(String::chr(0xffff));
+    if (cursor < 0) return {};
+    auto &analysis = get_session(path, owner);
+    const String clean_source = source.replace(String::chr(0xffff), "");
+    // Mouse hit testing can select the trailing boundary of an identifier.
+    const int position_cursor = cursor >= symbol.length() && !symbol.is_empty() && clean_source.substr(cursor - symbol.length(), symbol.length()) == symbol ? cursor - 1 : cursor;
+    const PackedStringArray before = clean_source.substr(0, position_cursor).split("\n");
+    const Luau::Position position{unsigned(before.size() - 1), unsigned(before[before.size() - 1].utf8().length())};
+    const auto name = analysis.update(clean_source, path);
+    Luau::FrontendOptions options;
+    options.retainFullTypeGraphs = true;
+    options.moduleTimeLimitSec = 2.0;
+    try { analysis.frontend.check(name, options); }
+    catch (const Luau::InternalCompilerError &error) { ERR_PRINT(String::utf8(error.what())); return {}; }
+    const auto module = analysis.frontend.moduleResolver.getModule(name);
+    const auto parsed = analysis.frontend.getSourceModule(name);
+    if (!module || !parsed) return {};
+    auto type = Luau::findTypeAtPosition(*module, *parsed, position);
+    if (!type) {
+        if (auto binding = Luau::findBindingAtPosition(*module, *parsed, position)) type = binding->typeId;
+    }
+    if (!type) {
+        const auto ancestry = Luau::findAstAncestryOfPosition(*parsed, position, true);
+        for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it) {
+            if (auto expr = (*it)->as<Luau::AstExprFunction>()) {
+                if (auto found = module->astTypes.find(expr)) { type = *found; break; }
+            }
+        }
+    }
+    if (!type) return {};
+    auto resolved = Luau::follow(*type);
+    if (Luau::get<Luau::IntersectionType>(resolved)) {
+        const auto ancestry = Luau::findAstAncestryOfPosition(*parsed, position, true);
+        for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it) {
+            if (auto call = (*it)->as<Luau::AstExprCall>(); call && call->func->location.contains(position)) {
+                if (auto selected = module->astOverloadResolvedTypes.find(call); selected && Luau::get<Luau::FunctionType>(Luau::follow(*selected))) {
+                    resolved = Luau::follow(*selected);
+                    break;
+                }
+            }
+        }
+    }
+    const Luau::FunctionType *fn = Luau::get<Luau::FunctionType>(resolved);
+    if (!fn) {
+        if (auto intersection = Luau::get<Luau::IntersectionType>(resolved)) {
+            for (auto part : intersection->parts) {
+                resolved = Luau::follow(part);
+                fn = Luau::get<Luau::FunctionType>(resolved);
+                if (fn) break;
+            }
+        }
+    }
+    if (!fn) return {};
+    Dictionary info;
+    info["display_name"] = symbol;
+    info["return_type"] = String::utf8(Luau::toString(fn->retTypes).c_str());
+    Array parameters;
+    const auto [args, tail] = Luau::flatten(fn->argTypes);
+    const size_t skip = fn->hasSelf ? 1 : 0;
+    info["is_method"] = fn->hasSelf && !args.empty() && Luau::get<Luau::ExternType>(Luau::follow(args.front())) != nullptr;
+    String signature = symbol + "(";
+    for (size_t i = skip; i < args.size(); ++i) {
+        Dictionary parameter;
+        const auto arg_name = i < fn->argNames.size() && fn->argNames[i] ? fn->argNames[i]->name : "arg" + std::to_string(i - skip + 1);
+        parameter["name"] = String::utf8(arg_name.c_str());
+        parameter["type"] = String::utf8(Luau::toString(args[i]).c_str());
+        parameters.push_back(parameter);
+        if (i != skip) signature += ", ";
+        signature += String(parameter["name"]) + ": " + String(parameter["type"]);
+    }
+    if (tail) {
+        const auto variadic = Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail));
+        if (!variadic || !variadic->hidden) {
+            Dictionary parameter;
+            parameter["name"] = "...";
+            parameter["type"] = String::utf8((variadic ? Luau::toString(variadic->ty) : Luau::toString(*tail)).c_str());
+            parameters.push_back(parameter);
+            if (args.size() > skip) signature += ", ";
+            signature += "...: " + String(parameter["type"]);
+        }
+    }
+    info["parameters"] = parameters;
+    info["signature"] = signature + ") -> " + String(info["return_type"]);
+    if (const auto doc = analysis.function_docs.find(resolved); doc != analysis.function_docs.end()) {
+        info["declaring_class"] = doc->second.first;
+        info["native_member"] = doc->second.second;
+    } else if (fn->definition && fn->definition->definitionModuleName) {
+        const auto file = analysis.files.readSource(*fn->definition->definitionModuleName);
+        if (file) {
+            const auto lines = String::utf8(file->source.c_str()).split("\n");
+            const auto location = fn->definition->originalNameLocation == Luau::Location() ? fn->definition->definitionLocation : fn->definition->originalNameLocation;
+            String description;
+            for (int line = int(location.begin.line) - 1; line >= 0 && line < lines.size(); --line) {
+                const String comment = lines[line].strip_edges();
+                if (!comment.begins_with("---")) break;
+                description = comment.substr(3).strip_edges() + (description.is_empty() ? String() : "\n" + description);
+            }
+            info["description"] = description.replace("[", "[lb]");
+        }
+    }
+    return info;
 }
 void ludot_clear_analysis() { MutexLock lock(analysis_mutex); session.reset(); }
 #endif

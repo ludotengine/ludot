@@ -3815,6 +3815,10 @@ EditorHelpBit::HelpData EditorHelpBit::_get_method_help_data(const StringName &p
 					current.experimental_message = HANDLE_DOC(method.experimental_message);
 				}
 			}
+			if (is_native && !method.description.is_empty() && class_doc->api_type != "extension" && class_doc->api_type != "editor_extension" && (!class_doc->brief_description.is_empty() || !class_doc->description.is_empty())) {
+				const String class_slug = String(p_class_name).to_lower();
+				current.documentation_url = "https://docs.godotengine.org/en/latest/classes/class_" + class_slug + ".html#class-" + class_slug.replace("@", "") + (method.name.begins_with("_") ? "-private-method-" : "-method-") + method.name.to_lower().lstrip("_").replace_chars("/_", '-');
+			}
 			current.doc_type = { method.return_type, method.return_enum, method.return_is_bitfield };
 			for (const DocData::ArgumentDoc &argument : method.arguments) {
 				const DocType argument_doc_type = { argument.type, argument.enumeration, argument.is_bitfield };
@@ -3949,6 +3953,10 @@ EditorHelpBit::HelpData EditorHelpBit::_get_annotation_help_data(const StringNam
 #undef HANDLE_DOC
 
 void EditorHelpBit::_add_type_to_title(const DocType &p_doc_type) {
+	if (EditorHelp::get_doc(p_doc_type.type.get_slice("[", 0)) == nullptr) {
+		title->add_text(p_doc_type.type);
+		return;
+	}
 	_add_type_to_rt(p_doc_type.type, p_doc_type.enumeration, p_doc_type.is_bitfield, title, this, symbol_class_name);
 }
 
@@ -3958,6 +3966,10 @@ void EditorHelpBit::_update_labels() {
 	if (!symbol_type.is_empty() || !symbol_name.is_empty()) {
 		title->clear();
 
+		if (symbol_hint == SYMBOL_HINT_SIGNATURE) {
+			title->add_image(get_editor_theme_icon(SNAME("MemberMethod")));
+			title->add_text(nbsp);
+		}
 		title->push_font(doc_bold_font);
 
 		if (!symbol_type.is_empty()) {
@@ -4050,6 +4062,7 @@ void EditorHelpBit::_update_labels() {
 				}
 			} break;
 			case SYMBOL_HINT_SIGNATURE: {
+				title->add_newline();
 				title->push_font(doc_source);
 				title->push_font_size(doc_source_size * 0.9);
 
@@ -4146,6 +4159,32 @@ void EditorHelpBit::_update_labels() {
 	content->clear();
 
 	bool has_prev_text = false;
+	if (symbol_hint == SYMBOL_HINT_SIGNATURE) {
+		if (!help_data.arguments.is_empty() || !help_data.rest_argument.name.is_empty()) {
+			content->push_font(doc_bold_font);
+			content->add_text(TTR("Parameters"));
+			content->pop();
+			for (const ArgumentData &argument : help_data.arguments) {
+				content->add_newline();
+				content->push_font(get_theme_font(SNAME("doc_source"), EditorStringName(EditorFonts)));
+				content->add_text(argument.name + ": " + argument.doc_type.type);
+				if (!argument.default_value.is_empty()) content->add_text(" = " + argument.default_value);
+				content->pop();
+			}
+			if (!help_data.rest_argument.name.is_empty()) {
+				content->add_newline();
+				content->add_text("...: " + help_data.rest_argument.doc_type.type);
+			}
+			content->add_newline();
+		}
+		if (!help_data.doc_type.type.is_empty()) {
+			content->push_font(doc_bold_font);
+			content->add_text(TTR("Returns"));
+			content->pop();
+			content->add_text("  " + help_data.doc_type.type);
+			content->add_newline();
+		}
+	}
 
 	if (!help_data.deprecated_message.is_empty()) {
 		has_prev_text = true;
@@ -4220,6 +4259,15 @@ void EditorHelpBit::_update_labels() {
 		}
 	}
 
+	documentation->clear();
+	documentation->set_visible(!help_data.documentation_url.is_empty());
+	if (!help_data.documentation_url.is_empty()) {
+		documentation->push_meta(help_data.documentation_url, RichTextLabel::META_UNDERLINE_ALWAYS);
+		documentation->push_color(get_theme_color(SNAME("accent_color"), EditorStringName(Editor)));
+		documentation->add_text(TTR("Open Godot documentation") + U" ↗");
+		documentation->pop();
+		documentation->pop();
+	}
 	if (is_inside_tree()) {
 		update_content_height();
 	}
@@ -4371,6 +4419,7 @@ void EditorHelpBit::_meta_clicked(const String &p_select) {
 }
 
 void EditorHelpBit::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_documentation_url"), &EditorHelpBit::get_documentation_url);
 	ADD_SIGNAL(MethodInfo("request_hide"));
 }
 
@@ -4692,6 +4741,26 @@ void EditorHelpBit::parse_symbol(const String &p_symbol, const String &p_prologu
 		symbol_type = TTR("Theme Property");
 		symbol_hint = SYMBOL_HINT_ASSIGNABLE;
 		help_data = _get_theme_item_help_data(class_name, item_name);
+	} else if (item_type == "function") {
+		symbol_type = TTR("Function");
+		symbol_name = item_data.get("display_name", item_name);
+		symbol_hint = SYMBOL_HINT_SIGNATURE;
+		if (!class_name.is_empty()) {
+			help_data = _get_method_help_data(class_name, item_name);
+			symbol_doc_link = vformat("@method %s.%s", class_name, item_name);
+		}
+		const Array parameters = item_data.get("parameters", Array());
+		help_data.arguments.clear();
+		help_data.rest_argument = ArgumentData();
+		for (int i = 0; i < parameters.size(); ++i) {
+			const Dictionary parameter = parameters[i];
+			const ArgumentData argument = {parameter.get("name", ""), {parameter.get("type", "any"), String(), false}, parameter.get("default", "")};
+			if (argument.name == "...") help_data.rest_argument = argument;
+			else help_data.arguments.push_back(argument);
+		}
+		help_data.doc_type = {item_data.get("return_type", "()"), String(), false};
+		const String description = item_data.get("description", "");
+		if (!description.is_empty()) help_data.description = description;
 	} else if (item_type == "method") {
 		symbol_doc_link = vformat("@method %s.%s", class_name, item_name);
 		symbol_type = TTR("Method");
@@ -4844,8 +4913,9 @@ EditorHelpBit::EditorHelpBit(const String &p_symbol, const String &p_prologue, b
 
 	title = memnew(RichTextLabel);
 	title->set_theme_type_variation(p_in_tooltip ? "EditorHelpBitTooltipTitle" : "EditorHelpBitTitle");
-	title->set_custom_minimum_size(Size2(640 * EDSCALE, 0)); // GH-93031. Set the minimum width even if `fit_content` is true.
+	title->set_custom_minimum_size(Size2((p_in_tooltip ? 520 : 640) * EDSCALE, 0)); // GH-93031. Set the minimum width even if `fit_content` is true.
 	title->set_fit_content(true);
+	if (p_in_tooltip) title->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 	title->set_selection_enabled(p_allow_selection);
 	title->set_context_menu_enabled(p_allow_selection);
 	title->set_selection_modifier(callable_mp_static(_fix_selection));
@@ -4859,13 +4929,24 @@ EditorHelpBit::EditorHelpBit(const String &p_symbol, const String &p_prologue, b
 	content = memnew(RichTextLabel);
 	content->set_theme_type_variation(p_in_tooltip ? "EditorHelpBitTooltipContent" : "EditorHelpBitContent");
 	content->set_autowrap_trim_flags(TextServer::BREAK_TRIM_END_EDGE_SPACES);
-	content->set_custom_minimum_size(Size2(640 * EDSCALE, content_min_height));
+	content->set_custom_minimum_size(Size2((p_in_tooltip ? 520 : 640) * EDSCALE, content_min_height));
 	content->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	content->set_selection_enabled(p_allow_selection);
 	content->set_context_menu_enabled(p_allow_selection);
 	content->set_selection_modifier(callable_mp_static(_fix_selection));
 	content->connect("meta_clicked", callable_mp(this, &EditorHelpBit::_meta_clicked));
 	add_child(content);
+
+	documentation = memnew(RichTextLabel);
+	documentation->set_theme_type_variation(p_in_tooltip ? "EditorHelpBitTooltipContent" : "EditorHelpBitContent");
+	documentation->set_fit_content(true);
+	documentation->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
+	documentation->set_scroll_active(false);
+	documentation->set_selection_enabled(false);
+	documentation->set_context_menu_enabled(false);
+	documentation->connect("meta_clicked", callable_mp(this, &EditorHelpBit::_meta_clicked));
+	documentation->hide();
+	add_child(documentation);
 
 	use_class_prefix = p_use_class_prefix;
 

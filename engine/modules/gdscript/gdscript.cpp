@@ -1075,6 +1075,9 @@ void GDScript::_get_property_list(List<PropertyInfo> *p_properties) const {
 }
 
 void GDScript::_bind_methods() {
+#ifdef TOOLS_ENABLED
+	ClassDB::bind_method(D_METHOD("get_symbol_help", "code", "symbol", "owner"), &GDScript::get_symbol_help, DEFVAL(Variant()));
+#endif
 	ClassDB::bind_vararg_method(METHOD_FLAGS_DEFAULT, "new", &GDScript::_new, MethodInfo("new"));
 }
 

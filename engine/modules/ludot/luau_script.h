@@ -40,6 +40,7 @@ public:
     Error reload(bool p_keep_state = false) override;
     Array get_diagnostics() const;
     PackedStringArray get_completions(const String &p_code) const;
+    Dictionary get_symbol_help(const String &p_code, const String &p_symbol, Object *p_owner = nullptr) const;
 #ifdef TOOLS_ENABLED
     StringName get_doc_class_name() const override { return class_name; }
     Vector<DocData::ClassDoc> get_documentation() const override { return {}; }

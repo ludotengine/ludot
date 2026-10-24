@@ -294,6 +294,7 @@ public:
 #ifdef TOOLS_ENABLED
 	virtual StringName get_doc_class_name() const override { return doc_class_name; }
 	virtual Vector<DocData::ClassDoc> get_documentation() const override { return docs; }
+	Dictionary get_symbol_help(const String &p_code, const String &p_symbol, Object *p_owner = nullptr) const;
 	virtual String get_class_icon_path() const override;
 #endif // TOOLS_ENABLED
 

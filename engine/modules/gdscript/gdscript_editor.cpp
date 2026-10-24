@@ -4647,3 +4647,113 @@ static Error _lookup_symbol_from_base(const GDScriptParser::DataType &p_base, co
 }
 
 #endif // TOOLS_ENABLED
+
+#ifdef TOOLS_ENABLED
+Dictionary GDScript::get_symbol_help(const String &p_code, const String &p_symbol, Object *p_owner) const {
+	ScriptLanguage::LookupResult result;
+	if (GDScriptLanguage::get_singleton()->lookup_code(p_code, p_symbol, get_path(), p_owner, result) != OK || (result.type != ScriptLanguage::LOOKUP_RESULT_CLASS_METHOD && result.type != ScriptLanguage::LOOKUP_RESULT_LOCAL_VARIABLE && result.type != ScriptLanguage::LOOKUP_RESULT_LOCAL_CONSTANT)) {
+		return {};
+	}
+	// Native methods use the shared engine documentation, including inherited methods.
+	if (ClassDB::class_exists(result.class_name) || result.class_name.begins_with("@")) {
+		return {};
+	}
+	GDScriptParser parser;
+	const String hover_source = result.script_path.is_empty() || result.script_path == get_path() ? p_code.replace(String::chr(0xffff), "") : result.script.is_valid() ? result.script->get_source_code()
+																																									   : FileAccess::get_file_as_string(result.script_path);
+	parser.parse(result.type == ScriptLanguage::LOOKUP_RESULT_CLASS_METHOD ? hover_source : p_code, result.script_path.is_empty() ? get_path() : result.script_path, true);
+	GDScriptAnalyzer analyzer(&parser);
+	analyzer.analyze();
+	const GDScriptParser::FunctionNode *function = nullptr;
+	if (result.type != ScriptLanguage::LOOKUP_RESULT_CLASS_METHOD) {
+		const auto context = parser.get_completion_context();
+		for (auto suite = context.current_suite; suite != nullptr; suite = suite->parent_block) {
+			if (!suite->has_local(p_symbol)) {
+				continue;
+			}
+			const auto &local = suite->get_local(p_symbol);
+			const GDScriptParser::ExpressionNode *initializer = local.type == GDScriptParser::SuiteNode::Local::VARIABLE ? local.variable->initializer : local.type == GDScriptParser::SuiteNode::Local::CONSTANT ? local.constant->initializer
+																																																				  : nullptr;
+			if (initializer && initializer->type == GDScriptParser::Node::LAMBDA) {
+				function = static_cast<const GDScriptParser::LambdaNode *>(initializer)->function;
+			}
+			break;
+		}
+		if (function == nullptr) {
+			const GDScriptParser::Node *node = context.node;
+			if (node && node->type == GDScriptParser::Node::CALL) {
+				node = static_cast<const GDScriptParser::CallNode *>(node)->callee;
+			}
+			if (node == nullptr || node->get_datatype().builtin_type != Variant::CALLABLE || node->get_datatype().method_info.name.is_empty()) {
+				return {};
+			}
+			DocData::MethodDoc method;
+			DocData::method_doc_from_methodinfo(method, node->get_datatype().method_info, result.description);
+			Dictionary info;
+			info["display_name"] = p_symbol;
+			info["description"] = method.description;
+			info["return_type"] = method.return_enum.is_empty() ? method.return_type : method.return_enum;
+			Array parameters;
+			for (const auto &argument : method.arguments) {
+				Dictionary parameter;
+				parameter["name"] = argument.name;
+				parameter["type"] = argument.enumeration.is_empty() ? argument.type : argument.enumeration;
+				parameter["default"] = argument.default_value;
+				parameters.push_back(parameter);
+			}
+			if (!method.rest_argument.name.is_empty()) {
+				Dictionary parameter;
+				parameter["name"] = "...";
+				parameter["type"] = method.rest_argument.type;
+				parameters.push_back(parameter);
+			}
+			info["parameters"] = parameters;
+			return info;
+		}
+	}
+	LocalVector<const GDScriptParser::ClassNode *> classes;
+	if (function == nullptr) {
+		classes.push_back(parser.get_tree());
+	}
+	while (!classes.is_empty()) {
+		const auto cls = classes[classes.size() - 1];
+		classes.resize(classes.size() - 1);
+		for (const auto &member : cls->members) {
+			if (member.type == GDScriptParser::ClassNode::Member::CLASS) {
+				classes.push_back(member.m_class);
+			}
+			if (member.type == GDScriptParser::ClassNode::Member::FUNCTION && member.function->identifier->name == result.class_member && (result.location < 0 || member.function->start_line == result.location)) {
+				function = member.function;
+			}
+		}
+	}
+	if (function == nullptr) {
+		return {};
+	}
+	Dictionary info;
+	info["display_name"] = p_symbol;
+	info["description"] = function->doc_data.description.is_empty() ? result.description : function->doc_data.description;
+	info["is_method"] = function->source_lambda == nullptr && !function->is_static;
+	info["return_type"] = function->get_datatype().builtin_type == Variant::NIL && !function->get_datatype().is_variant() ? String("void") : function->get_datatype().to_string();
+	Array parameters;
+	for (int i = 0; i < function->parameters.size(); ++i) {
+		const auto param = function->parameters[i];
+		Dictionary parameter;
+		parameter["name"] = param->identifier->name;
+		parameter["type"] = param->get_datatype().to_string();
+		const int default_index = i - (function->parameters.size() - function->default_arg_values.size());
+		if (default_index >= 0) {
+			parameter["default"] = function->default_arg_values[default_index].get_construct_string();
+		}
+		parameters.push_back(parameter);
+	}
+	if (function->rest_parameter != nullptr) {
+		Dictionary parameter;
+		parameter["name"] = "...";
+		parameter["type"] = function->rest_parameter->get_datatype().to_string();
+		parameters.push_back(parameter);
+	}
+	info["parameters"] = parameters;
+	return info;
+}
+#endif
