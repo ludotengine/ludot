@@ -1,0 +1,9 @@
+shader spatial
+renderMode("unshaded", "blend_add", "cull_disabled", "depth_draw_never")
+function fragment()
+    local d: number = length(UV - vec2(0.5)) * 2.0
+    local glow: number = pow(max(1.0 - d, 0.0), 3.2)
+    Albedo = vec3(1.0, 0.33, 0.045)
+    Emission = vec3(1.0, 0.24, 0.02) * glow
+    Alpha = glow * 0.95
+end

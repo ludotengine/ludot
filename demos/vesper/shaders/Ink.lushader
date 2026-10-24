@@ -1,0 +1,11 @@
+shader spatial
+renderMode("unshaded", "blend_add", "cull_disabled", "depth_draw_never")
+export Tint: vec4 = vec4(0.18, 0.42, 0.5, 0.35)
+export Width: number = 1.5
+function vertex()
+    PointSize = Width
+end
+function fragment()
+    Albedo = Tint.rgb
+    Alpha = Tint.a
+end

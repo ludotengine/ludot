@@ -1,0 +1,12 @@
+shader spatial
+renderMode("unshaded")
+local P: vec3
+function vertex()
+    P = Vertex
+end
+function fragment()
+    local flicker: number = sin(P.x * 8.0 + Time * 0.6) * cos(P.y * 9.0 - Time * 0.4)
+    local amber: vec3 = mix(vec3(1.0, 0.28, 0.025), vec3(1.0, 0.82, 0.26), flicker * 0.3 + 0.6)
+    Albedo = amber
+    Emission = amber * 2.8
+end

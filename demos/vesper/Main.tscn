@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/SolarSystem.luau" id="1"]
+[ext_resource type="Script" path="res://scripts/Flight.luau" id="2"]
+[node name="Vesper" type="Node3D"]
+script = ExtResource("1")
+[node name="Flight" type="Node3D" parent="."]
+script = ExtResource("2")
+[node name="Camera" type="Camera3D" parent="Flight"]
+position = Vector3(0, 62, 100)
+fov = 55.0
+near = 0.05
+far = 2500.0
+current = true

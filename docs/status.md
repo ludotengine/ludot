@@ -5,6 +5,11 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 
 ## Implemented
 
+- `demos/vesper` is a playable, procedural solar-system demo with Luau-only scene
+  construction and gameplay, lushader surfaces, free flight, visible orbits, and a
+  live source panel. All five Luau files pass native editor checking. Headless
+  gameplay checks cover movement, pause/resume, source display, and planet focus;
+  a 49-second native renderer capture covers the cinematic tour.
 - Vendored Godot 4.7.2-stable and Luau 0.743 source with pinned provenance.
 - Native parser support for brace classes, implicit `self`, per-instance defaults,
   exported fields, private field checking, and export range metadata.
