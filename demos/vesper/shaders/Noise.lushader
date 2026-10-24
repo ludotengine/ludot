@@ -1,0 +1,31 @@
+shader include
+
+--- Hash-based value noise, shared by the sun, clouds, gas giant, and sky.
+
+local function hash(p: vec3): number
+    local q: vec3 = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419))
+    q = q * 17.0
+    return fract(q.x * q.y * q.z * (q.x + q.y + q.z))
+end
+
+local function noise(p: vec3): number
+    local i: vec3 = floor(p)
+    local f: vec3 = fract(p)
+    local u: vec3 = f * f * (3.0 - 2.0 * f)
+    local bottom: number = mix(mix(hash(i), hash(i + vec3(1, 0, 0)), u.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), u.x), u.y)
+    local top: number = mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), u.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), u.x), u.y)
+    return mix(bottom, top, u.z)
+end
+
+local function fbm(p: vec3, octaves: int): number
+    local total: number = 0
+    local amplitude: number = 0.5
+    local q: vec3 = p
+    for i = 1, 8 do
+        if i > octaves then break end
+        total += amplitude * noise(q)
+        q = q * 2.02 + vec3(3.1, 1.7, 5.3)
+        amplitude *= 0.5
+    end
+    return total
+end

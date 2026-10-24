@@ -1,0 +1,44 @@
+shader spatial
+import "./Noise"
+import sunlight from "./Light"
+renderMode("unshaded", "cull_back", "blend_mix", "depth_draw_never")
+
+--- A sea-level sphere. Depth behind the water gives shallow shelves, surf, and clarity.
+
+export SceneDepth: DepthTexture
+export Shallow: vec3 = vec3(0.16, 0.58, 0.62)
+export Abyss: vec3 = vec3(0.02, 0.09, 0.2)
+export Foam: vec3 = vec3(0.92, 0.95, 0.94)
+
+local World: vec3
+local Local: vec3
+local Up: vec3
+
+function vertex()
+    World = (ModelMatrix * vec4(Vertex, 1.0)).xyz
+    Local = Vertex
+    Up = normalize((ModelMatrix * vec4(Vertex, 0.0)).xyz)
+end
+
+function fragment()
+    local depth: number = texture(SceneDepth, ScreenUV).x
+    local scene: vec4 = InverseProjectionMatrix * vec4(ScreenUV * 2.0 - 1.0, depth, 1.0)
+    local water: number = length(scene.xyz / scene.w) - length(Vertex)
+    local clarity: number = exp(-water * 1.4)
+
+    local ripple: number = fbm(Local * 3.0 + vec3(Time * 0.08, 0, Time * 0.05), 3)
+    local surf: number = smoothstep(0.7, 0.95, clarity + ripple * 0.25) * (0.6 + 0.4 * sin(Time * 1.5 + ripple * 9.0))
+
+    local up: vec3 = normalize(Up)
+    local view: vec3 = normalize(CameraPosition - World)
+    local toSun: vec3 = normalize(-World)
+    local fresnel: number = pow(1.0 - clamp(dot(up, view), 0.0, 1.0), 5.0)
+    local glint: number = pow(max(dot(up, normalize(view + toSun)), 0.0), 220.0) * smoothstep(-0.1, 0.2, dot(up, toSun))
+
+    local color: vec3 = mix(Abyss, Shallow, clarity) * sunlight(World, up, up)
+    color = mix(color, Foam * sunlight(World, up, up), surf)
+    color += vec3(0.25, 0.4, 0.6) * fresnel * 0.25 * smoothstep(-0.1, 0.3, dot(up, toSun))
+    Albedo = color
+    Emission = vec3(1.0, 0.9, 0.7) * glint * 6.0
+    Alpha = clamp(1.0 - clarity * 0.75 + surf * 0.8, 0.0, 1.0)
+end

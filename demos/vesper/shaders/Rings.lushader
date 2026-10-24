@@ -1,0 +1,33 @@
+shader spatial
+import "./Noise"
+renderMode("unshaded", "cull_disabled", "blend_mix", "depth_draw_never")
+
+--- Dusty ring bands. Each fragment checks whether the planet blocks its view of the sun.
+
+export Inner: vec3 = vec3(0.32, 0.25, 0.2)
+export Outer: vec3 = vec3(0.72, 0.6, 0.46)
+export PlanetRadius: number = 34.0
+
+local World: vec3
+
+function vertex()
+    World = (ModelMatrix * vec4(Vertex, 1.0)).xyz
+end
+
+function fragment()
+    local r: number = UV.x
+    local dust: number = noise(vec3(r * 140.0, 0, 0)) * 0.6 + noise(vec3(r * 420.0, 3.0, 0)) * 0.4
+    local gaps: number = smoothstep(0.08, 0.14, abs(r - 0.42)) * smoothstep(0.02, 0.05, abs(r - 0.71))
+    local edges: number = smoothstep(0.0, 0.06, r) * smoothstep(1.0, 0.92, r)
+    local color: vec3 = mix(Inner, Outer, r) * (0.75 + 0.5 * dust)
+
+    -- Shadow: does the segment from here toward the sun pass through the planet?
+    local toSun: vec3 = normalize(-World)
+    local fromPlanet: vec3 = World - NodePosition
+    local along: number = dot(-fromPlanet, toSun)
+    local miss: number = length(fromPlanet + toSun * along)
+    local shadow: number = if along > 0.0 then smoothstep(PlanetRadius * 0.9, PlanetRadius * 1.05, miss) else 1.0
+
+    Albedo = color * (0.06 + 0.94 * shadow) * vec3(1.0, 0.9, 0.78)
+    Alpha = edges * gaps * (0.2 + 0.6 * dust * dust)
+end

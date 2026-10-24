@@ -1,0 +1,39 @@
+shader spatial
+import "./Noise"
+renderMode("unshaded", "cull_front", "depth_draw_never", "fog_disabled")
+
+--- Procedural sky on a huge inverted sphere: three layers of stars and a dusty band.
+
+export Band: vec3 = vec3(0.22, 0.18, 0.34)
+export BandAxis: vec3 = vec3(0.3, 0.85, 0.42)
+
+local Direction: vec3
+
+function vertex()
+    Direction = normalize(Vertex)
+end
+
+local function stars(direction: vec3, cells: number, threshold: number): vec3
+    local p: vec3 = direction * cells
+    local cell: vec3 = floor(p)
+    local seed: number = hash(cell)
+    if seed < threshold then
+        return vec3(0.0)
+    end
+    local offset: vec3 = vec3(hash(cell + vec3(7.1)), hash(cell + vec3(3.3)), hash(cell + vec3(5.7))) * 0.6 + 0.2
+    local d: number = length(fract(p) - offset)
+    local size: number = 0.06 + 0.12 * hash(cell + vec3(1.9))
+    local twinkle: number = 0.75 + 0.25 * sin(Time * (1.0 + seed * 3.0) + seed * 40.0)
+    local warmth: number = hash(cell + vec3(9.4))
+    local tint: vec3 = mix(vec3(0.62, 0.74, 1.0), vec3(1.0, 0.82, 0.62), warmth)
+    return tint * smoothstep(size, 0.0, d) * twinkle
+end
+
+function fragment()
+    local d: vec3 = normalize(Direction)
+    local light: vec3 = stars(d, 90.0, 0.93) * 1.6 + stars(d, 220.0, 0.9) * 0.9 + stars(d, 480.0, 0.85) * 0.5
+    local plane: number = abs(dot(d, normalize(BandAxis)))
+    local dust: number = fbm(d * 4.0, 6)
+    local glow: number = exp(-plane * 9.0) * smoothstep(0.45, 0.8, dust)
+    Albedo = light + Band * glow * 0.35 + vec3(0.003, 0.004, 0.009)
+end

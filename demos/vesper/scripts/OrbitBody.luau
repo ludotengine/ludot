@@ -1,24 +1,20 @@
 import "@sim/Clock" as Clock
 
---- A circular orbit with an independent axial rotation.
+--- Moves a world along a circular orbit around its parent and turns its surface.
 class OrbitBody extends Node3D = {
-    export Radius: number = 18
-    export AngularSpeed: number = 0.032
-    export Phase: number = 0.8
-    export Spin: number = 0.12
-    private Elapsed: number = 0
+    export Radius: number = 250
+    export AngularSpeed: number = 0.005
+    export Phase: number = 0.7
+    export Spin: number = 0.012
 
     function _process(delta: number)
         if Engine:isEditorHint() then return end
-        if not Clock.Paused then
-            self.Elapsed += delta
+        const angle = self.Phase + Clock.Time * self.AngularSpeed
+        self.Position = Vector3(math.cos(angle), 0, math.sin(angle)) * self.Radius
+        const surface = self:getNodeOrNull("Surface") :: Node3D?
+        if surface ~= nil then
+            surface.Rotation = Vector3(0, Clock.Time * self.Spin, 0)
         end
-        const angle = self.Phase + self.Elapsed * self.AngularSpeed
-        self.Position = Vector3(
-            math.cos(angle) * self.Radius, 0,
-            math.sin(angle) * self.Radius
-        )
-        self.Rotation = Vector3(0, self.Elapsed * self.Spin, 0)
     end
 }
 return OrbitBody

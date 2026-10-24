@@ -178,4 +178,15 @@ function fragment() Albedo = brighten(Tint, 1.5) end""")
                 r = self.compile('shader spatial\n' + source)
                 self.assertNotEqual(r.returncode, 0)
                 self.assertIn(message, r.stderr)
+    def test_screen_textures_and_camera_builtins(self):
+        r = self.compile('shader spatial\nrenderMode("unshaded")\nexport SceneDepth: DepthTexture\nexport Scene: ScreenTexture\nfunction fragment()\n    local depth: number = texture(SceneDepth, ScreenUV).x\n    local eye: vec3 = CameraPosition - NodePosition\n    Albedo = texture(Scene, ScreenUV).rgb * depth + eye * 0.0\nend')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('uniform sampler2D SceneDepth : hint_depth_texture, repeat_disable, filter_nearest;', r.stdout)
+        self.assertIn('uniform sampler2D Scene : hint_screen_texture', r.stdout)
+        self.assertIn('(CAMERA_POSITION_WORLD - NODE_POSITION_WORLD)', r.stdout)
+        for source, message in [('local d: DepthTexture', 'only allowed as an exported uniform'), ('export D: DepthTexture = 1', 'take no value'), ('function fragment() local d: DepthTexture end', 'only allowed as an exported uniform')]:
+            with self.subTest(source=source):
+                r = self.compile('shader spatial\n' + source)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn(message, r.stderr)
 if __name__ == '__main__': unittest.main()

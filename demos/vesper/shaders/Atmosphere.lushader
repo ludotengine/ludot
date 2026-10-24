@@ -1,13 +1,75 @@
 shader spatial
-renderMode("unshaded", "blend_add", "cull_front", "depth_draw_never")
+renderMode("unshaded", "cull_front", "depth_test_disabled", "depth_draw_never", "blend_mix")
 
-export Tint: vec3 = vec3(0.12, 0.48, 0.95)
-export Strength: number = 0.6 in 0 to 4 step 0.1
+--- Planet fog. Each pixel marches through the air shell from the camera to the first
+--- surface behind it, so the haze thickens over distant ground, at the horizon, and
+--- when you fly inside it. Sunlit air scatters blue, the terminator glows warm.
+
+export SceneDepth: DepthTexture
+export PlanetRadius: number = 14.0
+export Thickness: number = 2.6
+export Density: number = 1.2
+export Falloff: number = 4.0
+export Haze: number = 0.4 in 0 to 1 step 0.01
+export Day: vec3 = vec3(0.37, 0.61, 1.0)
+export Sunset: vec3 = vec3(1.0, 0.54, 0.29)
+
+local World: vec3
+
+function vertex()
+    World = (ModelMatrix * vec4(Vertex, 1.0)).xyz
+end
+
+--- Distances along a ray to where it enters and leaves a sphere at the origin.
+local function sphere(origin: vec3, direction: vec3, radius: number): vec2
+    local b: number = dot(origin, direction)
+    local c: number = dot(origin, origin) - radius * radius
+    local d: number = b * b - c
+    if d < 0.0 then
+        return vec2(1.0, -1.0)
+    end
+    return vec2(-b - sqrt(d), -b + sqrt(d))
+end
 
 function fragment()
-    local facing: number = abs(dot(normalize(Normal), normalize(-Vertex)))
-    local rim: number = pow(1.0 - facing, 2.4)
-    Albedo = Tint * Strength
-    Emission = Tint * rim * Strength
-    Alpha = rim * 0.65
+    local eye: vec3 = CameraPosition - NodePosition
+    local ray: vec3 = normalize(World - CameraPosition)
+    local outer: number = PlanetRadius + Thickness
+    local span: vec2 = sphere(eye, ray, outer)
+    local near: number = max(span.x, 0.0)
+    local far: number = span.y
+
+    local depth: number = texture(SceneDepth, ScreenUV).x
+    if depth > 0.00001 then
+        local scene: vec4 = InverseProjectionMatrix * vec4(ScreenUV * 2.0 - 1.0, depth, 1.0)
+        far = min(far, length(scene.xyz / scene.w))
+    end
+    if far <= near then
+        discard()
+    end
+
+    local stride: number = (far - near) / 16.0
+    local optical: number = 0.0
+    local glow: vec3 = vec3(0.0)
+    for i = 0, 15 do
+        local p: vec3 = eye + ray * (near + (float(i) + 0.5) * stride)
+        local altitude: number = clamp((length(p) - PlanetRadius) / Thickness, 0.0, 1.0)
+        local density: number = exp(-altitude * Falloff) * (1.0 - altitude)
+        local sunHeight: number = dot(normalize(p), normalize(-(p + NodePosition)))
+        local lit: number = smoothstep(-0.3, 0.25, sunHeight)
+        local tint: vec3 = mix(Sunset, Day, smoothstep(-0.05, 0.45, sunHeight))
+        glow += tint * lit * density * stride
+        optical += density * stride
+    end
+
+    local toSun: vec3 = normalize(-CameraPosition)
+    local forward: number = pow(max(dot(ray, toSun), 0.0), 8.0)
+    local color: vec3 = glow / max(optical, 0.0001)
+    color = color * (0.85 + forward * 1.6) + Sunset * forward * 0.4
+    -- Horizontal views near the ground cross far more air than views from orbit,
+    -- so thin the fog as the camera descends to keep the terrain readable.
+    local cameraAltitude: number = clamp((length(eye) - PlanetRadius) / Thickness, 0.0, 1.0)
+    local clarity: number = mix(Haze, 1.0, smoothstep(0.15, 1.0, cameraAltitude))
+    Albedo = color
+    Alpha = 0.92 * (1.0 - exp(-optical * clarity * Density / Thickness))
 end

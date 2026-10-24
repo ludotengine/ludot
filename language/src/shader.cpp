@@ -35,7 +35,9 @@ struct Generator {
     std::string returnType = "void";
     const std::set<std::string> types = {"bool", "int", "uint", "float", "number", "boolean", "vec2", "vec3", "vec4", "ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4", "bvec2", "bvec3", "bvec4", "mat2", "mat3", "mat4", "sampler2D", "sampler2DArray", "sampler3D", "samplerCube", "samplerExternalOES"};
     const std::set<std::string> functions = {"mix", "clamp", "normalize", "texture", "textureLod", "textureSize", "texelFetch", "dot", "cross", "length", "distance", "reflect", "refract", "faceforward", "min", "max", "abs", "sign", "floor", "ceil", "round", "trunc", "fract", "mod", "step", "smoothstep", "sqrt", "inversesqrt", "pow", "exp", "exp2", "log", "log2", "sin", "cos", "tan", "asin", "acos", "atan", "radians", "degrees", "dFdx", "dFdy", "fwidth", "transpose", "determinant", "inverse", "outerProduct", "matrixCompMult", "lessThan", "greaterThan", "equal", "any", "all", "not"};
-    const std::map<std::string, std::string> builtins = {{"Color","COLOR"},{"Texture","TEXTURE"},{"Vertex","VERTEX"},{"Normal","NORMAL"},{"Position","POSITION"},{"Time","TIME"},{"Albedo","ALBEDO"},{"Alpha","ALPHA"},{"Roughness","ROUGHNESS"},{"Metallic","METALLIC"},{"Emission","EMISSION"},{"Light","LIGHT"},{"LightColor","LIGHT_COLOR"},{"LightEnergy","LIGHT_ENERGY"},{"PointSize","POINT_SIZE"},{"UV","UV"},{"UV2","UV2"},{"ScreenUV","SCREEN_UV"},{"TexturePixelSize","TEXTURE_PIXEL_SIZE"},{"ModelMatrix","MODEL_MATRIX"},{"ViewMatrix","VIEW_MATRIX"},{"ProjectionMatrix","PROJECTION_MATRIX"},{"Velocity","VELOCITY"},{"Transform","TRANSFORM"},{"Active","ACTIVE"},{"Custom","CUSTOM"},{"Lifetime","LIFETIME"},{"Delta","DELTA"},{"Index","INDEX"},{"Number","NUMBER"},{"RandomSeed","RANDOM_SEED"}};
+    const std::map<std::string, std::string> builtins = {{"Color","COLOR"},{"Texture","TEXTURE"},{"Vertex","VERTEX"},{"Normal","NORMAL"},{"Position","POSITION"},{"Time","TIME"},{"Albedo","ALBEDO"},{"Alpha","ALPHA"},{"Roughness","ROUGHNESS"},{"Metallic","METALLIC"},{"Emission","EMISSION"},{"Light","LIGHT"},{"LightColor","LIGHT_COLOR"},{"LightEnergy","LIGHT_ENERGY"},{"PointSize","POINT_SIZE"},{"UV","UV"},{"UV2","UV2"},{"ScreenUV","SCREEN_UV"},{"TexturePixelSize","TEXTURE_PIXEL_SIZE"},{"ModelMatrix","MODEL_MATRIX"},{"ViewMatrix","VIEW_MATRIX"},{"ProjectionMatrix","PROJECTION_MATRIX"},{"Velocity","VELOCITY"},{"Transform","TRANSFORM"},{"Active","ACTIVE"},{"Custom","CUSTOM"},{"Lifetime","LIFETIME"},{"Delta","DELTA"},{"Index","INDEX"},{"Number","NUMBER"},{"RandomSeed","RANDOM_SEED"},{"CameraPosition","CAMERA_POSITION_WORLD"},{"CameraDirection","CAMERA_DIRECTION_WORLD"},{"NodePosition","NODE_POSITION_WORLD"},{"InverseViewMatrix","INV_VIEW_MATRIX"},{"InverseProjectionMatrix","INV_PROJECTION_MATRIX"},{"View","VIEW"},{"FragCoord","FRAGCOORD"},{"ViewportSize","VIEWPORT_SIZE"},{"Rim","RIM"},{"RimTint","RIM_TINT"},{"Specular","SPECULAR"},{"Depth","DEPTH"},{"Attenuation","ATTENUATION"},{"Diffuse","DIFFUSE_LIGHT"},{"SpecularLight","SPECULAR_LIGHT"}};
+    // Screen-space textures are uniforms whose hint makes the engine bind the frame's depth or color.
+    const std::map<std::string, std::string> screenTextures = {{"DepthTexture", "hint_depth_texture, repeat_disable, filter_nearest"}, {"ScreenTexture", "hint_screen_texture, repeat_disable, filter_linear_mipmap"}, {"NormalRoughnessTexture", "hint_normal_roughness_texture, repeat_disable, filter_nearest"}};
     [[noreturn]] void fail(const Luau::AstNode* node, const std::string& message) {
         result.diagnostics.push_back({node->location.begin.line, node->location.begin.column, message, currentPath == includeStack.front() ? "" : currentPath});
         throw std::runtime_error(message);
@@ -47,6 +49,8 @@ struct Generator {
         auto ref = annotation ? annotation->as<Luau::AstTypeReference>() : nullptr;
         if (ref && !ref->prefix && (std::string(ref->name.value) == "flat" || std::string(ref->name.value) == "smooth"))
             fail(node, "Interpolation qualifiers are only allowed on top-level varyings");
+        if (ref && !ref->prefix && screenTextures.count(ref->name.value))
+            fail(node, std::string(ref->name.value) + " is only allowed as an exported uniform");
         if (!ref || ref->prefix || ref->parameters.size != 0 || types.count(ref->name.value) == 0)
             fail(node, "A shader declaration requires a scalar, vector, matrix, or sampler type");
         std::string name = ref->name.value;
@@ -462,6 +466,17 @@ bool unit(Generator& gen, const std::string& source, const std::string& path, bo
                     continue;
                 }
                 if (decl->vars.size != 1 || decl->values.size > 1) gen.fail(stat, "Export one uniform per declaration");
+                auto screenReference = decl->vars.data[0]->annotation ? decl->vars.data[0]->annotation->as<AstTypeReference>() : nullptr;
+                if (screenReference && !screenReference->prefix && gen.screenTextures.count(screenReference->name.value)) {
+                    if (decl->values.size || gen.uniformHints.count(declarationKey)) gen.fail(stat, std::string(screenReference->name.value) + " uniforms take no value or range");
+                    if (gen.kind == "particles") gen.fail(stat, "Screen textures are only available in canvas_item and spatial shaders");
+                    const std::string name = decl->vars.data[0]->name.value;
+                    gen.localTypes[decl->vars.data[0]] = "sampler2D";
+                    gen.globalTypes[name] = "sampler2D";
+                    exported.insert(name);
+                    gen.result.code += "uniform sampler2D " + name + " : " + gen.screenTextures.at(screenReference->name.value) + ";\n";
+                    continue;
+                }
                 const std::string uniformType = gen.type(decl->vars.data[0]->annotation, stat);
                 const std::string name = decl->vars.data[0]->name.value;
                 gen.localTypes[decl->vars.data[0]] = uniformType;
@@ -540,7 +555,7 @@ std::vector<std::string> shaderCompletions() {
     std::set<std::string> words = gen.types;
     words.insert(gen.functions.begin(), gen.functions.end());
     for (const auto& item : gen.builtins) words.insert(item.first);
-    for (const char* word : {"shader", "canvas_item", "spatial", "particles", "export", "function", "vertex", "fragment", "light", "start", "process", "local", "const", "if", "then", "else", "elseif", "end", "return", "for", "while", "do", "break", "continue", "in", "to", "step", "discard", "renderMode", "import", "from", "include", "flat", "smooth"}) words.insert(word);
+    for (const char* word : {"shader", "canvas_item", "spatial", "particles", "export", "function", "vertex", "fragment", "light", "start", "process", "local", "const", "if", "then", "else", "elseif", "end", "return", "for", "while", "do", "break", "continue", "in", "to", "step", "discard", "renderMode", "import", "from", "include", "flat", "smooth", "DepthTexture", "ScreenTexture", "NormalRoughnessTexture"}) words.insert(word);
     return {words.begin(), words.end()};
 }
 }

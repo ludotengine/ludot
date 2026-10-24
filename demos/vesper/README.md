@@ -1,74 +1,61 @@
 # Vesper
 
-A small, procedural space playground for Ludot. Seven orbiting worlds, a glowing
-sun, Earth and its moon, a low-poly asteroid belt, a ringed Saturn, and an icy Pluto.
-All gameplay and scene construction use **Luau**. Every custom surface effect uses
-**lushader**. There are no GDScript files, downloaded planet textures, or external
-models in this project.
+A small solar system to fly around, in the spirit of Outer Wilds: a glowing sun, a
+desert world of mesas, an Earth with oceans, clouds and a moon, a cratered Mars, an
+asteroid belt, a ringed gas giant, and Pluto with its heart-shaped plain.
 
-The palette and miniature planetary feel are inspired by Outer Wilds. This is
-original geometry and shader code, not a reproduction of that game's assets.
-Orbits, distances, sizes, and time are deliberately stylized. This is not an N-body
-or physically scaled astronomy simulation.
+Everything is generated when the game starts. Gameplay and world building are written
+in **Luau**, and every surface, sky, and atmosphere effect is a **lushader**. The
+project has no GDScript, textures, or imported models.
+
+Sizes, distances, and speeds are stylized for flying around, not for astronomy. The
+art direction is inspired by Outer Wilds, but all geometry and shader code here is
+original.
 
 ## Run
 
-Use the Ludot fork from this monorepo. Stock Godot cannot execute these scripts.
+Use the Ludot build from this monorepo. Stock Godot cannot run these scripts.
 
 ```sh
-ludot --editor --path demos/vesper --import
 ludot --path demos/vesper
 ```
 
-When running from this project directory, use `ludot --path .` instead. Open
-`project.godot` with Ludot to edit it. Geometry is built at runtime, so press Play
-to see the complete system.
+Add `-- --tour` to play the recorded camera tour.
 
 ## Controls
 
 | Input | Action |
 | --- | --- |
-| WASD | Fly in camera space |
-| Hold right mouse | Capture the cursor and look around |
-| Space / Ctrl | Move up / down |
+| Hold right mouse | Look around |
+| W A S D | Fly |
+| Space / Ctrl | Up / down |
 | Shift | Boost |
-| 1 / 2 / 3 | Jump near Earth / Mars / Pluto |
-| 0 | Return to the system overview |
-| P | Pause or resume planetary motion |
-| O | Show or hide orbit lines |
-| C | Show or hide actual source code beside the world |
-| R | Start or stop the cinematic tour |
-| Esc | Release the mouse cursor |
+| Mouse wheel | Flight speed, or zoom in the planet camera |
+| 1 to 6 | Planet camera: circle Ember, Earth, the Moon, Mars, the giant, or Pluto |
+| Esc or 0 | Back to free flight |
+| O | Show or hide orbits |
+| P | Pause the planets |
+| T | Start or stop the tour |
 
-## Code
+Free flight rides along with the nearest world, so its surface holds still under you
+while it orbits. You slow down near the ground and cannot fly into it.
 
-- `scripts/SolarSystem.luau`: geometry, native material resources, HUD, star field,
-  asteroid field, and the live source panel.
-- `scripts/OrbitBody.luau`: circular orbits and axial rotation.
-- `scripts/Flight.luau`: mouse/keyboard free flight and the repeatable camera tour.
-- `scripts/System.luau`: planet palette and orbit data.
-- `scripts/Clock.luau`: shared pause state.
-- `shaders/Planet.lushader`: procedural continents/bands, ice, faceted normals, and
-  sun-facing illumination.
-- `shaders/Sun.lushader` and `Corona.lushader`: animated solar surface and glow.
-- `shaders/Atmosphere.lushader`: additive atmospheric rim.
-- `shaders/Ink.lushader`: orbit paths, Saturn's rings, and stars.
+## How it works
 
-Shader resources load by their `.lushader` paths and share compiled shaders across
-materials. The code panel reads the real files rather than showing placeholder text.
-The demo uses the compatibility renderer so its corona also works without HDR glow.
-
-## Reproduce the video
-
-From the monorepo root:
-
-```sh
-ludot --path demos/vesper --write-movie /absolute/path/vesper.avi \
-  --fixed-fps 30 --quit-after 1470 -- --tour
-```
-
-This records 49 seconds of the running project at 1280 × 720, including the final
-source-code view. The supplied MP4 is compressed from that capture with opening and
-closing fades and an original procedural ambient soundtrack.
-
-The supplied logo retains the Godot/Luau attribution embedded in `icon.svg`.
+| File | What it does |
+| --- | --- |
+| `scripts/System.luau` | Every world: orbit, terrain recipe, palette, and air |
+| `scripts/Terrain.luau` | Cube-sphere meshes displaced by noise, ridges, terraces, canyons, and craters |
+| `scripts/SolarSystem.luau` | Builds the sun, sky, worlds, oceans, clouds, air, rings, belt, and orbit lines |
+| `scripts/OrbitBody.luau` | Moves each world along its orbit and turns its surface |
+| `scripts/Flight.luau` | Free flight, the planet camera, and tour playback |
+| `scripts/Tour.luau` | The tour's camera shots, in sun-relative planet coordinates |
+| `shaders/Terrain.lushader` | Height, slope, snow, and plains coloring, lit by the sun |
+| `shaders/Atmosphere.lushader` | Planet fog: ray-marches the air between the camera and the scene depth |
+| `shaders/Ocean.lushader` | Shallow shelves and surf from scene depth, plus sun glints |
+| `shaders/Clouds.lushader` | Drifting, warped cloud bands |
+| `shaders/Sun.lushader`, `Corona.lushader` | Boiling granulation and a halo that works from any distance |
+| `shaders/GasGiant.lushader`, `Rings.lushader` | Sheared bands with a storm vortex, and rings shadowed by the planet |
+| `shaders/Stars.lushader` | Procedural star layers and a dusty band across the sky |
+| `shaders/Orbit.lushader` | Orbit lines with a trail behind each world |
+| `shaders/Noise.lushader`, `Light.lushader` | Shared `shader include` libraries for noise and sunlight |

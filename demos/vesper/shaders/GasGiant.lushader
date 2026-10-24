@@ -1,0 +1,40 @@
+shader spatial
+import "./Noise"
+import sunlight from "./Light"
+renderMode("unshaded", "cull_back")
+
+--- Turbulent latitude bands, sheared by noise, with a slow storm vortex.
+
+export Pale: vec3 = vec3(0.93, 0.84, 0.68)
+export Rust: vec3 = vec3(0.72, 0.42, 0.24)
+export Dark: vec3 = vec3(0.38, 0.22, 0.15)
+export Storm: vec3 = vec3(0.86, 0.36, 0.2)
+export StormCenter: vec3 = vec3(0.55, -0.32, 0.77)
+
+local World: vec3
+local Local: vec3
+local Up: vec3
+
+function vertex()
+    World = (ModelMatrix * vec4(Vertex, 1.0)).xyz
+    Local = normalize(Vertex)
+    Up = normalize((ModelMatrix * vec4(Vertex, 0.0)).xyz)
+end
+
+function fragment()
+    local p: vec3 = Local
+    -- Twist the coordinates around the storm before sampling the bands.
+    local center: vec3 = normalize(StormCenter)
+    local spot: number = exp(-length(p - center) * 9.0)
+    local twist: number = spot * 5.0 + Time * 0.02
+    local swirl: vec3 = mix(p, p * cos(twist) + cross(center, p) * sin(twist), spot)
+    local shear: number = fbm(swirl * vec3(2.0, 9.0, 2.0) + vec3(Time * 0.01, 0, 0), 5)
+    local latitude: number = swirl.y * 7.5 + shear * 2.4
+    local band: number = sin(latitude) * 0.5 + 0.5
+    local fine: number = sin(latitude * 3.1 + shear * 5.0) * 0.5 + 0.5
+    local color: vec3 = mix(Rust, Pale, smoothstep(0.25, 0.75, band))
+    color = mix(color, Dark, smoothstep(0.7, 1.0, fine) * 0.35)
+    color = mix(color, Storm, smoothstep(0.25, 0.7, spot))
+    local up: vec3 = normalize(Up)
+    Albedo = color * sunlight(World, up, up)
+end

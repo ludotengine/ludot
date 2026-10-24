@@ -1,12 +1,28 @@
 shader spatial
+import "./Noise"
 renderMode("unshaded")
-local P: vec3
+
+--- Boiling granulation with a bright core and a hot, darker limb.
+
+export Core: vec3 = vec3(1.0, 0.86, 0.45)
+export Surface: vec3 = vec3(1.0, 0.42, 0.06)
+export Intensity: number = 3.2 in 0 to 10 step 0.1
+
+local Local: vec3
+local World: vec3
+
 function vertex()
-    P = Vertex
+    Local = normalize(Vertex)
+    World = (ModelMatrix * vec4(Vertex, 1.0)).xyz
 end
+
 function fragment()
-    local flicker: number = sin(P.x * 8.0 + Time * 0.6) * cos(P.y * 9.0 - Time * 0.4)
-    local amber: vec3 = mix(vec3(1.0, 0.28, 0.025), vec3(1.0, 0.82, 0.26), flicker * 0.3 + 0.6)
-    Albedo = amber
-    Emission = amber * 2.8
+    local flow: vec3 = Local * 5.0 + vec3(0, Time * 0.04, Time * 0.02)
+    local cells: number = fbm(flow + vec3(fbm(flow * 0.7, 3) * 2.5), 5)
+    local view: vec3 = normalize(CameraPosition - World)
+    local facing: number = clamp(dot(normalize(World - NodePosition), view), 0.0, 1.0)
+    local limb: number = pow(facing, 0.6)
+    local color: vec3 = mix(Surface, Core, smoothstep(0.35, 0.75, cells) * limb)
+    Albedo = color
+    Emission = color * Intensity * (0.6 + 0.6 * limb)
 end

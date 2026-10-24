@@ -1,0 +1,15 @@
+shader spatial
+renderMode("unshaded", "blend_add", "cull_disabled", "depth_draw_never")
+
+--- Orbit lines with a bright trail behind each world, fading ahead of it.
+
+export Tint: vec3 = vec3(0.33, 0.66, 0.78)
+export Phase: number = 0.0
+export Strength: number = 0.5 in 0 to 1 step 0.01
+
+function fragment()
+    local behind: number = fract(Phase - UV.x)
+    local trail: number = pow(1.0 - behind, 10.0)
+    Albedo = Tint
+    Alpha = Strength * (0.12 + 0.88 * trail)
+end

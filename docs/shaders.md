@@ -55,6 +55,9 @@ Top-level declarations:
   and the engine validates them for the shader type.
 - A varying can request interpolation with `flat<type>` or `smooth<type>`, for example
   `local Normal: flat<vec3>`. Integer and boolean varyings are always `flat`.
+- `export Name: DepthTexture`, `ScreenTexture`, or `NormalRoughnessTexture` declares a
+  `sampler2D` that the engine binds to the frame's depth, color, or normal-roughness
+  buffer. These uniforms take no value.
 
 ## Includes
 
@@ -97,7 +100,9 @@ declared type is an integer type. Otherwise literals are floats.
 Standard shader functions include `mix`, `clamp`, `normalize`, `texture`, and the
 functions listed in `language/src/shader.cpp`. Shader built-ins use explicit aliases
 such as `Color`, `Texture`, `Vertex`, `Albedo`, `Velocity`, and `Time`. `UV` keeps its
-spelling.
+spelling. Camera and screen built-ins include `CameraPosition`, `CameraDirection`,
+`NodePosition`, `View`, `FragCoord`, `ViewportSize`, `InverseViewMatrix`, and
+`InverseProjectionMatrix`, which together reconstruct world positions from depth.
 
 ## Diagnostics
 

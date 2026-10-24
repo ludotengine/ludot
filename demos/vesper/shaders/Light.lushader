@@ -1,0 +1,16 @@
+shader include
+
+--- The sun sits at the world origin. Light wraps softly past the terminator,
+--- turns warm near it, and leaves cool, never fully black shadows.
+
+export SunColor: vec3 = vec3(1.0, 0.86, 0.68)
+export Shadow: vec3 = vec3(0.035, 0.045, 0.085)
+
+local function sunlight(world: vec3, normal: vec3, up: vec3): vec3
+    local toSun: vec3 = normalize(-world)
+    local surface: number = clamp((dot(normal, toSun) + 0.2) / 1.2, 0.0, 1.0)
+    local day: number = smoothstep(-0.18, 0.25, dot(up, toSun))
+    local dusk: number = 1.0 - smoothstep(0.0, 0.45, abs(dot(up, toSun)))
+    local tint: vec3 = mix(SunColor, vec3(1.0, 0.55, 0.3), dusk * 0.6)
+    return Shadow + tint * surface * day
+end

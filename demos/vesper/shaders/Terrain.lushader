@@ -1,0 +1,58 @@
+shader spatial
+import "./Noise"
+import sunlight from "./Light"
+renderMode("unshaded", "cull_back")
+
+--- Colors terrain by height, slope, latitude, and plains mask, then lights it from the sun.
+
+export Deep: vec3 = vec3(0.09, 0.23, 0.25)
+export Shore: vec3 = vec3(0.85, 0.77, 0.54)
+export Low: vec3 = vec3(0.31, 0.54, 0.23)
+export High: vec3 = vec3(0.23, 0.4, 0.19)
+export Peak: vec3 = vec3(0.93, 0.95, 0.94)
+export Cliff: vec3 = vec3(0.42, 0.35, 0.29)
+export SeaLevel: number = -1.0
+export SnowLine: number = 0.86
+export PolarIce: number = 0.0 in 0 to 1 step 0.01
+export Haze: vec3 = vec3(0.37, 0.61, 1.0)
+
+local World: vec3
+local Local: vec3
+local Up: vec3
+local Surface: vec3
+local Height: number
+local Plains: number
+
+function vertex()
+    World = (ModelMatrix * vec4(Vertex, 1.0)).xyz
+    Local = Vertex
+    Up = normalize((ModelMatrix * vec4(Vertex, 0.0)).xyz)
+    Surface = normalize((ModelMatrix * vec4(Normal, 0.0)).xyz)
+    Height = Color.r
+    Plains = Color.g
+end
+
+function fragment()
+    local normal: vec3 = normalize(Surface)
+    local up: vec3 = normalize(Up)
+    local slope: number = 1.0 - clamp(dot(normal, up), 0.0, 1.0)
+    local grain: number = fbm(Local * 2.2, 5) - 0.5
+    local h: number = Height + grain * 0.05
+
+    local color: vec3 = mix(Low, High, smoothstep(0.35, 0.8, h))
+    if SeaLevel > 0.0 then
+        color = mix(Shore, color, smoothstep(SeaLevel + 0.005, SeaLevel + 0.03, h))
+        color = mix(Deep, color, smoothstep(SeaLevel - 0.02, SeaLevel + 0.002, h))
+    end
+    color = mix(color, Cliff, smoothstep(0.18, 0.45, slope + grain * 0.2))
+    local latitude: number = abs(normalize(Local).y)
+    local snow: number = smoothstep(SnowLine, SnowLine + 0.04, h + grain * 0.1)
+    snow = max(snow, smoothstep(PolarIce, PolarIce + 0.05, latitude + grain * 0.15) * step(0.01, PolarIce))
+    color = mix(color, Peak, snow * (1.0 - smoothstep(0.35, 0.6, slope)))
+    color = mix(color, Peak * 0.7, Plains * 0.8)
+
+    local view: vec3 = normalize(CameraPosition - World)
+    local rim: number = pow(1.0 - clamp(dot(normal, view), 0.0, 1.0), 3.0)
+    local light: vec3 = sunlight(World, normal, up)
+    Albedo = color * light + Haze * rim * 0.25 * smoothstep(-0.2, 0.4, dot(up, normalize(-World)))
+end
