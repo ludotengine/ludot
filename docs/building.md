@@ -122,6 +122,20 @@ took 6 minutes 23 seconds
 This measures a rebuild using saved objects, rather than a clean build with an
 empty cache.
 
+The cached desktop rerun at `8b23494` included a changed native integration source
+file and the full regression suites
+([run](https://github.com/ludotengine/ludot/actions/runs/40046404832)):
+
+| Platform | Editor build | Complete CI job |
+| --- | --- | --- |
+| Linux | 46 seconds | 2 minutes 7 seconds |
+| macOS | 1 minute | 3 minutes 50 seconds |
+| Windows | 2 minutes 7 seconds | 5 minutes 18 seconds |
+
+The language-tool builds took 3 seconds on Linux, 4 seconds on macOS, and 43 seconds
+on Windows. Windows reported 199 compiler-cache hits and no misses. First builds
+with empty caches still take substantially longer.
+
 ## Standalone LSP
 
 ```sh

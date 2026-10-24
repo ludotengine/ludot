@@ -87,8 +87,8 @@ A loop of 100,000 iterations, each reading a `Vector2` field, reading a `Timer`
 property, and calling a `Timer` method, took about 0.57 s in the unoptimized
 development build. It took about 61.6 s before the member cache.
 
-Linux, Windows, and macOS passed the complete desktop workflow at `8f2c635`
-([run](https://github.com/ludotengine/ludot/actions/runs/40043677812)). This includes
+Linux, Windows, and macOS passed the complete desktop workflow at `8b23494`
+([run](https://github.com/ludotengine/ludot/actions/runs/40046404832)). This includes
 language/shader/LSP tests, standalone packaging, native engine checks, debugging,
-and exported-pack checks. The macOS suites ran the executable selected by the
+exported-pack checks, and the nested native constructor regression. The macOS suites ran the executable selected by the
 generated app bundle's `Info.plist`.
