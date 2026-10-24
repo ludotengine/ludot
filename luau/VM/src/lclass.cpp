@@ -47,6 +47,13 @@ LuauClass* luaR_newblankclass(lua_State* L, TString* name, bool isopen)
  * flattened out. This flattened-out LuauClass's constructors need to have their closures updated. Otherwise they point at the old un-flattened
  * LuauClass.
  */
+static int luaR_constructnew(lua_State* L)
+{
+    lua_pushvalue(L, lua_upvalueindex(1));
+    lua_insert(L, 1);
+    return luaR_constructobject(L);
+}
+
 static void luaR_setupconstructor(lua_State* L, LuauClass* classobject, LuaTable* env)
 {
     LUAU_ASSERT(iswhite(obj2gco(classobject)));
@@ -62,6 +69,15 @@ static void luaR_setupconstructor(lua_State* L, LuauClass* classobject, LuaTable
     TValue* callSlot = luaH_setstr(L, classobject->metatable, L->global->tmname[TM_CALL]);
     LUAU_ASSERT(ttisnil(callSlot));
     setclvalue(L, callSlot, constructor);
+
+    // Bind the concrete class, including after inheritance flattens its layout.
+    Closure* factory = luaF_newCclosure(L, 1, env);
+    factory->c.f = luaR_constructnew;
+    factory->c.debugname = luaS_new(L, "new");
+    factory->c.cont = NULL;
+    setclassvalue(L, &factory->c.upvals[0], classobject);
+    TValue* newSlot = luaH_setstr(L, classobject->metatable, luaS_new(L, "new"));
+    setclvalue(L, newSlot, factory);
 
     classobject->metatable->readonly = true;
 

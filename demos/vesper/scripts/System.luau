@@ -74,7 +74,7 @@ const Pluto: World = {
     Name = "Pluto", Orbit = 820, Phase = 3.5, Speed = 0.0009, Spin = 0, PolarIce = 0.0,
     Shape = { Radius = 7, Relief = 0.045, Resolution = 112, Seed = 21, Frequency = 1.5,
         Mountains = 0.5, Terraces = 0, Canyons = 0.2, Craters = 18, CraterSize = 0.16,
-        Plains = Vector3(0.92, 0.2, 0.38) },
+        Plains = Vector3.new(0.92, 0.2, 0.38) },
     Palette = { Deep = rgb("#4f342a"), Shore = rgb("#7a5240"), Low = rgb("#9c6a50"),
         High = rgb("#bf8f70"), Peak = rgb("#f3ebe2"), Cliff = rgb("#5a3b2e") },
     Air = { Height = 0.7, Density = 0.08, Falloff = 3.0, Haze = 1, Day = rgb("#7f95d6"), Sunset = rgb("#a998d6") },

@@ -83,6 +83,7 @@ struct Session {
             TypeId metatable = arena.addType(TableType{{{"__call", Property::readonly(constructor)}}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
             TypeId cls = arena.addType(ExternType{name, {}, builtins->classType, metatable, {}, nullptr, "ludot", std::nullopt, true});
             this->classes[name] = cls;
+            getMutable<ExternType>(cls)->props["new"] = Property::readonly(constructor);
             getMutable<ExternType>(cls)->relation = Obj{instance};
             getMutable<ExternType>(instance)->relation = Klass{cls};
             scope->bindings[frontend.globals.globalNames.names->getOrAdd(name.c_str())] = Binding{cls, Location()};

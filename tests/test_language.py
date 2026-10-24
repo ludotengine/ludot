@@ -52,6 +52,46 @@ assert(#b.Items == 0)
         result = self.run_luau('class Player = { private Health: number = 100 in 0 to 100 }')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('only allowed on exported properties', result.stderr)
+    def test_new_constructor_inheritance_and_detached_factory(self):
+        source = '''--!strict
+class Base = {
+    export Value: number = 5
+    function add(amount: number): number self.Value += amount return self.Value end
+}
+class Child extends Base = { private Items: {number} = {} }
+const make = Child.new
+const a = make()
+const b = Child.new()
+assert(a:add(2) == 7)
+assert(b.Value == 5)
+collectgarbage("collect")
+assert(make():add(3) == 8)
+'''
+        for tool in ('luau', 'luau-analyze'):
+            result = self.run_luau(source if tool == 'luau' else source.replace('collectgarbage("collect")', ''), tool)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = self.run_luau(source.replace('collectgarbage("collect")', '') + '\na:add("wrong")', 'luau-analyze')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('TypeError', result.stderr)
+    def test_new_constructor_checks_initializer_arguments(self):
+        source = '''--!strict
+class Counter = {
+    export Value: number = 0
+    function __init(value: number) self.Value = value end
+}
+const counter = Counter.new(12)
+assert(counter.Value == 12)
+'''
+        for tool in ('luau', 'luau-analyze'):
+            result = self.run_luau(source, tool)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = self.run_luau(source.replace('Counter.new(12)', 'Counter.new("wrong")'), 'luau-analyze')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('TypeError', result.stderr)
+        for member in ('export new: number = 1', 'function new() end'):
+            result = self.run_luau('class Reserved = { ' + member + ' }')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("reserved for the constructor", result.stderr)
     def test_value_import_forms_and_alias_require(self):
         self.write('.luaurc', json.dumps({'aliases': {'helpers': './helpers'}}))
         self.write('helpers/math.luau', 'return { add = function(a, b) return a + b end, subtract = function(a, b) return a - b end }')

@@ -26,7 +26,7 @@ class LuauScript : public Script {
 protected:
     static void _bind_methods();
 public:
-    bool can_instantiate() const override { return valid && class_ref != LUA_NOREF && !base_type.is_empty(); }
+    bool can_instantiate() const override;
     int get_class_reference() const { return class_ref; }
     Ref<Script> get_base_script() const override { return base_script; }
     StringName get_global_name() const override { return class_name; }

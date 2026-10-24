@@ -27,6 +27,24 @@ initializers do not share a table between instances. Constructor arguments use
 the `__init` signature. Classes use the fork's native class bytecode and VM objects.
 The original experimental `class ... end` syntax remains available internally.
 
+Construct native nodes, resources, value types, and Luau classes with `.new()`:
+
+```lua
+const node = Node3D.new()
+const position = Vector3.new(1, 2, 3)
+const player = Player.new()
+```
+
+The checker and completion understand `.new()` and preserve its instance type and
+initializer arguments. `new` is reserved as a class member. Direct calls such as
+`Vector3(1, 2, 3)` remain compatible with older scripts.
+
+Normal Luau node scripts do not instantiate or run lifecycle callbacks while a
+scene is being edited. The editor uses placeholders for exported properties;
+scripts execute when the project runs. No `Engine:isEditorHint()` guard is needed
+in `_ready`, `_process`, or input callbacks. Editor tool scripts are not currently
+supported.
+
 `export` properties appear in the engine inspector. `private` properties are hidden
 from the inspector, and the checker rejects accesses outside the declaring class.
 Privacy is a type-checking rule, not a sandbox against reflective engine access or

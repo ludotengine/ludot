@@ -50,10 +50,10 @@ class LspTests(unittest.TestCase):
         self.assertIn('moveAndSlide', [entry['label'] for entry in result])
     def test_full_engine_api(self):
         self.server.api = ROOT / 'types/engine.api'
-        uri = self.open('--!strict\nlocal camera = Camera3D()\ncamera.Fov = 60\nlocal p: Vector2 = Vector2(1, 2) * 2\nreturn camera')
+        uri = self.open('--!strict\nlocal camera = Camera3D.new()\ncamera.Fov = 60\nlocal p: Vector2 = Vector2.new(1, 2) * 2\nreturn camera')
         checked, _ = self.server.analyze(uri)
         self.assertEqual(checked['diagnostics'], [])
-        text = 'local camera = Camera3D()\ncamera:'
+        text = 'local camera = Camera3D.new()\ncamera:'
         self.server.documents[uri] = {'version': 2, 'text': text}
         result = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 7}}})
         self.assertIn('projectRayNormal', [entry['label'] for entry in result])

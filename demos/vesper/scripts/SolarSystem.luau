@@ -8,14 +8,14 @@ import type World from "@sim/System"
 const function material(path: string, priority: number?): ShaderMaterial
     const shader = ResourceLoader:load(path) :: LuauShader
     assert(shader:getDiagnostics() == "", shader:getDiagnostics())
-    const surface = ShaderMaterial()
+    const surface = ShaderMaterial.new()
     surface.Shader = shader
     surface.RenderPriority = priority or 0
     return surface
 end
 
 const function sphere(radius: number, segments: number): SphereMesh
-    const mesh = SphereMesh()
+    const mesh = SphereMesh.new()
     mesh.Radius = radius
     mesh.Height = radius * 2
     mesh.RadialSegments = segments
@@ -24,7 +24,7 @@ const function sphere(radius: number, segments: number): SphereMesh
 end
 
 const function shell(parent: Node3D, mesh: Mesh, skin: ShaderMaterial): MeshInstance3D
-    const node = MeshInstance3D()
+    const node = MeshInstance3D.new()
     node.Mesh = mesh
     node.MaterialOverride = skin
     node.CastShadow = 0
@@ -35,7 +35,7 @@ end
 --- Palette colors are authored in sRGB. Shader math happens in linear space.
 const function vec3(color: Color): Vector3
     const linear = color:srgbToLinear()
-    return Vector3(linear.R, linear.G, linear.B)
+    return Vector3.new(linear.R, linear.G, linear.B)
 end
 
 class SolarSystem extends Node3D = {
@@ -44,11 +44,10 @@ class SolarSystem extends Node3D = {
     private Belt: Node3D? = nil
 
     function _ready()
-        if Engine:isEditorHint() then return end
         self:addEnvironment()
         self:addSky()
         self:addSun()
-        const orbits = Node3D()
+        const orbits = Node3D.new()
         orbits.Name = "Orbits"
         self:addChild(orbits)
         self.Orbits = orbits
@@ -59,9 +58,9 @@ class SolarSystem extends Node3D = {
     end
 
     function addEnvironment()
-        const environment = Environment()
+        const environment = Environment.new()
         environment.BackgroundMode = 1 -- clear color
-        environment.BackgroundColor = Color(0, 0, 0)
+        environment.BackgroundColor = Color.new(0, 0, 0)
         environment.TonemapMode = 3 -- ACES
         environment.TonemapExposure = 1.05
         environment.GlowEnabled = true
@@ -70,7 +69,7 @@ class SolarSystem extends Node3D = {
         environment.GlowBloom = 0.08
         environment.GlowHdrThreshold = 1.0
         environment.GlowBlendMode = 1 -- screen
-        const world = WorldEnvironment()
+        const world = WorldEnvironment.new()
         world.Environment = environment
         self:addChild(world)
     end
@@ -81,7 +80,7 @@ class SolarSystem extends Node3D = {
     end
 
     function addSun()
-        const sun = Node3D()
+        const sun = Node3D.new()
         sun.Name = "Sun"
         self:addChild(sun)
         shell(sun, sphere(System.Sun.Radius, 96), material("res://shaders/Sun.lushader"))
@@ -92,14 +91,14 @@ class SolarSystem extends Node3D = {
     end
 
     function addWorld(world: World, parent: Node3D)
-        const body = Node3D()
+        const body = Node3D.new()
         body.Name = world.Name
         body:setScript(ResourceLoader:load("res://scripts/OrbitBody.luau"))
         body:set("Radius", world.Orbit)
         body:set("AngularSpeed", world.Speed)
         body:set("Phase", world.Phase)
         parent:addChild(body)
-        const spin = Node3D()
+        const spin = Node3D.new()
         spin.Name = "Surface"
         body:addChild(spin)
         body:set("Spin", world.Spin)
@@ -153,33 +152,33 @@ class SolarSystem extends Node3D = {
 
     function addRings(body: Node3D, radius: number)
         const inner, outer = radius * 1.35, radius * 2.3
-        const mesh = ImmediateMesh()
+        const mesh = ImmediateMesh.new()
         const skin = material("res://shaders/Rings.lushader", 2)
         skin:setShaderParameter("PlanetRadius", radius)
         mesh:surfaceBegin(4, skin) -- triangle strip
         for i = 0, 256 do
             const a = i / 256 * math.pi * 2
-            const direction = Vector3(math.cos(a), 0, math.sin(a))
-            mesh:surfaceSetUv(Vector2(0, 0))
+            const direction = Vector3.new(math.cos(a), 0, math.sin(a))
+            mesh:surfaceSetUv(Vector2.new(0, 0))
             mesh:surfaceAddVertex(direction * inner)
-            mesh:surfaceSetUv(Vector2(1, 0))
+            mesh:surfaceSetUv(Vector2.new(1, 0))
             mesh:surfaceAddVertex(direction * outer)
         end
         mesh:surfaceEnd()
         const rings = shell(body, mesh, skin)
-        rings.Rotation = Vector3(0.38, 0, 0.12)
+        rings.Rotation = Vector3.new(0.38, 0, 0.12)
     end
 
     function addOrbitLine(world: World, body: Node3D, center: Node3D)
         const skin = material("res://shaders/Orbit.lushader", 1)
-        const mesh = ImmediateMesh()
+        const mesh = ImmediateMesh.new()
         mesh:surfaceBegin(1, skin) -- lines
         const steps = 512
         for i = 0, steps - 1 do
             for _, k in {i, i + 1} do
                 const a = k / steps * math.pi * 2
-                mesh:surfaceSetUv(Vector2(k / steps, 0))
-                mesh:surfaceAddVertex(Vector3(math.cos(a), 0, math.sin(a)) * world.Orbit)
+                mesh:surfaceSetUv(Vector2.new(k / steps, 0))
+                mesh:surfaceAddVertex(Vector3.new(math.cos(a), 0, math.sin(a)) * world.Orbit)
             end
         end
         mesh:surfaceEnd()
@@ -190,7 +189,7 @@ class SolarSystem extends Node3D = {
     end
 
     function addBelt()
-        const belt = Node3D()
+        const belt = Node3D.new()
         belt.Name = "Belt"
         self:addChild(belt)
         self.Belt = belt
@@ -201,13 +200,13 @@ class SolarSystem extends Node3D = {
         for key, hex in stone do
             skin:setShaderParameter(key, vec3(Color.html(hex)))
         end
-        skin:setShaderParameter("Haze", Vector3(0.3, 0.25, 0.2))
+        skin:setShaderParameter("Haze", Vector3.new(0.3, 0.25, 0.2))
         const spec = System.Belt
         const kinds = 6
         for kind = 1, kinds do
             const rock = Terrain.build({ Radius = 1, Relief = 0.32, Resolution = 24, Seed = 100 + kind,
                 Frequency = 2.4, Mountains = 0.3, Terraces = 0, Canyons = 0, Craters = 2, CraterSize = 0.45 })
-            const field = MultiMesh()
+            const field = MultiMesh.new()
             field.TransformFormat = 1 -- 3D
             field.InstanceCount = spec.Count // kinds
             field.Mesh = rock.Mesh
@@ -215,12 +214,12 @@ class SolarSystem extends Node3D = {
                 const a = math.random() * math.pi * 2
                 const r = spec.Inner + (spec.Outer - spec.Inner) * (math.random() + math.random()) / 2
                 const size = 0.35 + math.random() ^ 5 * 5
-                const axis = Vector3(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5):normalized()
-                const basis = Basis(axis, math.random() * 6.28):scaled(Vector3(size, size * (0.6 + math.random() * 0.4), size))
+                const axis = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5):normalized()
+                const basis = Basis.new(axis, math.random() * 6.28):scaled(Vector3.new(size, size * (0.6 + math.random() * 0.4), size))
                 const height = (math.random() - 0.5) * spec.Thickness
-                field:setInstanceTransform(i, Transform3D(basis, Vector3(math.cos(a) * r, height, math.sin(a) * r)))
+                field:setInstanceTransform(i, Transform3D.new(basis, Vector3.new(math.cos(a) * r, height, math.sin(a) * r)))
             end
-            const node = MultiMeshInstance3D()
+            const node = MultiMeshInstance3D.new()
             node.Multimesh = field
             node.MaterialOverride = skin
             belt:addChild(node)
@@ -228,7 +227,6 @@ class SolarSystem extends Node3D = {
     end
 
     function _process(delta: number)
-        if Engine:isEditorHint() then return end
         for _, trail in self.Trails do
             -- The trail shader brightens the arc just behind each world.
             const p = trail.Body.Position

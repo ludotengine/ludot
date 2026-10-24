@@ -8,6 +8,9 @@ Everything is generated when the game starts. Gameplay and world building are wr
 in **Luau**, and every surface, sky, and atmosphere effect is a **lushader**. The
 project has no GDScript, textures, or imported models.
 
+Nodes and value types use `.new()` constructors. The engine keeps normal Luau
+scripts inactive while editing, so lifecycle functions need no editor-hint guards.
+
 Sizes, distances, and speeds are stylized for flying around, not for astronomy. The
 art direction is inspired by Outer Wilds, but all geometry and shader code here is
 original.

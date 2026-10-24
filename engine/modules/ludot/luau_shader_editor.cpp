@@ -5,6 +5,7 @@
 #include "ludot/shader.h"
 #include "scene/gui/box_container.h"
 #include "scene/resources/syntax_highlighter.h"
+#include "editor/settings/editor_settings.h"
 
 LuauShaderEditor::LuauShaderEditor() {
     auto box = memnew(VBoxContainer);
@@ -15,9 +16,18 @@ LuauShaderEditor::LuauShaderEditor() {
     code->set_code_completion_enabled(true);
     Ref<CodeHighlighter> highlighter;
     highlighter.instantiate();
-    for (const char *keyword : {"shader", "export", "function", "end", "local", "const", "if", "then", "else", "elseif", "for", "do", "while", "return", "break", "continue", "and", "or", "not", "true", "false"})
-        highlighter->add_keyword_color(keyword, Color(0.9, 0.55, 0.65));
-    highlighter->add_color_region("--", "", Color(0.5, 0.6, 0.5), true);
+    const Color keyword = EDITOR_GET("text_editor/theme/highlighting/keyword_color");
+    for (const char *word : {"shader", "include", "import", "from", "as", "export", "function", "end", "local", "const", "if", "then", "else", "elseif", "for", "in", "to", "step", "do", "while", "repeat", "until", "return", "break", "continue", "and", "or", "not", "true", "false", "nil", "renderMode"})
+        highlighter->add_keyword_color(word, keyword);
+    const Color type = EDITOR_GET("text_editor/theme/highlighting/base_type_color");
+    for (const char *word : {"number", "float", "boolean", "bool", "int", "uint", "vec2", "vec3", "vec4", "ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4", "bvec2", "bvec3", "bvec4", "mat2", "mat3", "mat4", "sampler2D", "sampler2DArray", "sampler3D", "samplerCube", "samplerExternalOES", "DepthTexture", "ScreenTexture", "NormalRoughnessTexture"})
+        highlighter->add_keyword_color(word, type);
+    highlighter->set_symbol_color(EDITOR_GET("text_editor/theme/highlighting/symbol_color"));
+    highlighter->set_number_color(EDITOR_GET("text_editor/theme/highlighting/number_color"));
+    highlighter->set_function_color(EDITOR_GET("text_editor/theme/highlighting/function_color"));
+    highlighter->set_member_variable_color(EDITOR_GET("text_editor/theme/highlighting/member_variable_color"));
+    highlighter->add_color_region("--", "", EDITOR_GET("text_editor/theme/highlighting/comment_color"), true);
+    highlighter->add_color_region("\"", "\"", EDITOR_GET("text_editor/theme/highlighting/string_color"));
     code->set_syntax_highlighter(highlighter);
     box->add_child(code);
     errors = memnew(Label);

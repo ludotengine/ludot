@@ -18,7 +18,7 @@ class Flight extends Node3D = {
     private Yaw: number = 0
     private Mode: string = "free"
     private Anchor: Node3D? = nil
-    private AnchorLast: Vector3 = Vector3(0, 0, 0)
+    private AnchorLast: Vector3 = Vector3.new(0, 0, 0)
     private Focus: Body? = nil
     private Distance: number = 4
     private TourTime: number = 0
@@ -28,7 +28,6 @@ class Flight extends Node3D = {
     private StillFrames: number = 0
 
     function _ready()
-        if Engine:isEditorHint() then return end
         const args = OS:getCmdlineUserArgs()
         if args:has("--tour") then self.Mode = "tour" end
         -- --still=<seconds> --shot=<png> renders one moment of the tour, for framing shots.
@@ -41,8 +40,8 @@ class Flight extends Node3D = {
             end
         end
         const camera = self:getNode("Camera") :: Camera3D
-        camera.GlobalPosition = Vector3(-300, 420, 980)
-        camera:lookAt(Vector3(120, 0, 0), Vector3(0, 1, 0))
+        camera.GlobalPosition = Vector3.new(-300, 420, 980)
+        camera:lookAt(Vector3.new(120, 0, 0), Vector3.new(0, 1, 0))
         self.Pitch, self.Yaw = camera.Rotation.X, camera.Rotation.Y
     end
 
@@ -54,7 +53,7 @@ class Flight extends Node3D = {
     end
 
     function _unhandledInput(event: InputEvent)
-        if Engine:isEditorHint() or self.Mode == "tour" then return end
+        if self.Mode == "tour" then return end
         if event:isClass("InputEventMouseButton") then
             const button = event :: InputEventMouseButton
             if button.ButtonIndex == 2 then Input.MouseMode = if button.Pressed then 2 else 0 end
@@ -79,10 +78,10 @@ class Flight extends Node3D = {
     function frame(body: Body): (Vector3, Vector3, Vector3, Vector3)
         const origin = body.Node.GlobalPosition
         if body.Name == "Sun" then
-            return origin, Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1)
+            return origin, Vector3.new(1, 0, 0), Vector3.new(0, 1, 0), Vector3.new(0, 0, 1)
         end
         const toSun = (origin * -1):normalized()
-        const up = Vector3(0, 1, 0)
+        const up = Vector3.new(0, 1, 0)
         return origin, toSun, up, up:cross(toSun):normalized()
     end
 
@@ -114,7 +113,6 @@ class Flight extends Node3D = {
     end
 
     function _process(delta: number)
-        if Engine:isEditorHint() then return end
         if not Clock.Paused then Clock.Time += delta * Clock.Rate end
         const camera = self:getNode("Camera") :: Camera3D
         if self:pressed(KEY_O) then Scene.OrbitStrength = if Scene.OrbitStrength > 0 then 0 else 0.5 end
@@ -158,8 +156,8 @@ class Flight extends Node3D = {
             -- Thread the asteroid belt, looking along it toward the sun's glow.
             const a = 0.9 + t * 0.035
             const r = 486
-            camera.GlobalPosition = Vector3(math.cos(a) * r, 9 - t * 2, math.sin(a) * r)
-            camera:lookAt(Vector3(math.cos(a + 0.12) * (r - 25), 0, math.sin(a + 0.12) * (r - 25)), Vector3(0, 1, 0))
+            camera.GlobalPosition = Vector3.new(math.cos(a) * r, 9 - t * 2, math.sin(a) * r)
+            camera:lookAt(Vector3.new(math.cos(a + 0.12) * (r - 25), 0, math.sin(a + 0.12) * (r - 25)), Vector3.new(0, 1, 0))
             return
         end
         const body = self:find(shot.Body)
@@ -177,7 +175,7 @@ class Flight extends Node3D = {
             const right = ahead:cross(up)
             -- Average the ground around the point so the camera glides over peaks.
             local ground = 0
-            for _, offset in {Vector3(0, 0, 0), ahead * 0.04, ahead * -0.04, right * 0.04, right * -0.04} do
+            for _, offset in {Vector3.new(0, 0, 0), ahead * 0.04, ahead * -0.04, right * 0.04, right * -0.04} do
                 ground += self:groundAt(body, origin + (up + offset):normalized() * scale) / 5
             end
             const position = origin + up * (ground + scale * shot.Altitude)
@@ -192,7 +190,7 @@ class Flight extends Node3D = {
     function orbit(camera: Camera3D)
         const body = self.Focus :: Body
         const center = body.Node.GlobalPosition
-        camera.Rotation = Vector3(self.Pitch, self.Yaw, 0)
+        camera.Rotation = Vector3.new(self.Pitch, self.Yaw, 0)
         camera.GlobalPosition = center + camera.GlobalBasis.Z * body.Radius * self.Distance
     end
 
@@ -208,11 +206,11 @@ class Flight extends Node3D = {
         else
             self.Anchor = nil
         end
-        camera.Rotation = Vector3(self.Pitch, self.Yaw, 0)
+        camera.Rotation = Vector3.new(self.Pitch, self.Yaw, 0)
         const function axis(positive: number, negative: number): number
             return (if Input:isPhysicalKeyPressed(positive) then 1 else 0) - (if Input:isPhysicalKeyPressed(negative) then 1 else 0)
         end
-        const move = Vector3(axis(KEY_D, KEY_A), axis(KEY_SPACE, KEY_CTRL), axis(KEY_S, KEY_W))
+        const move = Vector3.new(axis(KEY_D, KEY_A), axis(KEY_SPACE, KEY_CTRL), axis(KEY_S, KEY_W))
         local speed = self.Speed
         if body ~= nil then
             -- Slow down near the ground.

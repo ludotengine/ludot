@@ -10,12 +10,21 @@ func check(condition: bool, message: String) -> void:
 func _init() -> void:
     var nested_script = ClassDB.instantiate("LuauScript")
     nested_script.set_source_code("""class NestedConstruction extends Node = {
-    private Child: Node = Node()
+    private Child: Node = Node.new()
+    function construction(): boolean
+        const node = Node3D.new()
+        const vector = Vector3.new(1, 2, 3)
+        const numbers = PackedInt32Array.new({4, 5})
+        const valid = node:isClass("Node3D") and vector.X == 1 and vector.Y == 2 and vector.Z == 3 and numbers:get(1) == 5
+        node:free()
+        return valid
+    end
     function child() return self.Child end
 }""")
     check(nested_script.reload() == OK, "Nested native initializer compiles")
     var parent := Node.new()
     parent.set_script(nested_script)
+    check(parent.call("construction") == true, "Node and value .new constructors preserve arguments and native methods")
     var child = parent.call("child")
     check(child is Node and child != parent, "A native field initializer creates a separate child object")
     if child is Node and child != parent:

@@ -5,6 +5,13 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 
 ## Implemented
 
+- `.new()` constructors for Luau classes, native nodes/resources, and native value
+  types, with typed results and initializer arguments in the editor and LSP.
+  Normal Luau scripts use editor placeholders and do not run lifecycle callbacks
+  while editing, so per-function `Engine:isEditorHint()` guards are unnecessary.
+  Range keywords (`in`, `to`, `step`) and scalar/vector types are colored in the
+  dedicated lushader editor. Native engine/editor and language/LSP regressions
+  cover these behaviors.
 - `demos/vesper` is a playable solar-system demo built entirely at startup from Luau
   and lushader: cube-sphere terrain with ridges, terraces, canyons, and craters,
   oceans, clouds, ray-marched atmosphere fog, a gas giant with rings, an asteroid

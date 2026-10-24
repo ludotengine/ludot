@@ -1234,6 +1234,7 @@ void ConstraintGenerator::prototypeClass(const ScopePtr& scope, AstStatClass* cl
 
     bool hasExplicitConstructor = false;
     TypeId constructorTy = nullptr;
+    TypeId newConstructorTy = nullptr;
     TableType::Props defaultConstructorProps;
 
     for (const auto& member : classDecl->members)
@@ -1303,7 +1304,12 @@ void ConstraintGenerator::prototypeClass(const ScopePtr& scope, AstStatClass* cl
     {
         TypeId ctorArgTy = arena->addType(TableType{defaultConstructorProps, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
         constructorTy = arena->addType(FunctionType{arena->addTypePack({classObjectTy, ctorArgTy}), arena->addTypePack({classInstanceTy})});
+        newConstructorTy = arena->addType(FunctionType{arena->addTypePack({ctorArgTy}), arena->addTypePack({classInstanceTy})});
     }
+    else
+        newConstructorTy = arena->addType(BlockedType{});
+
+    staticProps["new"] = Property::readonly(newConstructorTy);
 
     LUAU_ASSERT(constructorTy);
     TypeId classMetatable =
@@ -2683,6 +2689,11 @@ ControlFlow ConstraintGenerator::visit(const ScopePtr& scope, AstStatClass* stat
                         eraseValue(constructorFunction.generics, classDeclRecord->instanceTy);
                         eraseValue(constructorFunction.genericPacks, initFn->retTypes);
 
+                        FunctionType newFunction = constructorFunction;
+                        newFunction.argTypes = constructorArgs;
+                        if (!newFunction.argNames.empty())
+                            newFunction.argNames.erase(newFunction.argNames.begin());
+                        TypeId newFn = arena->addType(std::move(newFunction));
                         TypeId constructorFn = arena->addType(std::move(constructorFunction));
 
                         const ExternType* classExternTy = get<ExternType>(classTy);
@@ -2693,6 +2704,9 @@ ControlFlow ConstraintGenerator::visit(const ScopePtr& scope, AstStatClass* stat
                         LUAU_ASSERT(classCallTy);
                         LUAU_ASSERT(is<BlockedType>(*classCallTy));
                         emplaceType<BoundType>(asMutable(*classCallTy), constructorFn);
+                        TypeId newTy = *classExternTy->props.at("new").readTy;
+                        LUAU_ASSERT(is<BlockedType>(newTy));
+                        emplaceType<BoundType>(asMutable(newTy), newFn);
                     }
                 }
             },

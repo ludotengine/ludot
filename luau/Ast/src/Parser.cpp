@@ -1742,7 +1742,9 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
                 }
             }
 
-            if (strncmp(propName->name.value, "__", 2) == 0)
+            if (propName->name == "new")
+                report(propName->location, "Class member 'new' is reserved for the constructor");
+            else if (strncmp(propName->name.value, "__", 2) == 0)
                 report(propName->location, "Class properties cannot start with '__'");
             else if (classMemberNamespace.contains(propName->name))
                 report(propName->location, "Duplicate class member '%s'", propName->name.value);
@@ -1803,7 +1805,9 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
             if (body->args.size > 0 && body->args.data[0]->name == "self" && body->args.data[0]->annotation != nullptr)
                 report(body->args.data[0]->annotation->location, "The 'self' parameter cannot have a type annotation");
 
-            if (strncmp(name.name.value, "__", 2) == 0)
+            if (name.name == "new")
+                report(name.location, "Class member 'new' is reserved for the constructor");
+            else if (strncmp(name.name.value, "__", 2) == 0)
             {
                 if (kExplicitlyDisallowedMetamethods.count(name.name.value) > 0)
                     report(name.location, "Classes cannot define '%s' as a metamethod", name.name.value);

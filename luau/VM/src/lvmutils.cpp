@@ -263,6 +263,11 @@ void luaV_gettable(lua_State* L, const TValue* t, TValue* key, StkId val)
         else if (LUAU_UNLIKELY(FFlag::DebugLuauUserDefinedClassesRuntime && ttisclass(t)))
         {
             LuauClass* lco = classvalue(t);
+            if (ttisstring(key) && tsvalue(key) == luaS_new(L, "new"))
+            {
+                setobj2s(L, val, luaH_get(lco->metatable, key));
+                return;
+            }
             const TValue* res = luaH_get(lco->memberstooffset, key);
 
             // Class objects throw if you try to access a member that is not

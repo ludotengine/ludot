@@ -44,6 +44,7 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source)
         TypeId metatable = arena.addType(TableType{{{"__call", Property::readonly(constructor)}}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
         TypeId cls = arena.addType(ExternType{row[1], {}, builtins->classType, metatable, {}, nullptr, "ludot", std::nullopt, true});
         getMutable<ExternType>(cls)->relation = Obj{instance};
+        getMutable<ExternType>(cls)->props["new"] = Property::readonly(constructor);
         getMutable<ExternType>(instance)->relation = Klass{cls};
         instances[row[1]] = instance;
         classes[row[1]] = cls;

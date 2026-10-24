@@ -59,14 +59,14 @@ const function grid(resolution: number): Grid
         end
     end
     const directions: {Vector3} = {}
-    for i = 1, #xs do directions[i] = Vector3(xs[i], ys[i], zs[i]) end
-    const result = { Directions = directions, Indices = PackedInt32Array(indices) }
+    for i = 1, #xs do directions[i] = Vector3.new(xs[i], ys[i], zs[i]) end
+    const result = { Directions = directions, Indices = PackedInt32Array.new(indices) }
     grids[resolution] = result
     return result
 end
 
 const function noise(seed: number, frequency: number, octaves: number, kind: number): FastNoiseLite
-    const field = FastNoiseLite()
+    const field = FastNoiseLite.new()
     field.Seed = seed
     field.NoiseType = 1 -- smooth simplex
     field.Frequency = frequency / 100 -- samples are taken at direction * 100
@@ -133,7 +133,7 @@ const function sampler(shape: Shape): (direction: Vector3) -> (number, number)
         end
         if plains ~= nil then
             -- Two overlapping lobes make a heart-shaped ice plain.
-            const side = plains:cross(Vector3(0, 1, 0)):normalized() * 0.13
+            const side = plains:cross(Vector3.new(0, 1, 0)):normalized() * 0.13
             const lobe = math.max((plains + side):normalized():dot(direction), (plains - side):normalized():dot(direction))
             const plain = smoothstep(0.955, 0.975, lobe)
             height = height * (1 - plain * 0.85) + plain * 0.15
@@ -173,14 +173,14 @@ const function build(shape: Shape): Surface
     for i, direction in cube.Directions do
         const h: number = heights[i]
         positions[i] = direction * (shape.Radius * (1 + shape.Relief * h))
-        colors[i] = Color((h - low) / span, masks[i], 0)
+        colors[i] = Color.new((h - low) / span, masks[i], 0)
     end
-    const arrays = Array()
+    const arrays = Array.new()
     arrays:resize(13) -- Mesh.ARRAY_MAX
-    arrays:set(0, PackedVector3Array(positions)) -- Mesh.ARRAY_VERTEX
-    arrays:set(3, PackedColorArray(colors)) -- Mesh.ARRAY_COLOR
+    arrays:set(0, PackedVector3Array.new(positions)) -- Mesh.ARRAY_VERTEX
+    arrays:set(3, PackedColorArray.new(colors)) -- Mesh.ARRAY_COLOR
     arrays:set(12, cube.Indices) -- Mesh.ARRAY_INDEX
-    const tool = SurfaceTool()
+    const tool = SurfaceTool.new()
     tool:createFromArrays(arrays, 3) -- triangles
     tool:generateNormals()
     const seaLevel: number? = shape.SeaLevel

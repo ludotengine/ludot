@@ -20,7 +20,8 @@ with tempfile.TemporaryDirectory(prefix='ludot-editor-tests-') as directory:
     (project / 'project.godot').write_text('config_version=5\n[application]\nconfig/name="Ludot editor tests"\n[editor_plugins]\nenabled=PackedStringArray("res://addons/editor_test/plugin.cfg")\n[rendering]\nrenderer/rendering_method="gl_compatibility"\n')
     (project / 'Player.luau').write_text('class Player extends Node = {\n    export Speed: number = 1\n    function _ready()\n        print("Ready!")\n    end\n}\n')
     (project / 'Hover.gd').write_text('extends Node\n## Adds two numbers.\nfunc add(a: int, b: int = 2) -> int:\n    return a + b\nfunc _ready() -> void:\n    get_node(".")\n    add(1, 2)\n')
-    (project / 'NodeNode.luau').write_text('class NodeNode extends Node3D = { export Calls: number = 0 function Start(): number self.Calls += 1 return self.Calls end function Add(amount: number): number return amount + 1 end }')
+    (project / 'NodeNode.luau').write_text('class NodeNode extends Node3D = { export Calls: number = 0 function _ready() self.Calls = 100 end function _process(delta: number) self.Calls += 1 end function Start(): number self.Calls += 1 return self.Calls end function Add(amount: number): number return amount + 1 end }')
+    (project / 'Sample.lushader').write_text('shader spatial\nexport Strength: number = 1 in 0 to 2 step 0.1\nfunction fragment()\n    Albedo = vec3(Strength)\nend\n')
     (project / 'main.tscn').write_text('[gd_scene load_steps=3 format=3]\n[ext_resource type="Script" path="res://NodeNode.luau" id="1"]\n[ext_resource type="Script" path="res://Player.luau" id="2"]\n[node name="NodeNode" type="Node3D"]\nscript = ExtResource("1")\n[node name="Node3D" type="Node3D" parent="."]\nscript = ExtResource("2")\n')
     cache = project / '.godot/editor'
     cache.mkdir(parents=True)

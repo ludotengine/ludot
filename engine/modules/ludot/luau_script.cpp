@@ -410,6 +410,12 @@ int native_construct(lua_State *L) {
     LuauLanguage::push_variant(L, value);
     return 1;
 }
+int native_construct_new(lua_State *L) {
+    // Variant's callable table receives an implicit first argument; .new does not.
+    lua_pushnil(L);
+    lua_insert(L, 1);
+    return native_construct(L);
+}
 int native_operator(lua_State *L) {
     const auto op = Variant::Operator(lua_tointeger(L, lua_upvalueindex(1)));
     Variant result;
@@ -996,6 +1002,9 @@ void LuauLanguage::init() {
             lua_pushcclosure(state, native_static_call, "native static method", 2);
             lua_setfield(state, -2, api_name(method).utf8().get_data());
         }
+        lua_pushinteger(state, i);
+        lua_pushcclosure(state, native_construct_new, "new", 1);
+        lua_setfield(state, -2, "new");
         lua_newtable(state);
         lua_pushinteger(state, i);
         lua_pushcclosure(state, native_construct, "native constructor", 1);
@@ -1420,7 +1429,7 @@ Error LuauScript::reload(bool p_keep_state) {
         const auto affected = language->invalidate_modules(get_path());
         Vector<Ref<LuauScript>> dependents;
         for (LuauScript *dependent : language->scripts)
-            if (dependent != this && dependent->can_instantiate() && affected.has(dependent->get_path())) dependents.push_back(Ref<LuauScript>(dependent));
+            if (dependent != this && dependent->valid && dependent->class_ref != LUA_NOREF && affected.has(dependent->get_path())) dependents.push_back(Ref<LuauScript>(dependent));
         for (const auto &dependent : dependents) dependent->reload(true);
     }
     return OK;
@@ -1438,6 +1447,14 @@ bool LuauScript::get_property_default_value(const StringName &p_property, Varian
     r_value = *value; return true;
 }
 void LuauScript::get_script_method_list(List<MethodInfo> *r_methods) const { for (const auto &method : methods) r_methods->push_back(method.value); }
+bool LuauScript::can_instantiate() const {
+    const bool ready = valid && class_ref != LUA_NOREF && !base_type.is_empty();
+#ifdef TOOLS_ENABLED
+    return ready && ScriptServer::is_scripting_enabled() && !Engine::get_singleton()->is_recovery_mode_hint();
+#else
+    return ready;
+#endif
+}
 ScriptInstance *LuauScript::instance_create(Object *p_this) {
     ERR_FAIL_COND_V(!valid, nullptr);
     auto instance = memnew(LuauScriptInstance(p_this, Ref<LuauScript>(this)));

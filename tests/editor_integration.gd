@@ -18,6 +18,11 @@ func run() -> void:
     for frame in range(4):
         await get_tree().process_frame
     var script = load("res://Player.luau")
+    var saved_editor_source: String = script.source_code
+    check(not script.can_instantiate(), "Non-tool Luau scripts stay inactive in the editor")
+    var scene_root = EditorInterface.get_edited_scene_root()
+    check(scene_root.get_script() != null, "The scene retains its Luau script while editing")
+    check(scene_root.get("Calls") == 0, "Export defaults are exposed by the editor placeholder")
     EditorInterface.edit_script(script)
     for frame in range(3):
         await get_tree().process_frame
@@ -44,6 +49,17 @@ func run() -> void:
     check(highlighter.get_line_syntax_highlighting(3).size() > 4, "Interpolation expressions receive their own colors")
     code.text = 'local s = 1\nlocal nextValue = 2'
     check(highlighter.get_line_syntax_highlighting(1)[0].color != normal, "Edits invalidate multiline highlighting")
+    code.text = 'class Player extends Node = { export Speed: number = 1 in 0 to 10 step 0.1 }'
+    var keyword_color: Color = EditorInterface.get_editor_settings().get_setting("text_editor/theme/highlighting/keyword_color")
+    for word in ["class", "extends", "export", "in", "to", "step"]:
+        var column = code.text.find(word)
+        check(highlighter.get_line_syntax_highlighting(0)[column].color == keyword_color, word + " uses the keyword color")
+    code.text = 'class Player extends Node = { function test() const node = Node3D.new() node:free() end }'
+    script.source_code = code.text
+    check(script.get_diagnostics().is_empty(), "Native .new constructors type-check in the editor")
+    var constructors = script.get_completions('class Player extends Node = { function test() const node = Node3D.' + String.chr(0xffff) + ' end }')
+    check(constructors.has("new"), "Native class completion offers .new")
+    script.source_code = saved_editor_source
     code.text = 'class Player extends Node = { function _ready() self: end }'
     code.set_caret_line(0)
     code.set_caret_column(code.text.find("self:") + 5)
@@ -196,6 +212,22 @@ func run() -> void:
             var expected_name = "Walker" if base == "CharacterBody3D" else base + "Script"
             check(generated.source_code.begins_with("class " + expected_name + " extends " + base), "Template class names avoid native type collisions")
     dialog.queue_free()
+    var shader = load("res://Sample.lushader")
+    EditorInterface.edit_resource(shader)
+    for frame in 4:
+        await get_tree().process_frame
+    var shader_code: CodeEdit = null
+    for candidate in EditorInterface.get_base_control().find_children("*", "CodeEdit", true, false):
+        if candidate.text.begins_with("shader spatial"):
+            shader_code = candidate
+            break
+    check(shader_code != null, "The dedicated lushader editor opens")
+    if shader_code != null:
+        var shader_colors = shader_code.syntax_highlighter.get_line_syntax_highlighting(1)
+        var range_line = shader_code.get_line(1)
+        for word in ["export", "in", "to", "step"]:
+            check(shader_colors[range_line.find(word)].color == keyword_color, "Lushader " + word + " uses the keyword color")
+        check(shader_colors[range_line.find("number")].color == EditorInterface.get_editor_settings().get_setting("text_editor/theme/highlighting/base_type_color"), "Lushader scalar types use the type color")
     # Do not leave the deliberately incomplete completion buffer dirty at exit.
     code.text = script.source_code
     if failures.is_empty():
