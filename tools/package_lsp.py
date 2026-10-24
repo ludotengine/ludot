@@ -19,6 +19,8 @@ suffix = '.exe' if sys.platform == 'win32' else ''
 work = build / 'lsp-package'
 work.mkdir(parents=True, exist_ok=True)
 command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--name', 'ludot-lsp', '--paths', str(root / 'tools'), '--distpath', str(output), '--workpath', str(work / 'objects'), '--specpath', str(work)]
+if sys.platform == 'win32':
+    command += ['--icon', str(root / 'engine/platform/windows/godot.ico')]
 for source, destination, kind in [
     (build / 'luau' / ('luau-analyze' + suffix), 'bin', 'binary'),
     (build / ('ludot-shader' + suffix), 'bin', 'binary'),

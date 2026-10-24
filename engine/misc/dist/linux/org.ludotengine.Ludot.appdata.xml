@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2017-2022 Rémi Verschelde <remi@godotengine.org> -->
+<component type="desktop">
+  <id>org.ludotengine.Ludot</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Ludot Engine</name>
+  <summary>Multi-platform 2D and 3D game engine with a feature-rich editor</summary>
+  <launchable type="desktop-id">org.ludotengine.Ludot.desktop</launchable>
+  <description>
+    <p>
+      Ludot is a desktop game engine for 2D and 3D projects, with native Luau,
+      GDScript, and Luau shaders.
+    </p>
+    <p>
+      This is an independent hard fork of Godot and Luau. Original engine and
+      dependency licenses remain in the source distribution.
+    </p>
+  </description>
+  <url type="homepage">https://github.com/ludotengine/ludot</url>
+  <url type="bugtracker">https://github.com/ludotengine/ludot/issues</url>
+  <url type="help">https://github.com/ludotengine/ludot/blob/main/docs/building.md</url>
+  <developer_name>Ludot contributors</developer_name>
+</component>

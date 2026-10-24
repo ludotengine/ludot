@@ -91,11 +91,11 @@ String DisplayServerWayland::_get_app_id_from_context(DisplayServerEnums::Contex
 
 	switch (p_context) {
 		case DisplayServerEnums::CONTEXT_EDITOR: {
-			app_id = "org.godotengine.Editor";
+			app_id = "org.ludotengine.Editor";
 		} break;
 
 		case DisplayServerEnums::CONTEXT_PROJECTMAN: {
-			app_id = "org.godotengine.ProjectManager";
+			app_id = "org.ludotengine.ProjectManager";
 		} break;
 
 		case DisplayServerEnums::CONTEXT_ENGINE:
@@ -104,7 +104,7 @@ String DisplayServerWayland::_get_app_id_from_context(DisplayServerEnums::Contex
 			if (config_name.length() != 0) {
 				app_id = config_name;
 			} else {
-				app_id = "org.godotengine.Godot";
+				app_id = "org.ludotengine.Ludot";
 			}
 		}
 	}

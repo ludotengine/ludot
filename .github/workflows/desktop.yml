@@ -30,7 +30,7 @@ jobs:
           # Godot 4.7 requires Apple Clang 16 or newer.
           - os: macos-26
             platform: macos
-            sconsflags: ''
+            sconsflags: generate_bundle=yes
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -150,12 +150,21 @@ jobs:
           path: ${{ env.CACHE_DIRECTORY }}
           key: scons-${{ matrix.platform }}-${{ github.ref_name }}-${{ github.sha }}
       - name: Native engine, debugger, and export tests
+        if: runner.os != 'macOS'
         run: python tools/test_desktop.py
+      - name: macOS app bundle tests
+        if: runner.os == 'macOS'
+        run: python tools/test_desktop.py engine/bin/ludot_macos_editor.app
+      - name: Archive macOS app
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent engine/bin/ludot_macos_editor.app dist/ludot-macos-editor.zip
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: ludot-${{ matrix.platform }}
           path: |
             engine/bin/ludot.*
+            dist/ludot-macos-editor.zip
+            engine/misc/dist/linux/org.ludotengine.Ludot.*
             build/ludot-shader*
             build/luau/luau*
             tools/ludot_lsp/*.py

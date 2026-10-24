@@ -17,12 +17,20 @@ if env.editor_build:
         ludot.Append(CPPPATH=[str(root / 'luau' / component / 'include')])
 
 luau_build = ludot.Clone()
+# Luau intentionally uses constructor parameters named after their members. Its
+# own build does not enable shadow warnings; inheriting Godot's policy emits tens
+# of thousands of diagnostics from these headers during a native engine build.
+luau_build['CCFLAGS'] = [flag for flag in luau_build['CCFLAGS'] if flag not in {
+    '-Wshadow', '-Wshadow-field-in-constructor', '-Wshadow-uncaptured-local', '/w34458',
+}]
 if env['platform'] == 'windows' and not env['use_mingw']:
     # Godot uses /fp:strict, which enables FP exceptions. Luau temporarily turns
     # precise arithmetic off for selected VM operations, incompatible with those
     # exceptions. Use MSVC's default precise mode for Luau sources only.
     luau_build['CCFLAGS'] = [flag for flag in luau_build['CCFLAGS'] if not flag.startswith('/fp:')]
     luau_build.Append(CCFLAGS=['/fp:precise'])
+compiler_build = luau_build.Clone()
+compiler_build.Append(CPPDEFINES=['LUAU_ENABLE_ASSERT'])
 
 if env.editor_build:
     for component in ['Analysis', 'Config']:
@@ -30,7 +38,8 @@ if env.editor_build:
             env.modules_sources.append(luau_build.Object(target='generated/' + component + '/' + source.stem, source=str(source)))
 ludot.add_source_files(env.modules_sources, '*.cpp')
 for component in ['Common', 'Ast', 'Bytecode', 'Inliner', 'Compiler', 'VM']:
+    component_build = compiler_build if component in ['Ast', 'Compiler'] else luau_build
     for source in sorted((root / 'luau' / component / 'src').glob('*.cpp')):
-        obj = luau_build.Object(target='generated/' + component + '/' + source.stem, source=str(source))
+        obj = component_build.Object(target='generated/' + component + '/' + source.stem, source=str(source))
         env.modules_sources.append(obj)
 env.modules_sources.append(ludot.Object(target='generated/shader', source=str(root / 'language/src/shader.cpp')))

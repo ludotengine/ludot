@@ -57,10 +57,25 @@ Godot and the native binding keep their existing compilation settings.
 The fork includes mobile and web source inherited from Godot, but Ludot does not
 support or build those targets.
 
+On macOS, add `generate_bundle=yes` to produce
+`engine/bin/ludot_macos_editor.app`. The bundle uses the Ludot executable and icon.
+`tools/test_desktop.py` accepts this `.app` path as well as a bare executable.
+CI tests the generated app and uploads `ludot-macos-editor.zip`.
+
+Linux desktop and MIME metadata live under `engine/misc/dist/linux/` with the
+`org.ludotengine.Ludot` identifier. The Windows Inno Setup source is
+`engine/misc/dist/windows/ludot.iss`; its app identifier is separate from Godot's.
+
 The native module builds the monorepo's Luau sources directly. Editor builds also
 include Luau Analysis and Config for type checking and completion. Export templates
 include the VM and compiler without the editor analyzer. Engine binaries use the
 `ludot` prefix in `engine/bin/`.
+
+Luau translation units retain ordinary compiler warnings but do not inherit Godot's
+shadowing warnings. Luau intentionally uses member names as constructor parameter
+names, which otherwise produces thousands of repeated header diagnostics.
+Compiler and AST assertions remain enabled in optimized native builds, as they do
+in the standalone language tools.
 
 For a headless engine integration check, use the editor binary:
 

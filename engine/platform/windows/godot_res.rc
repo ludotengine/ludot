@@ -23,7 +23,7 @@ BEGIN
             VALUE "ProductName",            GODOT_VERSION_NAME
             VALUE "Licence",                "MIT"
             VALUE "LegalCopyright",         "(c) 2007-present Juan Linietsky, Ariel Manzur and Godot Engine contributors"
-            VALUE "Info",                   "https://godotengine.org"
+            VALUE "Info",                   "https://github.com/ludotengine/ludot"
             VALUE "ProductVersion",         GODOT_VERSION_FULL_BUILD
         END
     END

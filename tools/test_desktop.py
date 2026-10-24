@@ -2,6 +2,7 @@
 """Run desktop integration suites against the editor produced by CI."""
 import argparse
 from pathlib import Path
+import plistlib
 import subprocess
 import sys
 
@@ -18,6 +19,14 @@ if engine is None:
     if len(candidates) != 1:
         parser.error('Pass the editor binary path when multiple builds are present')
     engine = candidates[0]
+if engine.suffix == '.app':
+    contents = engine / 'Contents'
+    metadata = plistlib.loads((contents / 'Info.plist').read_bytes())
+    if metadata['CFBundleName'] != 'Ludot' or not metadata['CFBundleIdentifier'].startswith('org.ludotengine.ludot'):
+        parser.error('The macOS bundle must identify itself as Ludot')
+    if not (contents / 'Resources' / metadata['CFBundleIconFile']).is_file():
+        parser.error('The macOS bundle is missing its app icon')
+    engine = contents / 'MacOS' / metadata['CFBundleExecutable']
 for suite in ('test_engine.py', 'test_debugger.py', 'test_export.py'):
     print(f'Running {suite} with {engine.name}', flush=True)
     subprocess.run([sys.executable, str(root / 'tools' / suite), str(engine.resolve())], check=True)

@@ -42,6 +42,9 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   script builds a self-contained distribution with runtime and upstream license notices.
 - Ludot product name, logo, and issue links. The upstream update check and official
   template downloads are disabled, since Godot builds lack the Luau module.
+- Desktop distribution metadata uses Ludot names and identifiers. The macOS bundle
+  generator packages the renamed executable, and Windows console wrappers use the
+  Ludot icon. Original copyright notices remain intact.
 - Deferred documentation-cache loads are cancelled after editor shutdown, so a
   command-line export cannot start a documentation worker on the freed filesystem.
 
@@ -85,5 +88,9 @@ development build. It took about 61.6 s before the member cache.
 The macOS editor, language/shader/LSP suites, standalone package, debugger, and
 exported-pack checks passed in GitHub Actions at `a25fa13`
 ([job](https://github.com/ludotengine/ludot/actions/runs/40037145384/job/120701010724)).
+Linux also passed the complete desktop job at `a25fa13`
+([job](https://github.com/ludotengine/ludot/actions/runs/40037145384/job/120701011145)).
 Windows still needs validation of the MSVC floating-point mode fix in `4c08027`
-or later. The latest Linux CI build is also pending; its local results are above.
+or later.
+The newer macOS app-bundle generation and launch checks are not included in the
+raw-executable macOS result linked above.
