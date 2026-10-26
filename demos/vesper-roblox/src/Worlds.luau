@@ -1,6 +1,6 @@
 --!strict
 const ReplicatedStorage = game:GetService("ReplicatedStorage")
-const AssetService = game:GetService("AssetService")
+const MeshAssets = require(ReplicatedStorage.Client.Vesper.MeshAssets)
 const Math = require(ReplicatedStorage.Client.Vesper.Math)
 const Geometry = require(ReplicatedStorage.Client.Vesper.Geometry)
 const Textures = require(ReplicatedStorage.Client.Vesper.Textures)
@@ -34,6 +34,10 @@ export type System = {
 	TextureBusy: boolean,
 	TextureIndex: number,
 	TextureClock: number,
+	ActiveTerrain: Body?,
+	PreferredTerrain: Body?,
+	FailedTerrain: Body?,
+	TerrainLoading: boolean,
 }
 const Worlds = {}
 
@@ -41,11 +45,19 @@ function Worlds.ground(body: Body, worldPosition: Vector3): number
 	if #body.Terrain == 0 then
 		return body.Radius
 	end
+	for _, patch in body.Terrain do
+		if patch.Mesh == nil then
+			return body.Radius * 1.15
+		end
+	end
 	const direction = body.Surface:PointToObjectSpace(worldPosition).Unit
 	const start = direction * body.Radius * 1.6
 	local height = body.Radius * 0.5
 	for _, patch in body.Terrain do
-		const face, point = patch.Mesh:RaycastLocal(start - patch.Center, direction * -body.Radius * 3)
+		const face, point = (patch.Mesh :: EditableMesh):RaycastLocal(
+			start - patch.Center,
+			direction * -body.Radius * 3
+		)
 		if face ~= nil then
 			const hit = point + patch.Center
 			if hit:Dot(direction) > 0 then
@@ -64,48 +76,13 @@ function Worlds.ribbon(
 	name: string,
 	inner: number,
 	outer: number,
-	segments: number,
-	bands: number,
+	_segments: number,
+	_bands: number,
 	ring: boolean
 ): Geometry.Patch
-	const mesh = AssetService:CreateEditableMesh()
-	assert(mesh ~= nil, "Vesper: EditableMesh budget exhausted while building " .. name)
-	const ids, colorIds, vertices = {}, {}, {}
-	for row = 0, bands do
-		ids[row + 1], colorIds[row + 1] = {}, {}
-		const radius = inner + (outer - inner) * row / bands
-		for column = 0, segments do
-			const a = column / segments * math.pi * 2
-			const p = Vector3.new(math.cos(a), 0, math.sin(a)) * radius
-			local color = Color3.new(0.16, 0.31, 0.34)
-			local alpha = 0.45
-			if ring == true then
-				const stripe = math.sin(radius * 4) * math.sin(radius * 1.7) * 0.5 + 0.5
-				const gap = 1 - Math.smooth(0.98, 1, math.sin(radius * 0.8))
-				color = Color3.new(0.29, 0.2, 0.12):Lerp(Color3.new(0.83, 0.7, 0.48), stripe)
-				alpha = (0.25 + stripe * 0.6) * gap
-			end
-			const id, colorId = mesh:AddVertex(p), mesh:AddColor(color, alpha)
-			ids[row + 1][column + 1], colorIds[row + 1][column + 1] = id, colorId
-			table.insert(vertices, { Position = p, Normal = Vector3.yAxis, Base = color, ColorId = colorId })
-		end
-	end
-	for row = 1, bands do
-		for column = 1, segments do
-			for _, tri in
-				{ { { row, column }, { row, column + 1 }, { row + 1, column } }, {
-					{ row, column + 1 },
-					{ row + 1, column + 1 },
-					{ row + 1, column },
-				} }
-			do
-				const a, b, c = tri[1], tri[2], tri[3]
-				const face = mesh:AddTriangle(ids[a[1]][a[2]], ids[b[1]][b[2]], ids[c[1]][c[2]])
-				mesh:SetFaceColors(face, { colorIds[a[1]][a[2]], colorIds[b[1]][b[2]], colorIds[c[1]][c[2]] })
-			end
-		end
-	end
-	return Geometry.finish(mesh, parent, name, Vector3.zero, vertices, nil, true, 1)
+	const id = if ring == true then MeshAssets.Rings else MeshAssets.Orbit
+	const scale = if ring == true then (inner + outer) / (34 * (1.35 + 2.45)) else (inner + outer) * 0.5
+	return Geometry.asset(parent, name, id, Vector3.zero, scale, nil, true, 1, false)
 end
 
 function Worlds.addBody(system: System, spec: any, parent: Body?)
@@ -142,13 +119,14 @@ function Worlds.addBody(system: System, spec: any, parent: Body?)
 		end
 		if spec.Shape.SeaLevel ~= nil then
 			const sea = radius * (1 + spec.Shape.Relief * spec.Shape.SeaLevel)
+			Geometry.activateTerrain(body.Terrain)
 			const ocean = Geometry.sphere(model, "Ocean", sea, 32, nil, false, 1)
 			for _, vertex in ocean.Vertices do
 				-- Terrain raycasts give the seabed; sea-level clamping is skipped here.
 				const origin = vertex.Position.Unit * radius * 1.6
 				local seabed = radius * 0.5
 				for _, patch in body.Terrain do
-					const face, point = patch.Mesh:RaycastLocal(origin - patch.Center, -origin * 2)
+					const face, point = (patch.Mesh :: EditableMesh):RaycastLocal(origin - patch.Center, -origin * 2)
 					if face ~= nil then
 						const hit = point + patch.Center
 						if hit:Dot(vertex.Normal) > 0 then
@@ -162,6 +140,7 @@ function Worlds.addBody(system: System, spec: any, parent: Body?)
 					:Lerp(Color3.fromHex("#3a9c9d"), shallow)
 					:Lerp(Color3.fromHex("#c3e0cf"), surf * 0.75)
 			end
+			Geometry.releaseTerrain(body.Terrain)
 			table.insert(body.Lit, ocean)
 		end
 	end
@@ -198,20 +177,21 @@ function Worlds.asteroids(system: System)
 	folder.Parent = system.Root
 	for kind = 1, 6 do
 		const rock = Geometry.sphere(folder, "RockPrototype" .. kind, 1, 5, nil, false, 1)
+		const rockMesh = rock.Mesh :: EditableMesh
 		const offsets = {}
 		for _, vertex in rock.Vertices do
 			const p = vertex.Position
 			const stretch = 0.8 + Math.fbm(p * 2.4 + Vector3.one * kind, 3) * 0.5
 			offsets[vertex.Position] = p * stretch * Vector3.new(1, 0.72, 0.9)
 		end
-		for _, id in rock.Mesh:GetVertices() do
-			const p = rock.Mesh:GetPosition(id)
-			rock.Mesh:SetPosition(id, offsets[p])
+		for _, id in rockMesh:GetVertices() do
+			const p = rockMesh:GetPosition(id)
+			rockMesh:SetPosition(id, offsets[p])
 		end
 		for _, vertex in rock.Vertices do
 			const n = vertex.Normal
 			vertex.Base = Color3.fromHex("#4f4740"):Lerp(Color3.fromHex("#7d746a"), math.clamp(n.Y * 0.5 + 0.5, 0, 1))
-			rock.Mesh:SetColor(
+			rockMesh:SetColor(
 				vertex.ColorId,
 				Math.shade(vertex.Base, Math.light(Vector3.new(100, 0, 0), vertex.Normal, vertex.Normal))
 			)
@@ -257,26 +237,27 @@ function Worlds.build(root: Folder): System
 		TextureBusy = false,
 		TextureIndex = 0,
 		TextureClock = 0,
+		ActiveTerrain = nil,
+		PreferredTerrain = nil,
+		FailedTerrain = nil,
+		TerrainLoading = false,
 	}
-	table.insert(
-		system.Bodies,
-		{
-			Name = "Sun",
-			Model = root :: Instance,
-			Spec = { Spin = 0, Orbit = 0, Phase = 0, Speed = 0 },
-			Radius = Config.Sun.Radius,
-			Frame = CFrame.identity,
-			Surface = CFrame.identity,
-			Parent = nil,
-			Terrain = {},
-			Lit = {},
-			Clouds = nil,
-			Halo = nil,
-			Orbit = nil,
-			Rings = nil,
-			LastLight = 0,
-		}
-	)
+	table.insert(system.Bodies, {
+		Name = "Sun",
+		Model = root :: Instance,
+		Spec = { Spin = 0, Orbit = 0, Phase = 0, Speed = 0 },
+		Radius = Config.Sun.Radius,
+		Frame = CFrame.identity,
+		Surface = CFrame.identity,
+		Parent = nil,
+		Terrain = {},
+		Lit = {},
+		Clouds = nil,
+		Halo = nil,
+		Orbit = nil,
+		Rings = nil,
+		LastLight = 0,
+	})
 	for _, spec in Config.Worlds do
 		Worlds.addBody(system, spec, nil)
 	end
@@ -285,11 +266,68 @@ function Worlds.build(root: Folder): System
 	return system
 end
 
+function Worlds.streamTerrain(system: System, cameraPosition: Vector3)
+	local nearest: Body? = nil
+	local distance = 10
+	for _, body in system.Bodies do
+		if #body.Terrain > 0 then
+			const score = (cameraPosition - body.Frame.Position).Magnitude / body.Radius
+			if score < distance then
+				nearest, distance = body, score
+			end
+		end
+	end
+	const preferred = system.PreferredTerrain
+	if preferred ~= nil and #preferred.Terrain > 0 then
+		nearest = preferred
+	end
+	if nearest ~= system.FailedTerrain then
+		system.FailedTerrain = nil
+	end
+	if
+		system.TerrainLoading == true
+		or nearest == system.ActiveTerrain
+		or (nearest ~= nil and nearest == system.FailedTerrain)
+	then
+		return
+	end
+	system.TerrainLoading = true
+	const requested = nearest
+	task.spawn(function()
+		if system.ActiveTerrain ~= nil then
+			Geometry.releaseTerrain(system.ActiveTerrain.Terrain)
+		end
+		system.ActiveTerrain = nil
+		if requested ~= nil then
+			const ok, message = pcall(function()
+				Geometry.activateTerrain(requested.Terrain)
+			end)
+			if ok == true then
+				system.ActiveTerrain = requested
+				requested.LastLight = -math.huge
+				system.Root:SetAttribute("TerrainStreamingError", nil)
+				system.Root:SetAttribute("ActiveTerrain", requested.Name)
+			else
+				Geometry.releaseTerrain(requested.Terrain)
+				system.FailedTerrain = requested
+				system.Root:SetAttribute("TerrainStreamingError", tostring(message))
+				warn(message)
+			end
+		else
+			system.Root:SetAttribute("ActiveTerrain", "")
+		end
+		system.TerrainLoading = false
+	end)
+end
+
 function Worlds.update(system: System, delta: number, cameraPosition: Vector3, immediate: boolean)
 	if system.Paused == false then
 		system.Time += delta
 	end
 	const time = system.Time
+	if immediate == false then
+		Worlds.streamTerrain(system, cameraPosition)
+	end
 	for index, body in system.Bodies do
 		if index == 1 then
 			continue
@@ -301,13 +339,18 @@ function Worlds.update(system: System, delta: number, cameraPosition: Vector3, i
 		body.Frame = CFrame.new(position)
 		body.Surface = body.Frame * CFrame.Angles(0, time * spec.Spin, 0)
 		for _, patch in body.Terrain do
-			Geometry.place(patch, body.Surface)
+			const frame = if patch.Mesh ~= nil
+				then body.Surface
+				else body.Frame * CFrame.Angles(0, -time * spec.Speed, 0)
+			Geometry.place(patch, frame)
 		end
 		for _, patch in body.Lit do
 			const frame = if patch == body.Clouds
 				then body.Frame * CFrame.Angles(0, time * (spec.Spin + 0.012), 0)
 				else body.Surface
-			Geometry.place(patch, frame)
+			if patch.Template == nil or patch.Mesh ~= nil then
+				Geometry.place(patch, frame)
+			end
 		end
 		if body.Rings ~= nil then
 			Geometry.place(body.Rings, body.Frame * CFrame.Angles(0.15, 0, -0.2))
@@ -322,7 +365,7 @@ function Worlds.update(system: System, delta: number, cameraPosition: Vector3, i
 			const localSun = facing:VectorToObjectSpace(-position.Unit)
 			body.Halo.Part.CFrame = facing * CFrame.Angles(0, 0, math.atan2(localSun.Y, localSun.X))
 			const scale = distance / math.sqrt(math.max(distance * distance - body.Radius * body.Radius, 1))
-			body.Halo.Part.Size = body.Halo.Part.MeshSize * math.min(scale, 2)
+			body.Halo.Part.Size = body.Halo.BaseSize * math.min(scale, 2)
 			body.Halo.Part.Transparency = if distance < body.Radius * 1.15 then 1 else 0.02
 		end
 		const interval = if (cameraPosition - position).Magnitude < body.Radius * 8 then 0.2 else 2.5
@@ -340,6 +383,7 @@ function Worlds.update(system: System, delta: number, cameraPosition: Vector3, i
 			end
 			if body.Rings ~= nil then
 				const ids, values = {}, {}
+				const ringMesh = body.Rings.Mesh :: EditableMesh
 				const ringFrame = body.Frame * CFrame.Angles(0.15, 0, -0.2)
 				for i, vertex in body.Rings.Vertices do
 					const p = ringFrame:PointToWorldSpace(vertex.Position)
@@ -350,7 +394,7 @@ function Worlds.update(system: System, delta: number, cameraPosition: Vector3, i
 					ids[i] = vertex.ColorId
 					values[i] = if eclipsed then vertex.Base:Lerp(Color3.new(), 0.92) else vertex.Base
 				end
-				body.Rings.Mesh:BatchSetValues(ids, values)
+				ringMesh:BatchSetValues(ids, values)
 			end
 		end
 	end
@@ -377,12 +421,12 @@ function Worlds.update(system: System, delta: number, cameraPosition: Vector3, i
 		end
 	end
 	for _, patch in system.Assets[1].Patches do
-		Geometry.place(patch, CFrame.new(cameraPosition))
+		patch.Part.CFrame = CFrame.new(cameraPosition + patch.Center) * patch.Rotation
 	end
 	const sun = system.Assets[4]
 	sun.Part.CFrame = CFrame.Angles(time * 0.004, time * 0.012, 0)
 	system.Corona.Part.CFrame = CFrame.lookAt(Vector3.zero, cameraPosition)
-	system.Corona.Part.Size = system.Corona.Part.MeshSize * (1 + math.sin(time * 0.4) * 0.008)
+	system.Corona.Part.Size = system.Corona.BaseSize * (1 + math.sin(time * 0.4) * 0.008)
 end
 
 return Worlds

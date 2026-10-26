@@ -2,7 +2,7 @@
 const ReplicatedStorage = game:GetService("ReplicatedStorage")
 const AssetService = game:GetService("AssetService")
 const Math = require(ReplicatedStorage.Client.Vesper.Math)
-const Geometry = require(ReplicatedStorage.Client.Vesper.Geometry)
+const MeshAssets = require(ReplicatedStorage.Client.Vesper.MeshAssets)
 const Textures = {}
 
 function Textures.image(
@@ -90,87 +90,59 @@ function Textures.sky(parent: Instance): any
 	const sky = Instance.new("Folder")
 	sky.Name = "Starfield"
 	sky.Parent = parent
-	const images, patches = {}, {}
+	const patches = {}
 	const sides = { "Back", "Front", "Right", "Left", "Up", "Down" }
 	for index, side in sides do
-		const image = Textures.image(512, 512, function(_point: Vector3, u: number, v: number): (Color3, number)
-			const x, y = u * 2 - 1, 1 - v * 2
-			const directions = {
-				Vector3.new(x, y, 1),
-				Vector3.new(-x, y, -1),
-				Vector3.new(1, y, -x),
-				Vector3.new(-1, y, x),
-				Vector3.new(x, 1, -y),
-				Vector3.new(x, -1, y),
-			}
-			const p = directions[index].Unit
-			const plane = math.abs(p:Dot(Vector3.new(0.4, 0.8, 0.3).Unit))
-			const dust = math.exp(-plane * 15) * Math.fbm(p * 6, 5)
-			return Color3.new(dust * 0.022, dust * 0.015, dust * 0.03), 1
-		end)
-		const random = Random.new(743 + index)
-		for _ = 1, 450 do
-			const x, y = random:NextInteger(0, 511), random:NextInteger(0, 511)
-			const brightness, warm = random:NextNumber(0.25, 1), random:NextNumber()
-			const color = Color3.new(brightness, brightness * (0.8 + warm * 0.2), brightness * (0.7 + (1 - warm) * 0.3))
-			if brightness > 0.96 then
-				image:DrawCircle(
-					Vector2.new(x, y),
-					1,
-					color,
-					0,
-					Enum.ImageCombineType.Overwrite,
-					Enum.AntiAliasing.Enabled
-				)
-			else
-				image:DrawRectangle(Vector2.new(x, y), Vector2.one, color, 0, Enum.ImageCombineType.Overwrite)
-			end
-		end
-		table.insert(images, image)
-		-- MeshPart extents are limited to 2048 studs. Twenty-five tiles cover
-		-- each 10,000-stud sky face, all sampling one shared EditableImage.
+		const imageId = MeshAssets.Sky[index]
+		-- SurfaceGui image rectangles share the six images without allocating
+		-- 150 editable meshes for the sky's otherwise trivial quad geometry.
+		const axes = {
+			{ Vector3.xAxis, Vector3.yAxis },
+			{ -Vector3.xAxis, Vector3.yAxis },
+			{ -Vector3.zAxis, Vector3.yAxis },
+			{ Vector3.zAxis, Vector3.yAxis },
+			{ Vector3.xAxis, -Vector3.zAxis },
+			{ Vector3.xAxis, Vector3.zAxis },
+		}
+		const right, up = axes[index][1], axes[index][2]
+		const back = right:Cross(up)
 		for row = 0, 4 do
 			for column = 0, 4 do
-				const mesh = AssetService:CreateEditableMesh()
-				assert(mesh ~= nil, "Vesper: EditableMesh budget exhausted while creating the starfield")
-				const positions, coordinates = {}, {}
-				local center = Vector3.zero
-				for vertex, offset in { Vector2.new(0, 0), Vector2.new(1, 0), Vector2.new(1, 1), Vector2.new(0, 1) } do
-					const uv = Vector2.new((column + offset.X) / 5, (row + offset.Y) / 5)
-					const x, y = uv.X * 2 - 1, 1 - uv.Y * 2
-					const directions = {
-						Vector3.new(x, y, 1),
-						Vector3.new(-x, y, -1),
-						Vector3.new(1, y, -x),
-						Vector3.new(-1, y, x),
-						Vector3.new(x, 1, -y),
-						Vector3.new(x, -1, y),
-					}
-					positions[vertex], coordinates[vertex] = directions[index] * 5000, uv
-					center += positions[vertex] / 4
-				end
-				const ids, uvIds = {}, {}
-				for vertex, p in positions do
-					ids[vertex] = mesh:AddVertex(p - center)
-					uvIds[vertex] = mesh:AddUV(coordinates[vertex])
-				end
-				for _, tri in { { 1, 2, 3 }, { 1, 3, 4 } } do
-					local a, b, c = tri[1], tri[2], tri[3]
-					const p, q, r = positions[a], positions[b], positions[c]
-					if (q - p):Cross(r - p):Dot(p) > 0 then
-						b, c = c, b
-					end
-					const face = mesh:AddTriangle(ids[a], ids[b], ids[c])
-					mesh:SetFaceUVs(face, { uvIds[a], uvIds[b], uvIds[c] })
-				end
-				table.insert(
-					patches,
-					Geometry.finish(mesh, sky, side .. row .. "_" .. column, center, {}, image, false, 1)
-				)
+				const center = back * 5000
+					+ right * ((column + 0.5) / 5 * 10000 - 5000)
+					+ up * (5000 - (row + 0.5) / 5 * 10000)
+				const part = Instance.new("Part")
+				part.Name = side .. row .. "_" .. column
+				part.Size = Vector3.new(2000, 2000, 0.05)
+				part.Anchored = true
+				part.CanCollide, part.CanTouch, part.CanQuery, part.CastShadow = false, false, false, false
+				part.Transparency = 1
+				const rotation = CFrame.fromMatrix(Vector3.zero, right, up, back)
+				part.CFrame = CFrame.new(center) * rotation
+				part.Parent = sky
+				const surface = Instance.new("SurfaceGui")
+				surface.Name = "Stars"
+				surface.Face = Enum.NormalId.Front
+				surface.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+				surface.CanvasSize = Vector2.new(100, 100)
+				surface.AlwaysOnTop = false
+				surface.LightInfluence = 0
+				surface.Brightness = 1
+				surface.MaxDistance = 0
+				surface.Parent = part
+				const label = Instance.new("ImageLabel")
+				label.Name = "Tile"
+				label.Size = UDim2.fromScale(1, 1)
+				label.BackgroundTransparency = 1
+				label.ImageContent = Content.fromAssetId(imageId)
+				label.ImageRectOffset = Vector2.new(column * 100, row * 100)
+				label.ImageRectSize = Vector2.new(100, 100)
+				label.Parent = surface
+				table.insert(patches, { Part = part, Center = center, Rotation = rotation })
 			end
 		end
 	end
-	return { Sky = sky, Images = images, Patches = patches }
+	return { Sky = sky, Patches = patches }
 end
 
 const bases: { [EditableImage]: buffer } = {}

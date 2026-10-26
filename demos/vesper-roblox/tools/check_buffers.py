@@ -2,7 +2,7 @@
 from pathlib import Path
 import base64,json,math,struct
 root=Path(__file__).resolve().parents[1]
-data=json.loads((root/'src/TerrainData.model.json').read_text())
+data=json.loads((root/'assets/TerrainData.model.json').read_text())
 triangles=0
 for world in data['Children']:
     seams={}

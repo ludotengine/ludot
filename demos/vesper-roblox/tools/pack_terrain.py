@@ -44,7 +44,7 @@ for name, (radius, relief, sea) in recipes.items():
         "source_vertices": len(data["positions"]), "sea_normalized": normalized_sea,
         "sha256": hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest(),
     }
-output = ROOT / "src/TerrainData.model.json"
+output = ROOT / "assets/TerrainData.model.json"
 output.write_text(json.dumps({"ClassName": "Folder", "Children": children}, separators=(",", ":")) + "\n")
 (ROOT / "assets/manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 print("Packed", len(children), "original terrain meshes;", output.stat().st_size, "bytes")

@@ -69,7 +69,17 @@ function Flight.connect(state: State)
 		Enum.KeyCode.Six,
 	}
 	const function inputBegan(input: InputObject, processed: boolean)
-		if processed == true then
+		if UserInputService:GetFocusedTextBox() ~= nil then
+			return
+		end
+		local planetKey = false
+		for _, key in numbers do
+			if input.KeyCode == key then
+				planetKey = true
+				break
+			end
+		end
+		if processed == true and planetKey == false then
 			return
 		end
 		const code = input.KeyCode
@@ -151,6 +161,7 @@ function Flight.tour(state: State, delta: number)
 			break
 		end
 	end
+	state.System.PreferredTerrain = body
 	const origin = body.Frame.Position
 	const x = if body.Name == "Sun" then Vector3.xAxis else -origin.Unit
 	const y = Vector3.yAxis
@@ -176,6 +187,7 @@ function Flight.tour(state: State, delta: number)
 end
 
 function Flight.update(state: State, delta: number)
+	state.System.PreferredTerrain = if state.Mode == "planet" then state.Focus else nil
 	if state.Mode == "tour" then
 		Flight.tour(state, delta)
 		state.Position = state.Camera.CFrame.Position

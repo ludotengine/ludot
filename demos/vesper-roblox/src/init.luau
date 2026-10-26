@@ -13,10 +13,14 @@ const function start()
 	camera.CFrame = CFrame.lookAt(Vector3.new(-300, 420, 980), Vector3.new(120, 0, 0))
 	-- The edit-mode preview is replaced by assets generated on this client.
 	for _, child in Lighting:GetChildren() do
-		if child:GetAttribute("VesperPreview") == true then child:Destroy() end
+		if child:GetAttribute("VesperPreview") == true then
+			child:Destroy()
+		end
 	end
 	for _, child in workspace:GetChildren() do
-		if child:GetAttribute("VesperPreview") == true then child:Destroy() end
+		if child:GetAttribute("VesperPreview") == true then
+			child:Destroy()
+		end
 	end
 	const air = Environment.setup()
 	const root = Instance.new("Folder")
@@ -32,6 +36,7 @@ const function start()
 	end
 	RunService:BindToRenderStep("Vesper", Enum.RenderPriority.Camera.Value + 1, update)
 	update(0)
+	root:SetAttribute("Ready", true)
 	print("Vesper ready: original terrain, six worlds, editable meshes and images.")
 end
 

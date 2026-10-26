@@ -10,8 +10,12 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   orbiting worlds, oceans, clouds, rings, a tiled starfield, 1,800 shared-mesh
   asteroids, and the free/planet/tour cameras. Strict Roblox Luau analysis and
   edit-mode geometry, orbit, pause, clearance, and camera checks pass. The scene
-  was visually inspected in Studio. Runtime input and published-client behavior
-  have not been playtested; Roblox atmosphere/ocean effects approximate lushaders.
+  was visually inspected in Studio. Client playtests verify startup, free flight,
+  Earth focus, pause, and orbit visibility. Fixed-size terrain streaming bounds
+  editable terrain to six patches. Two client rounds through all five terrain worlds
+  verify mesh release and ground raycasts. Distant terrain and sky use published original
+  assets. Production clients and lower-memory devices remain unverified; Roblox
+  atmosphere/ocean effects approximate lushaders.
 - `.new()` constructors for Luau classes, native nodes/resources, and native value
   types, with typed results and initializer arguments in the editor and LSP.
   Normal Luau scripts use editor placeholders and do not run lifecycle callbacks

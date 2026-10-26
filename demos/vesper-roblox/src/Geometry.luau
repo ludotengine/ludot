@@ -1,17 +1,20 @@
 --!strict
 const AssetService = game:GetService("AssetService")
-const EncodingService = game:GetService("EncodingService")
 const ReplicatedStorage = game:GetService("ReplicatedStorage")
 const Math = require(ReplicatedStorage.Client.Vesper.Math)
+const MeshAssets = require(ReplicatedStorage.Client.Vesper.MeshAssets)
 
 export type Vertex = { Position: Vector3, Normal: Vector3, Base: Color3, ColorId: number }
 export type Patch = {
 	Part: MeshPart,
-	Mesh: EditableMesh,
+	Mesh: EditableMesh?,
 	Center: Vector3,
 	Vertices: { Vertex },
 	Radius: number,
 	Image: EditableImage?,
+	BaseSize: Vector3,
+	AssetId: number?,
+	Template: MeshPart?,
 }
 
 const Geometry = {}
@@ -54,7 +57,9 @@ function Geometry.finish(
 	transparent: boolean,
 	strength: number
 ): Patch
-	mesh:RemoveUnused()
+	if mesh.FixedSize == false then
+		mesh:RemoveUnused()
+	end
 	const part = AssetService:CreateMeshPartAsync(Content.fromObject(mesh), {
 		CollisionFidelity = Enum.CollisionFidelity.Box,
 		RenderFidelity = Enum.RenderFidelity.Precise,
@@ -73,58 +78,122 @@ function Geometry.finish(
 	end
 	part.CFrame = CFrame.new(center)
 	part.Parent = parent
-	return { Part = part, Mesh = mesh, Center = center, Vertices = vertices, Radius = 0, Image = image }
+	return {
+		Part = part,
+		Mesh = mesh,
+		Center = center,
+		Vertices = vertices,
+		Radius = 0,
+		Image = image,
+		BaseSize = part.Size,
+	}
+end
+
+const loadedMeshes: { [number]: EditableMesh } = {}
+
+function Geometry.asset(
+	parent: Instance,
+	name: string,
+	id: number,
+	center: Vector3,
+	scale: number,
+	image: EditableImage?,
+	transparent: boolean,
+	strength: number,
+	unique: boolean
+): Patch
+	local mesh = if unique == false then loadedMeshes[id] else nil
+	if mesh == nil then
+		mesh = AssetService:CreateEditableMeshAsync(Content.fromAssetId(id), { FixedSize = true })
+		assert(mesh ~= nil, "Vesper: fixed-size EditableMesh memory exhausted while loading " .. name)
+		if unique == false then
+			loadedMeshes[id] = mesh
+		end
+	end
+	const fixed = mesh :: EditableMesh
+	const vertices: { Vertex } = {}
+	if image == nil then
+		for _, vertex in fixed:GetVertices() do
+			const face = fixed:GetVertexFaces(vertex)[1]
+			const colorId = fixed:GetVertexFaceColor(vertex, face)
+			const normalId = fixed:GetVertexFaceNormal(vertex, face)
+			table.insert(vertices, {
+				Position = fixed:GetPosition(vertex) * scale + center,
+				Normal = fixed:GetNormal(normalId) :: Vector3,
+				Base = fixed:GetColor(colorId) :: Color3,
+				ColorId = colorId,
+			})
+		end
+	end
+	const patch = Geometry.finish(fixed, parent, name, center, vertices, image, transparent, strength)
+	patch.Part.Size *= scale
+	patch.BaseSize = patch.Part.Size
+	return patch
 end
 
 function Geometry.terrain(world: any, parent: Instance): { Patch }
 	const patches: { Patch } = {}
-	const folder = ReplicatedStorage.Client.Vesper.TerrainData[world.Name]
-	for side = 1, 6 do
-		const raw = EncodingService:Base64Decode(buffer.fromstring(folder["Face" .. side].Value))
-		const count, indexCount, sea = buffer.readu32(raw, 0), buffer.readu32(raw, 4), buffer.readf32(raw, 8)
-		const mesh = AssetService:CreateEditableMesh()
-		assert(mesh ~= nil, "Vesper: EditableMesh budget exhausted while creating " .. world.Name)
-		const positions: { Vector3 }, normals: { Vector3 }, bases: { Color3 } = {}, {}, {}
-		local minimum, maximum =
-			Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
-		for i = 1, count do
-			const offset = 12 + (i - 1) * 32
-			const p = Vector3.new(
-				buffer.readf32(raw, offset),
-				buffer.readf32(raw, offset + 4),
-				buffer.readf32(raw, offset + 8)
-			)
-			const n = Vector3.new(
-				buffer.readf32(raw, offset + 12),
-				buffer.readf32(raw, offset + 16),
-				buffer.readf32(raw, offset + 20)
-			)
-			positions[i], normals[i] = p, n
-			bases[i] =
-				Math.terrainColor(world, p, n, buffer.readf32(raw, offset + 24), buffer.readf32(raw, offset + 28), sea)
-			minimum, maximum = minimum:Min(p), maximum:Max(p)
-		end
-		const center = (minimum + maximum) * 0.5
-		const ids: { number }, normalIds: { number }, colorIds: { number }, vertices: { Vertex } = {}, {}, {}, {}
-		for i, p in positions do
-			ids[i] = mesh:AddVertex(p - center)
-			normalIds[i] = mesh:AddNormal(normals[i])
-			colorIds[i] = mesh:AddColor(bases[i], 1)
-			vertices[i] = { Position = p, Normal = normals[i], Base = bases[i], ColorId = colorIds[i] }
-		end
-		const first = 12 + count * 32
-		for index = 0, indexCount - 1, 3 do
-			const a = buffer.readu16(raw, first + index * 2) + 1
-			const b = buffer.readu16(raw, first + (index + 1) * 2) + 1
-			const c = buffer.readu16(raw, first + (index + 2) * 2) + 1
-			const face = mesh:AddTriangle(ids[a], ids[b], ids[c])
-			mesh:SetFaceNormals(face, { normalIds[a], normalIds[b], normalIds[c] })
-			mesh:SetFaceColors(face, { colorIds[a], colorIds[b], colorIds[c] })
-		end
-		table.insert(patches, Geometry.finish(mesh, parent, "Terrain" .. side, center, vertices, nil, false, 1))
-		task.wait()
+	for side, asset in (MeshAssets.Terrain :: any)[world.Name] do
+		const center = Vector3.new(asset.Center[1], asset.Center[2], asset.Center[3])
+		const template = AssetService:CreateMeshPartAsync(Content.fromAssetId(asset.StaticId))
+		const part = template:Clone()
+		part.Name = "Terrain" .. side
+		part.Anchored = true
+		part.CanCollide, part.CanTouch, part.CanQuery, part.CastShadow = false, false, false, false
+		part.Material = Enum.Material.Neon
+		part.Color = Color3.new(0.6, 0.6, 0.6)
+		part.CFrame = CFrame.new(center)
+		part.Parent = parent
+		table.insert(patches, {
+			Part = part,
+			Mesh = nil,
+			Center = center,
+			Vertices = {},
+			Radius = 0,
+			Image = nil,
+			BaseSize = part.Size,
+			AssetId = asset.Id,
+			Template = template,
+		})
 	end
 	return patches
+end
+
+function Geometry.activateTerrain(patches: { Patch })
+	for _, patch in patches do
+		const mesh =
+			AssetService:CreateEditableMeshAsync(Content.fromAssetId(patch.AssetId :: number), { FixedSize = true })
+		assert(mesh ~= nil, "Vesper: active terrain exceeds the client editable-mesh budget")
+		patch.Mesh = mesh
+		const vertices: { Vertex } = {}
+		for _, vertex in mesh:GetVertices() do
+			const face = mesh:GetVertexFaces(vertex)[1]
+			const colorId = mesh:GetVertexFaceColor(vertex, face)
+			table.insert(vertices, {
+				Position = mesh:GetPosition(vertex) + patch.Center,
+				Normal = mesh:GetNormal(mesh:GetVertexFaceNormal(vertex, face)) :: Vector3,
+				Base = mesh:GetColor(colorId) :: Color3,
+				ColorId = colorId,
+			})
+		end
+		const display = AssetService:CreateMeshPartAsync(Content.fromObject(mesh))
+		patch.Part:ApplyMesh(display)
+		patch.Part.Size = display.Size
+		display:Destroy()
+		patch.Mesh, patch.Vertices = mesh, vertices
+	end
+end
+
+function Geometry.releaseTerrain(patches: { Patch })
+	for _, patch in patches do
+		const mesh = patch.Mesh
+		if mesh ~= nil then
+			patch.Part:ApplyMesh(patch.Template :: MeshPart)
+			patch.Part.Size = (patch.Template :: MeshPart).Size
+			patch.Mesh, patch.Vertices = nil, {}
+			mesh:Destroy()
+		end
+	end
 end
 
 function Geometry.sphere(
@@ -136,78 +205,14 @@ function Geometry.sphere(
 	transparent: boolean,
 	strength: number
 ): Patch
-	const mesh = AssetService:CreateEditableMesh()
-	assert(mesh ~= nil, "Vesper: EditableMesh budget exhausted while creating " .. name)
-	const ids: { { number } }, normalIds: { { number } }, colors: { { number } }, uvs: { { number } } = {}, {}, {}, {}
-	const vertices: { Vertex } = {}
-	const longitude = detail * 2
-	for y = 0, detail do
-		ids[y + 1], normalIds[y + 1], colors[y + 1], uvs[y + 1] = {}, {}, {}, {}
-		const latitude = math.pi * y / detail
-		for x = 0, longitude do
-			const angle = math.pi * 2 * x / longitude
-			const n = Vector3.new(
-				math.sin(latitude) * math.cos(angle),
-				math.cos(latitude),
-				math.sin(latitude) * math.sin(angle)
-			)
-			const p = n * radius
-			const id, color = mesh:AddVertex(p), mesh:AddColor(Color3.new(1, 1, 1), 1)
-			ids[y + 1][x + 1] = id
-			normalIds[y + 1][x + 1] = mesh:AddNormal(n)
-			colors[y + 1][x + 1] = color
-			uvs[y + 1][x + 1] = mesh:AddUV(Vector2.new(x / longitude, y / detail))
-			-- The two unreferenced seam poles are removed with their attributes.
-			if not (y == 0 and x == 0) and not (y == detail and x == longitude) then
-				table.insert(vertices, { Position = p, Normal = n, Base = Color3.new(1, 1, 1), ColorId = color })
-			end
-		end
-	end
-	const function triangle(y1: number, x1: number, y2: number, x2: number, y3: number, x3: number)
-		const a, b, c = mesh:GetPosition(ids[y1][x1]), mesh:GetPosition(ids[y2][x2]), mesh:GetPosition(ids[y3][x3])
-		if (b - a):Cross(c - a):Dot(a) < 0 then
-			y2, y3, x2, x3 = y3, y2, x3, x2
-		end
-		const face = mesh:AddTriangle(ids[y1][x1], ids[y2][x2], ids[y3][x3])
-		mesh:SetFaceNormals(face, { normalIds[y1][x1], normalIds[y2][x2], normalIds[y3][x3] })
-		mesh:SetFaceColors(face, { colors[y1][x1], colors[y2][x2], colors[y3][x3] })
-		mesh:SetFaceUVs(face, { uvs[y1][x1], uvs[y2][x2], uvs[y3][x3] })
-	end
-	for y = 1, detail do
-		for x = 1, longitude do
-			if y > 1 then
-				triangle(y, x, y + 1, x, y, x + 1)
-			end
-			if y < detail then
-				triangle(y, x + 1, y + 1, x, y + 1, x + 1)
-			end
-		end
-	end
-	const patch = Geometry.finish(mesh, parent, name, Vector3.zero, vertices, image, transparent, strength)
+	const id = if detail <= 5 then MeshAssets.Rock else MeshAssets.Sphere
+	const patch = Geometry.asset(parent, name, id, Vector3.zero, radius, image, transparent, strength, image == nil)
 	patch.Radius = radius
 	return patch
 end
 
 function Geometry.billboard(parent: Instance, name: string, radius: number, image: EditableImage): Patch
-	const mesh = AssetService:CreateEditableMesh()
-	assert(mesh ~= nil, "Vesper: EditableMesh budget exhausted while creating " .. name)
-	const ids, uv = {}, {}
-	for i, p in
-		{
-			Vector3.new(-radius, -radius, 0),
-			Vector3.new(radius, -radius, 0),
-			Vector3.new(radius, radius, 0),
-			Vector3.new(-radius, radius, 0),
-		}
-	do
-		ids[i] = mesh:AddVertex(p)
-		uv[i] = mesh:AddUV(({ Vector2.new(0, 1), Vector2.new(1, 1), Vector2.new(1, 0), Vector2.new(0, 0) })[i])
-	end
-	for _, tri in { { 1, 2, 3 }, { 1, 3, 4 } } do
-		const face = mesh:AddTriangle(ids[tri[1]], ids[tri[2]], ids[tri[3]])
-		mesh:SetFaceUVs(face, { uv[tri[1]], uv[tri[2]], uv[tri[3]] })
-	end
-	return Geometry.finish(mesh, parent, name, Vector3.zero, {}, image, true, 1)
+	return Geometry.asset(parent, name, MeshAssets.Quad, Vector3.zero, radius, image, true, 1, false)
 end
 
 function Geometry.place(patch: Patch, frame: CFrame)
@@ -223,7 +228,10 @@ function Geometry.light(patch: Patch, frame: CFrame)
 		ids[i] = vertex.ColorId
 		values[i] = Math.shade(vertex.Base, Math.light(position, normal, radial))
 	end
-	patch.Mesh:BatchSetValues(ids, values)
+	const mesh = patch.Mesh
+	if mesh ~= nil then
+		mesh:BatchSetValues(ids, values)
+	end
 end
 
 return Geometry
