@@ -1,0 +1,37 @@
+{
+  "Ember": {
+    "resolution": 48,
+    "triangles": 27648,
+    "source_vertices": 13826,
+    "sea_normalized": -1,
+    "sha256": "56e2a28f45fc40c89bba97f3d4c2f91856c7ae571ac0570802d824764fe50b22"
+  },
+  "Earth": {
+    "resolution": 48,
+    "triangles": 27648,
+    "source_vertices": 13826,
+    "sea_normalized": 0.5793321718127652,
+    "sha256": "6edcb7e37444e8a7d67569779f4f6d08165e58b567b5b97848e2db151a969c0a"
+  },
+  "Moon": {
+    "resolution": 48,
+    "triangles": 27648,
+    "source_vertices": 13826,
+    "sea_normalized": -1,
+    "sha256": "e4d8d84fde81c54b16dbf9cd62a08f43c56b94737cd35b42821ba9f63ef57808"
+  },
+  "Mars": {
+    "resolution": 48,
+    "triangles": 27648,
+    "source_vertices": 13826,
+    "sea_normalized": -1,
+    "sha256": "f9a7db40b2546be136d80aef7603c9eb8e3618a7cb783b3e5c9a2eae1fe9523d"
+  },
+  "Pluto": {
+    "resolution": 48,
+    "triangles": 27648,
+    "source_vertices": 13826,
+    "sea_normalized": -1,
+    "sha256": "33ac78eb6cbc051eabd5ddfe5d447946480ddbf0c094e492c1b48bfe0b23bd72"
+  }
+}

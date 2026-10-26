@@ -5,6 +5,13 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 
 ## Implemented
 
+- `demos/vesper-roblox` ports Vesper to Roblox with exported original terrain,
+  EditableMeshes, procedural EditableImages, point-sun vertex/texture lighting,
+  orbiting worlds, oceans, clouds, rings, a tiled starfield, 1,800 shared-mesh
+  asteroids, and the free/planet/tour cameras. Strict Roblox Luau analysis and
+  edit-mode geometry, orbit, pause, clearance, and camera checks pass. The scene
+  was visually inspected in Studio. Runtime input and published-client behavior
+  have not been playtested; Roblox atmosphere/ocean effects approximate lushaders.
 - `.new()` constructors for Luau classes, native nodes/resources, and native value
   types, with typed results and initializer arguments in the editor and LSP.
   Normal Luau scripts use editor placeholders and do not run lifecycle callbacks

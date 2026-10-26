@@ -1,0 +1,13 @@
+{
+  "name": "Vesper Roblox",
+  "emitLegacyScripts": false,
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Client": {"$className": "Folder", "Vesper": {"$path": "src"}},
+      "ClientLoader": {"$path": "ClientLoader.client.luau"}
+    },
+    "ServerScriptService": {"ServerLoader": {"$path": "ServerLoader.server.luau"}},
+    "Workspace": {"$properties": {"Gravity": 0, "StreamingEnabled": false}}
+  }
+}
