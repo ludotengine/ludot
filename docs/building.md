@@ -51,7 +51,7 @@ repeatedly. This keeps the default runtime optimization and editor features.
 
 For repeated language-tool builds, install ccache and configure CMake with
 `-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache`.
-CI restores this compiler cache on Linux and macOS. Windows uses sccache with MSVC
+CI keeps this compiler cache on Linux and macOS. Windows uses sccache with MSVC
 and GitHub's cache backend, configured through the same CMake launcher options.
 
 Use `platform=windows` with an MSVC developer environment on Windows and
@@ -223,9 +223,26 @@ an artifact-storage failure cannot prevent those checks from running. Uploaded
 editor and LSP artifacts are retained for seven days. Upload failures still fail
 the job; a storage-quota error does not count as a successful build delivery.
 
-Pushes to one branch share a concurrency group. The running build finishes and
-saves its cache; only the newest pending run waits behind it. This avoids losing
-an almost-complete engine build each time another fix is pushed.
+CI runs on Blacksmith runners: 32 vCPU Linux, 16 vCPU Windows Server 2025, and
+12 vCPU Apple Silicon macOS 26. The Blacksmith GitHub app must stay installed on
+the organization, or jobs wait in the queue without starting.
+
+The workflow runs for pull requests, pushes to `main`, and manual dispatch. A
+branch without a pull request is not built on push; open a pull request or start
+the workflow manually. This keeps a branch with an open pull request from building
+every commit twice.
+
+Linux compiler caches live on a Blacksmith sticky disk in `.ci-cache/`. It is
+shared by all branches and pull requests, and mounting it copies no archive. With
+branch protection enabled, only default-branch runs commit changes to that disk.
+Windows and macOS restore their SCons and ccache directories through Blacksmith's
+colocated Actions cache. Cache keys omit the branch name, so a pull request reuses
+its previous run and the base branch's entries. Blacksmith scopes those entries by
+branch unless that protection is turned off in the Blacksmith dashboard.
+
+Runs for one pull request or branch share a concurrency group. The running build
+finishes and saves its cache; only the newest pending run waits behind it. This
+avoids losing an almost-complete engine build each time another fix is pushed.
 
 To regenerate desktop artwork after editing `logo.svg`, install Pillow in the
 build virtual environment and run `.venv/bin/python tools/generate_branding.py`.

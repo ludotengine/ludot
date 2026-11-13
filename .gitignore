@@ -8,5 +8,6 @@ __pycache__/
 *.egg-info/
 
 /dist/
+/.ci-cache/
 /.scons_cache/
 /.ccache/
