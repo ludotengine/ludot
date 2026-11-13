@@ -218,6 +218,11 @@ checks its stdio protocol from an unrelated project directory, and uploads a
 separate archive for each platform. A configured workflow is not evidence that
 every platform has passed. Consult the workflow runs for actual results.
 
+CI uploads build artifacts after engine compilation and headless regressions, so
+an artifact-storage failure cannot prevent those checks from running. Uploaded
+editor and LSP artifacts are retained for seven days. Upload failures still fail
+the job; a storage-quota error does not count as a successful build delivery.
+
 Pushes to one branch share a concurrency group. The running build finishes and
 saves its cache; only the newest pending run waits behind it. This avoids losing
 an almost-complete engine build each time another fix is pushed.
