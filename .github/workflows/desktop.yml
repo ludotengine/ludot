@@ -1,6 +1,9 @@
 name: Desktop builds
+# Pull requests build their head once. Pushes build only on main, so a branch with
+# an open pull request is not compiled twice for the same commit.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -8,11 +11,11 @@ permissions:
 # Finish the running build so it can save its object cache. GitHub keeps only
 # the newest pending run for this branch while it waits for that cache.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 env:
-  CACHE_DIRECTORY: ${{ github.workspace }}/.scons_cache/
-  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CACHE_DIRECTORY: ${{ github.workspace }}/.ci-cache/scons/
+  CCACHE_DIR: ${{ github.workspace }}/.ci-cache/ccache
   CCACHE_MAXSIZE: 500M
   SCCACHE_GHA_ENABLED: 'true'
 jobs:
@@ -21,14 +24,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          # Blacksmith runners. Linux keeps its compiler caches on a sticky disk, so
+          # nothing is downloaded or uploaded. The other platforms use Blacksmith's
+          # colocated Actions cache.
+          - os: blacksmith-32vcpu-ubuntu-2404
             platform: linuxbsd
             sconsflags: linker=mold scu_build=yes
-          - os: windows-2022
+          - os: blacksmith-16vcpu-windows-2025
             platform: windows
             sconsflags: ''
           # Godot 4.7 requires Apple Clang 16 or newer.
-          - os: macos-26
+          - os: blacksmith-12vcpu-macos-26
             platform: macos
             sconsflags: generate_bundle=yes
     runs-on: ${{ matrix.os }}
@@ -54,8 +60,16 @@ jobs:
         if: runner.os == 'macOS'
         run: bash engine/misc/scripts/install_vulkan_sdk_macos.sh
       - run: python -m pip install scons==4.11.1
+      # Shared by every branch and pull request. Only the default branch commits
+      # changes when branch protection is on; other runs still read the warm cache.
+      - name: Mount compiler caches
+        if: runner.os == 'Linux'
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-linuxbsd-compiler-caches
+          path: ${{ github.workspace }}/.ci-cache
       - name: Restore language compiler cache
-        if: runner.os != 'Windows'
+        if: runner.os == 'macOS'
         uses: actions/cache/restore@v6
         with:
           path: ${{ env.CCACHE_DIR }}
@@ -83,7 +97,7 @@ jobs:
             ccache --show-stats
           fi
       - name: Save language compiler cache
-        if: always() && runner.os != 'Windows'
+        if: always() && runner.os == 'macOS'
         uses: actions/cache/save@v6
         with:
           path: ${{ env.CCACHE_DIR }}
@@ -96,14 +110,16 @@ jobs:
           python tools/package_lsp.py
       # SCons caches objects by content, so only files that changed since the cached
       # build are recompiled.
+      # Keys omit the branch: cache scoping already limits which runs can read an
+      # entry, and a pull request's merge ref never matched a branch-named key.
       - name: Restore SCons cache
+        if: runner.os != 'Linux'
         uses: actions/cache/restore@v6
         with:
           path: ${{ env.CACHE_DIRECTORY }}
-          key: scons-${{ matrix.platform }}-${{ github.ref_name }}-${{ github.sha }}
+          key: scons-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: |
-            scons-${{ matrix.platform }}-${{ github.ref_name }}-
-            scons-${{ matrix.platform }}-main-
+            scons-${{ matrix.platform }}-
       - name: Store cache timestamp
         shell: bash
         run: echo "CACHE_TIMESTAMP=$(date +%s)" >> "$GITHUB_ENV"
@@ -136,16 +152,11 @@ jobs:
         working-directory: engine
         run: python misc/scripts/purge_cache.py ${{ env.CACHE_TIMESTAMP }} "${{ env.CACHE_DIRECTORY }}"
       - name: Save SCons cache
-        if: always() && steps.build.outcome != 'skipped'
+        if: always() && steps.build.outcome != 'skipped' && runner.os != 'Linux'
         uses: actions/cache/save@v6
         with:
           path: ${{ env.CACHE_DIRECTORY }}
-          key: scons-${{ matrix.platform }}-${{ github.ref_name }}-${{ github.sha }}
-      - name: Install StyLua
-        uses: JohnnyMorganz/stylua-action@v4
-        with:
-          version: v2.6.0
-          args: --version
+          key: scons-${{ matrix.platform }}-${{ github.sha }}
       - name: Bundle StyLua
         shell: python
         run: |
@@ -154,15 +165,19 @@ jobs:
           if sys.platform == "darwin":
               directory /= "ludot_macos_editor.app/Contents/MacOS"
           suffix = ".exe" if sys.platform == "win32" else ""
-          shutil.copy2(shutil.which("stylua"), directory / ("ludot.stylua" + suffix))
-          shutil.copy2("thirdparty/stylua/LICENSE.md", directory / "ludot.stylua.LICENSE.md")
           platform = {"linux": "linux", "darwin": "macos", "win32": "windows"}[sys.platform]
-          url = f"https://github.com/Kampfkarren/selene/releases/download/0.32.0/selene-0.32.0-{platform}.zip"
-          archive = zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(url).read()))
-          binary = next(name for name in archive.namelist() if pathlib.PurePosixPath(name).name == "selene" + suffix)
-          destination = directory / ("ludot.selene" + suffix)
-          destination.write_bytes(archive.read(binary))
-          destination.chmod(0o755)
+          stylua_target = {"linux": "linux-x86_64", "darwin": "macos-aarch64", "win32": "windows-x86_64"}[sys.platform]
+          downloads = {
+              "stylua": f"https://github.com/JohnnyMorganz/StyLua/releases/download/v2.6.0/stylua-{stylua_target}.zip",
+              "selene": f"https://github.com/Kampfkarren/selene/releases/download/0.32.0/selene-0.32.0-{platform}.zip",
+          }
+          for tool, url in downloads.items():
+              archive = zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(url).read()))
+              binary = next(name for name in archive.namelist() if pathlib.PurePosixPath(name).name == tool + suffix)
+              destination = directory / (f"ludot.{tool}" + suffix)
+              destination.write_bytes(archive.read(binary))
+              destination.chmod(0o755)
+          shutil.copy2("thirdparty/stylua/LICENSE.md", directory / "ludot.stylua.LICENSE.md")
           shutil.copy2("thirdparty/selene/LICENSE.md", directory / "ludot.selene.LICENSE.md")
       - name: Native engine, debugger, and export tests
         if: runner.os != 'macOS'
