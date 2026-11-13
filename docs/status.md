@@ -31,7 +31,22 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   checks cover flight, the planet camera, riding along with a moving world, ground
   clearance, pause, and orbit visibility. A 54-second Forward+ capture covers the tour.
 - Vendored Godot 4.7.2-stable and Luau 0.743 source with pinned provenance.
-- Engine version 4.7.2-lu.2, set by the `status` field in `engine/version.py`.
+- Engine version 4.7.2-lu.3, set by the `status` field in `engine/version.py`.
+- One `Enum` global for every exposed, non-editor engine enum, modeled on Roblox's:
+  `Enum.MouseMode.Captured` with `Name`, `Value`, and `EnumType`, plus `fromName`,
+  `fromValue`, `getEnumItems`, and `Enum:getEnums()`. Engine methods and properties
+  return EnumItems for non-bitfield enums and accept items or numbers. Native
+  checking, the standalone LSP, and Inspector exports use `Enum.<Name>` types. The
+  old `Class.Enums` namespaces, global enum tables, and `Class.Enum` annotations are
+  gone. Signal arguments and virtual callback arguments still arrive as numbers.
+- A native `task` library (`spawn`, `defer`, `delay`, `wait`, `cancel`) with one
+  scheduler per VM, stepped from SceneTree's process frame. Engine callbacks start in
+  resumable threads, so `task.wait` works in `_ready`, `_process`, and signal
+  handlers. Waits follow game time, pause, and time scale. Threads of freed objects
+  are dropped, resumed errors print a stack trace, suspended threads keep their code
+  through hot reload, and the debugger lists suspended tasks. The headless task suite
+  and the debugger suite cover these behaviors. Waits always use game time; there is
+  no real-time option.
 - `onready` properties whose initializers can use `self`, such as
   `self:getNode("A/Child/Node")`, and run before `_ready`, base classes first.
   Unannotated onready properties take their initializer's type.
@@ -238,9 +253,9 @@ case domains, and arm reachability, and refines matching enum values.
 Godot Object identity checks support nodes, resources, input events, and registered
 extension classes. Native checking and standalone LSP share their class-name
 validation/refinement logic. Both `isA` and `IsA` work; completion uses the selected
-project style. Native class, builtin, and global enum metadata now includes typed
-constant names and enum namespaces. Inspector exports retain the underlying
-numeric/string values and display enum member names.
+project style. Engine enums now live under the `Enum` global described in the
+language guide. Inspector exports retain the underlying numeric/string values and
+display enum member names.
 
 The editor preserves unsupported extended syntax through StyLua and supplies a
 line-preserving view to Selene. Native match warnings support the editor's Selene

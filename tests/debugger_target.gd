@@ -6,6 +6,8 @@ var frames := 0
 func _init() -> void:
     probe = Node.new()
     probe.set_script(load("res://DebuggerProbe.luau"))
+    root.add_child.call_deferred(probe)
+    probe.call("startTasks")
     var result = probe.call("run", 5.0)
     var coroutine_result = probe.call("runCoroutine")
     if result != 12.0 or coroutine_result != 15.0:
@@ -24,9 +26,10 @@ func _init() -> void:
     EngineDebugger.profiler_enable("servers", true, [16, true])
 
 func _process(_delta: float) -> bool:
-    probe.call("profiled")
     frames += 1
-    if frames < 30:
-        return false
-    probe.free()
-    return true
+    if frames > 30:
+        return true
+    probe.call("profiled")
+    if frames == 30:
+        probe.queue_free()
+    return false

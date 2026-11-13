@@ -967,7 +967,7 @@ SubtypingResult Subtyping::isCovariantWith(SubtypingEnvironment& env, TypeId sub
         result = isCovariantWith(env, p, scope);
     else if (auto p = get2<SingletonType, SingletonType>(subTy, superTy))
         result = isCovariantWith(env, p, scope);
-    else if (auto p = get2<ExternType, PrimitiveType>(subTy, superTy); p && p.first->enumInfo)
+    else if (auto p = get2<ExternType, PrimitiveType>(subTy, superTy); p && p.first->enumInfo && !p.first->enumInfo->isObject)
     {
         result.isSubtype = p.second->type == (p.first->enumInfo->isString ? PrimitiveType::String : PrimitiveType::Number);
     }

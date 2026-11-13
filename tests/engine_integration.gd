@@ -118,7 +118,7 @@ func _init() -> void:
     modified = modified.replace("function damage", """function nativeFeatures(): boolean
         assert(Vector2.Zero == Vector2(0, 0))
         assert(Color.fromHsv(0, 1, 1).R == 1)
-        assert(Node.ProcessModeInherit == 0)
+        assert(Node.ProcessModeInherit == Enum.NodeProcessMode.Inherit and Node.ProcessModeInherit.Value == 0)
         assert(FileAccess.fileExists("res://Player.luau"))
         local values = Array({10, 20})
         values[1] = 7

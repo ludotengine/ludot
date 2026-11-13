@@ -5,6 +5,7 @@
 #include "Luau/TypeArena.h"
 #include "Luau/TypeInfer.h"
 #include "Luau/TypeChecker2.h"
+#include "Luau/GlobalTypes.h"
 #include <set>
 
 namespace Luau
@@ -127,5 +128,27 @@ void addLudotIsA(TypeArena& arena, const BuiltinTypes& builtins, TypeId object, 
             property.tags.push_back("LudotHiddenAlias");
         instance->props[name] = property;
     }
+}
+void addLudotTaskLibrary(GlobalTypes& globals)
+{
+    auto& arena = globals.globalTypes;
+    const BuiltinTypes& builtins = *globals.builtinTypes;
+    TypePackId anyPack = arena.addTypePack(VariadicTypePack{builtins.anyType});
+    TypeId callback = arena.addType(FunctionType{anyPack, anyPack});
+    TypeId target = arena.addType(UnionType{{callback, builtins.threadType}});
+    auto function = [&](std::vector<TypeId> arguments, bool variadic, TypePackId results)
+    {
+        return Property::readonly(arena.addType(FunctionType{arena.addTypePack(arguments, variadic ? std::optional<TypePackId>{anyPack} : std::nullopt), results}));
+    };
+    TypePackId thread = arena.addTypePack({builtins.threadType});
+    TableType::Props props;
+    props["spawn"] = function({target}, true, thread);
+    props["defer"] = function({target}, true, thread);
+    props["delay"] = function({builtins.optionalNumberType, target}, true, thread);
+    props["wait"] = function({builtins.optionalNumberType}, false, arena.addTypePack({builtins.numberType}));
+    props["cancel"] = function({builtins.threadType}, false, builtins.emptyTypePack);
+    TypeId library = arena.addType(TableType{props, std::nullopt, TypeLevel{}, globals.globalScope.get(), TableState::Sealed});
+    getMutable<TableType>(library)->name = "task";
+    globals.globalScope->bindings[globals.globalNames.names->getOrAdd("task")] = Binding{library, Location()};
 }
 } // namespace Luau

@@ -7,6 +7,8 @@ namespace {
 class LuauCallable : public CallableCustom {
     int reference;
     uint64_t generation;
+    // The object whose code created this callable. Its tasks end when it is freed.
+    ObjectID owner;
     const void *identity;
     static bool equal(const CallableCustom *p_a, const CallableCustom *p_b) {
         const auto a = static_cast<const LuauCallable *>(p_a);
@@ -24,6 +26,7 @@ public:
         reference = lua_ref(p_state, p_index);
         generation = LuauLanguage::get_singleton()->generation;
         identity = lua_topointer(p_state, p_index);
+        owner = LuauLanguage::get_singleton()->current_task_owner();
     }
     ~LuauCallable() {
         auto language = LuauLanguage::get_singleton();
@@ -45,21 +48,19 @@ public:
         if (language == nullptr) { r_error.error = Callable::CallError::CALL_ERROR_INSTANCE_IS_NULL; return; }
         MutexLock lock(language->mutex);
         if (!is_valid()) { r_error.error = Callable::CallError::CALL_ERROR_INSTANCE_IS_NULL; return; }
-        lua_State *L = language->active_state != nullptr ? language->active_state : language->state;
+        lua_State *L = language->state;
         const int top = lua_gettop(L);
         lua_getref(L, reference);
         for (int i = 0; i < p_count; ++i) LuauLanguage::push_variant(L, *p_args[i]);
-        const int status = lua_pcall(L, p_count, 1, 0);
-        // Close profiled frames that an error unwound without reaching RETURN.
-        if (language->profiling) language->profile_unwind(L, lua_stackdepth(L) + 1);
+        // Signal handlers run in a resumable thread, so they can call task.wait.
+        const int status = language->invoke(p_count, owner) ? LUA_OK : LUA_ERRRUN;
         if (status == LUA_OK && LuauLanguage::try_variant(L, -1, r_result)) {
             r_error.error = Callable::CallError::CALL_OK;
         } else if (status == LUA_OK) {
             ERR_PRINT(language->last_error);
             r_error.error = Callable::CallError::CALL_ERROR_INVALID_ARGUMENT;
         } else {
-            language->last_error = String::utf8(lua_tostring(L, -1));
-            ERR_PRINT(language->last_error);
+            // invoke already reported the error with its stack trace.
             r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
         }
         lua_settop(L, top);

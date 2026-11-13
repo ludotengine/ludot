@@ -261,15 +261,62 @@ assert(count == 2)
 
     def test_godot_global_and_builtin_enum_types(self):
         source = """--!strict
-const key: Key = Key.KEY_W
-const button: MouseButton = MouseButton.MOUSE_BUTTON_LEFT
-const axis: Vector3.Axis = Vector3.AXIS_Z
-const kind: Variant.Type = Variant.Type.TYPE_INT
-const converted: Vector3.Axis? = Vector3.Enums.Axis.from(2)
-return { key, button, axis, kind, converted }
+const key: Enum.Key = Enum.Key.W
+const button: Enum.MouseButton = Enum.MouseButton.Left
+const axis: Enum.Axis = Enum.Axis.Z
+const kind: Enum.VariantType = Enum.VariantType.Int
+const converted: Enum.Axis? = Enum.Axis:fromValue(2)
+const named: Enum.MouseMode? = Enum.MouseMode:fromName("Captured")
+const items: { Enum.MouseMode } = Enum.MouseMode:getEnumItems()
+const enums: { Enum } = Enum:getEnums()
+const item: EnumItem = Enum.MouseMode.Captured
+const name: string = Enum.MouseMode.Captured.Name
+const value: number = Enum.MouseMode.Captured.Value
+const same: Enum.MouseMode = Enum.MouseMode.Captured.EnumType.Captured
+const legacy: Enum.MouseMode = Input.MOUSE_MODE_CAPTURED
+Input:setMouseMode(Enum.MouseMode.Captured)
+const current: Enum.MouseMode = Input:getMouseMode()
+const process: Enum.NodeProcessMode = Node.new().ProcessMode
+const text = match current with
+	case Enum.MouseMode.Visible then "visible"
+	case Enum.MouseMode.Hidden then "hidden"
+	case Enum.MouseMode.Captured then "captured"
+	case Enum.MouseMode.Confined then "confined"
+	case Enum.MouseMode.ConfinedHidden then "confined hidden"
+	case Enum.MouseMode.Max then "max"
+end
+return { key, button, axis, kind, converted, named, items, enums, item, name, value, same, legacy, process, text }
 """
         flags = ('--ludot-api=' + str(ROOT / 'types/engine.api'),)
         self.assert_passes(self.run_source(source, 'luau-analyze', flags))
+        for wrong, message in (
+            ('enum MyEnum = { Yes, No }\nreturn Enum.MyEnum', "MyEnum"),
+            ('return Enum.MouseMode.Nope', "Nope"),
+            ('const number: number = Enum.MouseMode.Captured\nreturn number', "number"),
+            ('const old: Input.MouseMode = Input.MOUSE_MODE_CAPTURED\nreturn old', "Input.MouseMode"),
+            ('return Key.KEY_W', "Key"),
+            ('const mode: Enum.MouseMode = Enum.Key.W\nreturn mode', "Enum.Key"),
+        ):
+            result = self.run_source('--!strict\n' + wrong, 'luau-analyze', flags)
+            self.assertNotEqual(result.returncode, 0, wrong)
+            self.assertIn(message, result.stderr, wrong)
+
+    def test_task_library_types(self):
+        source = """--!strict
+const worker: thread = task.spawn(function(value: number) print(value) end, 1)
+const deferred: thread = task.defer(worker, "resumed")
+const delayed: thread = task.delay(0.5, function() end)
+const later: thread = task.delay(nil, worker)
+const elapsed: number = task.wait(0.1)
+const frame: number = task.wait()
+task.cancel(delayed)
+return { worker, deferred, later, elapsed, frame }
+"""
+        flags = ('--ludot-api=' + str(ROOT / 'types/engine.api'),)
+        self.assert_passes(self.run_source(source, 'luau-analyze', flags))
+        for wrong in ('const text: string = task.wait()\nreturn text', 'task.cancel(5)', 'task.spawn(5)', 'task.delay("soon", function() end)'):
+            result = self.run_source('--!strict\n' + wrong, 'luau-analyze', flags)
+            self.assertNotEqual(result.returncode, 0, wrong)
 
     def test_godot_is_a_all_objects_and_invalid_names(self):
         source = '''--!strict
@@ -290,7 +337,7 @@ return { read, move }
         source = """--!strict
 const function read(event: InputEventMouseMotion | InputEventKey): number
 	if event:isA("InputEventMouseMotion") then return event.Relative.X end
-	return event.Keycode
+	return event.Keycode.Value
 end
 return read
 """

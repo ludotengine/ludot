@@ -250,7 +250,7 @@ class LspTests(unittest.TestCase):
 
     def test_native_enum_constants_and_checked_conversion(self):
         self.server.api = ROOT / 'types/engine.api'
-        uri = self.open('--!strict\nconst mode: Input.MouseMode = Input.MOUSE_MODE_CAPTURED\nInput.MouseMode = mode\nreturn mode')
+        uri = self.open('--!strict\nconst mode: Enum.MouseMode = Input.MOUSE_MODE_CAPTURED\nInput:setMouseMode(Enum.MouseMode.Captured)\nreturn mode')
         checked, _ = self.server.analyze(uri)
         self.assertEqual(checked['diagnostics'], [])
         self.server.documents[uri] = {'version': 2, 'text': '--!strict\nreturn Input.'}
@@ -258,6 +258,16 @@ class LspTests(unittest.TestCase):
         labels = [entry['label'] for entry in completions]
         self.assertIn('MOUSE_MODE_CAPTURED', labels)
         self.assertNotIn('MouseModeCaptured', labels)
+        self.server.documents[uri] = {'version': 3, 'text': '--!strict\nreturn Enum.MouseMode.'}
+        completions = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 22}}})
+        labels = [entry['label'] for entry in completions]
+        self.assertIn('Captured', labels)
+        self.assertIn('fromName', labels)
+        self.server.documents[uri] = {'version': 4, 'text': '--!strict\nreturn task.'}
+        completions = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 12}}})
+        labels = [entry['label'] for entry in completions]
+        for name in ('spawn', 'defer', 'delay', 'wait', 'cancel'):
+            self.assertIn(name, labels)
 
     def test_match_warning_severity_and_selene_ignores(self):
         text = '--!strict\nenum Action = { Join, Chat }\nconst action: Action = Action.Join\nmatch action with case Action.Join then print(1) end'

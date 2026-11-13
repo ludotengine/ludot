@@ -21,9 +21,12 @@ class FeatureProbe extends Node = {
 	export State: states.State = states.State.Running
 	export Text: states.Text = states.Text.First
 	export Local: Local = Local.Second
-	export Mode: Input.MouseMode = Input.MOUSE_MODE_CAPTURED
-	export Key: Key = Key.KEY_W
-	export Axis: Vector3.Axis = Vector3.AXIS_Z
+	export Mode: Enum.MouseMode = Enum.MouseMode.Captured
+	export Key: Enum.Key = Enum.Key.W
+	export Axis: Enum.Axis = Enum.Axis.Z
+	function modeName(): string
+		return self.Mode.Name
+	end
 	function check(event: InputEvent): boolean
 		assert(pipelineResult ~= nil and pipelineResult.Name == "near")
 		assert(self:IsA("FeatureProbe") and self:isA("Node") and self:isA("Object"))
@@ -35,13 +38,34 @@ class FeatureProbe extends Node = {
 			error("Mouse motion did not narrow")
 		end
 		assert(not event:IsA("Node"))
-		assert(Input.MOUSE_MODE_CAPTURED == 2)
-		assert(Key.KEY_W == 87 and MouseButton.MOUSE_BUTTON_LEFT == 1)
-		assert(Variant.Type.TYPE_INT == 2 and Vector3.AXIS_Z == 2)
-		assert(Vector3.Enums.Axis.from(2) == Vector3.AXIS_Z)
-		assert(Input.Enums.MouseMode.from(2) == Input.MOUSE_MODE_CAPTURED)
-		assert(Input.Enums.MouseMode.from(999999) == nil)
-		assert(Control.Enums.LayoutPreset.PRESET_TOP_LEFT == Control.PRESET_TOP_LEFT)
+		assert(Input.MOUSE_MODE_CAPTURED == Enum.MouseMode.Captured)
+		assert(Enum.Key.W.Value == 87 and Enum.MouseButton.Left.Value == 1)
+		assert(Enum.VariantType.Int.Value == 2 and Vector3.AXIS_Z == 2)
+		assert(Enum.Axis:fromValue(2) == Enum.Axis.Z)
+		assert(Enum.MouseMode:fromValue(2) == Input.MOUSE_MODE_CAPTURED)
+		assert(Enum.MouseMode:fromValue(999999) == nil)
+		assert(Enum.MouseMode:fromName("Captured") == Enum.MouseMode.Captured and Enum.MouseMode:fromName("Nope") == nil)
+		assert(Enum.LayoutPreset.TopLeft == Control.PRESET_TOP_LEFT)
+		assert(Enum.MouseMode.Captured.EnumType == Enum.MouseMode and Enum.MouseMode.Captured.EnumType.Captured == Enum.MouseMode.Captured)
+		assert(Enum.MouseMode.Captured.Name == "Captured" and Enum.MouseMode.Captured.Value == 2)
+		assert(#Enum.MouseMode:getEnumItems() == 6 and #Enum:getEnums() > 500)
+		assert(typeof(Enum.MouseMode.Captured) == "EnumItem" and typeof(Enum.MouseMode) == "Enum")
+		assert(tostring(Enum.MouseMode.Captured) == "Enum.MouseMode.Captured" and tostring(Enum.MouseMode) == "Enum.MouseMode")
+		assert(not pcall(function() return (Enum :: any).Local end))
+		assert(not pcall(function() return (Enum.MouseMode :: any).Nope end))
+		assert(self.Mode == Enum.MouseMode.Captured)
+		assert(self.ProcessMode == Enum.NodeProcessMode.Inherit and self:getProcessMode() == Enum.NodeProcessMode.Inherit)
+		const light = OmniLight3D.new()
+		light:setParam(Enum.Light3DParam.Energy, 3)
+		assert(light:getParam(Enum.Light3DParam.Energy) == 3)
+		light.ShadowEnabled = true
+		light:free()
+		local seen = 0
+		for name, item in Enum.MouseMode do
+			assert(Enum.MouseMode[name] == item)
+			seen += 1
+		end
+		assert(seen == 6)
 		const name: string = self?:getParent()?.Name ?? "No parent"
 		assert(name == "No parent")
 		return true
@@ -61,7 +85,7 @@ func _initialize() -> void:
 	if not errors.is_empty():
 		fail(str(errors))
 		return
-	var expected = {"State": [1, 7], "Text": ["hello, world", "second: value"], "Local": [1, 9]}
+	var expected = {"State": [1, 7], "Text": ["hello, world", "second: value"], "Local": [1, 9], "Mode": [0, 1, 2, 3, 4, 5]}
 	for name in expected:
 		var metadata = script.get_enum_property(name)
 		if metadata.get("values") != expected[name]:
@@ -85,6 +109,11 @@ func _initialize() -> void:
 		if property.name == "Text" and property.type != TYPE_STRING:
 			fail("String enum has the wrong Inspector type")
 			return
+	node.set("Mode", 3)
+	if node.call("modeName") != "Confined" or node.get("Mode") != 3:
+		fail("An Inspector value did not become the matching EnumItem")
+		return
+	node.set("Mode", 2)
 	node.set("State", 1)
 	node.set("Text", "second: value")
 	var packed = PackedScene.new()

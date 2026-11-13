@@ -2,6 +2,7 @@
 #include "Luau/LudotEnums.h"
 #include "Luau/Ast.h"
 #include "Luau/Scope.h"
+#include "Luau/GlobalTypes.h"
 #include <algorithm>
 
 namespace Luau
@@ -9,6 +10,8 @@ namespace Luau
 std::optional<PrimitiveType::Type> enumUnderlyingType(TypeId type)
 {
     type = follow(type);
+    if (auto enumeration = get<ExternType>(type); enumeration && enumeration->enumInfo && enumeration->enumInfo->isObject)
+        return std::nullopt;
     if (auto enumeration = get<ExternType>(type); enumeration && enumeration->enumInfo)
         return enumeration->enumInfo->isString ? PrimitiveType::String : PrimitiveType::Number;
     if (auto unionType = get<UnionType>(type))
@@ -155,5 +158,96 @@ EnumTypes makeEnumTypes(
     for (TypeId member : members)
         getMutable<ExternType>(member)->metatable = operations;
     return {domain, namespaceType};
+}
+EngineEnumTypes addEngineEnumTypes(GlobalTypes& globals, const EngineEnumCatalog& catalog, ApiCase methodCase, ApiCase propertyCase)
+{
+    auto& arena = globals.globalTypes;
+    auto scope = globals.globalScope;
+    const BuiltinTypes& builtins = *globals.builtinTypes;
+    auto external = [&](const std::string& name, std::optional<TypeId> parent)
+    {
+        return arena.addType(ExternType{name, {}, parent, std::nullopt, {}, nullptr, "ludot", std::nullopt});
+    };
+    auto array = [&](TypeId element)
+    {
+        return arena.addType(TableType{TableType::Props{}, TableIndexer{builtins.numberType, element}, TypeLevel{}, scope.get(), TableState::Sealed});
+    };
+    auto method = [&](TypeId self, std::vector<TypeId> arguments, TypeId result)
+    {
+        arguments.insert(arguments.begin(), self);
+        TypeId fn = arena.addType(FunctionType{arena.addTypePack(arguments), arena.addTypePack({result})});
+        getMutable<FunctionType>(fn)->hasSelf = true;
+        return Property::readonly(fn);
+    };
+    auto optional = [&](TypeId type)
+    {
+        return arena.addType(UnionType{{type, builtins.nilType}});
+    };
+    const std::string name = engineApiName("name", propertyCase);
+    const std::string value = engineApiName("value", propertyCase);
+    const std::string enumType = engineApiName("enum_type", propertyCase);
+    const std::string getEnumItems = engineApiName("get_enum_items", methodCase);
+    const std::string fromName = engineApiName("from_name", methodCase);
+    const std::string fromValue = engineApiName("from_value", methodCase);
+
+    EngineEnumTypes result;
+    result.item = external("EnumItem", std::nullopt);
+    result.enumeration = external("Enum", std::nullopt);
+    auto item = getMutable<ExternType>(result.item);
+    item->props[name] = Property::readonly(builtins.stringType);
+    item->props[value] = Property::readonly(builtins.numberType);
+    item->props[enumType] = Property::readonly(result.enumeration);
+    auto base = getMutable<ExternType>(result.enumeration);
+    base->props[getEnumItems] = method(result.enumeration, {}, array(result.item));
+    base->props[fromName] = method(result.enumeration, {builtins.stringType}, optional(result.item));
+    base->props[fromValue] = method(result.enumeration, {builtins.numberType}, optional(result.item));
+
+    TypeId global = external("Enums", std::nullopt);
+    getMutable<ExternType>(global)->props[engineApiName("get_enums", methodCase)] = method(global, {}, array(result.enumeration));
+    for (const EngineEnum& enumeration : catalog.enums)
+    {
+        auto info = std::make_shared<EnumTypeInfo>();
+        info->name = "Enum." + enumeration.name;
+        info->isObject = true;
+        for (const EngineEnumItem& member : enumeration.items)
+            info->members.push_back({member.name, member.value, {}, {}});
+        TypeId root = external(info->name, result.item);
+        getMutable<ExternType>(root)->enumInfo = info;
+        TypeId namespaceType = external(enumeration.name, result.enumeration);
+        getMutable<ExternType>(root)->props[enumType] = Property::readonly(namespaceType);
+        std::vector<TypeId> members;
+        auto space = getMutable<ExternType>(namespaceType);
+        for (size_t i = 0; i < enumeration.items.size(); ++i)
+        {
+            TypeId member = nullptr;
+            for (size_t j = 0; j < i; ++j)
+                if (enumeration.items[j].value == enumeration.items[i].value)
+                    member = members[j];
+            if (!member)
+            {
+                member = external(info->name + "." + enumeration.items[i].name, root);
+                getMutable<ExternType>(member)->enumInfo = info;
+                getMutable<ExternType>(member)->enumMember = i;
+            }
+            members.push_back(member);
+            space->props[enumeration.items[i].name] = Property::readonly(member);
+        }
+        space->props[getEnumItems] = method(namespaceType, {}, array(root));
+        space->props[fromName] = method(namespaceType, {builtins.stringType}, optional(root));
+        space->props[fromValue] = method(namespaceType, {builtins.numberType}, optional(root));
+        TypeId iterator = arena.addType(
+            FunctionType{arena.addTypePack({builtins.anyType, builtins.anyType}), arena.addTypePack({builtins.optionalStringType, root})}
+        );
+        TypeId iter = arena.addType(FunctionType{arena.addTypePack({namespaceType}), arena.addTypePack({iterator, builtins.nilType, builtins.nilType})});
+        space->metatable = arena.addType(TableType{{{"__iter", Property::readonly(iter)}}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
+        getMutable<ExternType>(global)->props[enumeration.name] = Property::readonly(namespaceType);
+        scope->importedTypeBindings["Enum"][enumeration.name] = TypeFun{{}, {}, root};
+        result.roots.push_back(root);
+        result.members.push_back(std::move(members));
+    }
+    scope->exportedTypeBindings["EnumItem"] = TypeFun{{}, {}, result.item};
+    scope->exportedTypeBindings["Enum"] = TypeFun{{}, {}, result.enumeration};
+    scope->bindings[globals.globalNames.names->getOrAdd("Enum")] = Binding{global, Location()};
+    return result;
 }
 } // namespace Luau

@@ -67,6 +67,7 @@ func run() -> void:
     var has_health := false
     var has_amount := false
     var has_global := false
+    var has_tasks := false
     for index in count:
         var variable := await receive("stack_frame_var")
         if failed: return
@@ -74,8 +75,20 @@ func run() -> void:
         has_health = has_health or (value[0] == "Health" and value[1] == 1 and value[3] == 7.0)
         has_amount = has_amount or (value[0] == "amount" and value[1] == 0 and value[3] == 5.0)
         has_global = has_global or value[1] == 2
+        if value[0] == "[suspended tasks]" and value[1] == 2:
+            var listed: Array = value[3]
+            var kinds := []
+            for item in listed:
+                kinds.append(item.get("kind"))
+                if not str(item.get("location")).contains("DebuggerProbe.luau") and item.get("kind") == "wait":
+                    fail("A waiting task does not report where it is suspended: " + str(item))
+                    return
+            has_tasks = kinds.has("wait") and kinds.has("delay")
     if not has_health or not has_amount or not has_global:
         fail("Luau debugger members, locals or globals are missing")
+        return
+    if not has_tasks:
+        fail("Suspended tasks are missing from the debugger globals")
         return
     send("evaluate", ["if amount == 5 then self.Health + amount else 0", 0])
     var evaluated := await receive("evaluation_return")
@@ -167,7 +180,8 @@ func run() -> void:
     var profiled_nested := false
     var profiled_coroutine := false
     var profiled_pcall := false
-    while not profiled_luau or not profiled_native or not profiled_nested or not profiled_coroutine or not profiled_pcall:
+    var profiled_task := false
+    while not profiled_luau or not profiled_native or not profiled_nested or not profiled_coroutine or not profiled_pcall or not profiled_task:
         var signature := await receive("servers:function_signature")
         if failed: return
         var name := str(signature[2][0])
@@ -179,5 +193,6 @@ func run() -> void:
         profiled_coroutine = profiled_coroutine or (name.begins_with("res://DebuggerProbe.luau::") and name.ends_with("::worker"))
         profiled_nested = profiled_nested or (name.begins_with("res://DebuggerProbe.luau::") and name.ends_with("::profiledHelper"))
         profiled_native = profiled_native or name == "res://DebuggerProbe.luau::0::Node.getChildCount"
+        profiled_task = profiled_task or (name.begins_with("res://DebuggerProbe.luau::") and name.ends_with("::taskWorker"))
     print("LUDOT_DEBUGGER_TESTS_PASSED")
     quit()

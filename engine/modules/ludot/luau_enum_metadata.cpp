@@ -32,56 +32,27 @@ Dictionary resolve(Luau::AstStatBlock *root, const String &prefix, const String 
 	seen.insert(key);
 	Declarations declarations;
 	root->visit(&declarations);
-	const String global_name = prefix.is_empty() ? name : prefix + "." + name;
-	PackedStringArray global_labels;
-	Array global_values;
-	for (int i = 0; i < CoreConstants::get_global_constant_count(); ++i) {
-		if (String(CoreConstants::get_global_constant_enum(i)) != global_name) {
-			continue;
+	// Engine enums are annotated as Enum.<Name>. Scripts hold EnumItems; scenes store the values.
+	if (prefix == "Enum") {
+		const auto &catalog = ludot_engine_enum_catalog();
+		for (size_t i = 0; i < catalog.enums.size(); ++i) {
+			if (String::utf8(catalog.enums[i].name.c_str()) != name) {
+				continue;
+			}
+			PackedStringArray labels;
+			Array values;
+			for (const auto &item : catalog.enums[i].items) {
+				labels.push_back(String::utf8(item.name.c_str()));
+				values.push_back(int64_t(item.value));
+			}
+			Dictionary result;
+			result["names"] = labels;
+			result["values"] = values;
+			result["string"] = false;
+			result["engine"] = int(i);
+			return result;
 		}
-		global_labels.push_back(CoreConstants::get_global_constant_name(i));
-		global_values.push_back(CoreConstants::get_global_constant_value(i));
-	}
-	if (!global_values.is_empty()) {
-		Dictionary result;
-		result["names"] = global_labels;
-		result["values"] = global_values;
-		result["string"] = false;
-		return result;
-	}
-	for (int i = Variant::VECTOR2; !prefix.is_empty() && i < Variant::VARIANT_MAX; ++i) {
-		const auto kind = Variant::Type(i);
-		if (Variant::get_type_name(kind) != prefix || !Variant::has_enum(kind, name)) {
-			continue;
-		}
-		PackedStringArray labels;
-		Array values;
-		List<StringName> constants;
-		Variant::get_enumerations_for_enum(kind, name, &constants);
-		for (const StringName &constant : constants) {
-			labels.push_back(constant);
-			values.push_back(Variant::get_enum_value(kind, name, constant));
-		}
-		Dictionary result;
-		result["names"] = labels;
-		result["values"] = values;
-		result["string"] = false;
-		return result;
-	}
-	if (!prefix.is_empty() && ClassDB::class_exists(prefix) && ClassDB::has_enum(prefix, name)) {
-		PackedStringArray labels;
-		Array values;
-		List<StringName> constants;
-		ClassDB::get_enum_constants(prefix, name, &constants);
-		for (const StringName &constant : constants) {
-			labels.push_back(constant);
-			values.push_back(ClassDB::get_integer_constant(prefix, constant));
-		}
-		Dictionary result;
-		result["names"] = labels;
-		result["values"] = values;
-		result["string"] = false;
-		return result;
+		return {};
 	}
 	if (prefix.is_empty()) {
 		if (auto alias = declarations.aliases.getptr(name)) {

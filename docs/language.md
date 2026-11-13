@@ -170,16 +170,113 @@ for name, value in Action do
 end
 ```
 
-Native class enums expose Godot's original constant names, such as
-`Input.MOUSE_MODE_CAPTURED` and `Control.PRESET_TOP_LEFT`. Their typed namespaces
-live under `.Enums`, such as `Input.Enums.MouseMode.from(value)`. The annotation
-is `Input.MouseMode`; `Input.MouseMode` in a value expression remains the engine's
-mouse-mode property. This avoids a namespace/property collision. Global Godot
-enums use their own namespaces, such as `Key.KEY_W`, `MouseButton.MOUSE_BUTTON_LEFT`,
-and `Variant.Type.TYPE_INT`. Enum names and constant names are independent of
-project method/property casing. Existing PascalCase constant spellings remain
-compatible; completion favors the original constant names. Native bitfield
+### Engine enums
+
+Every engine enum lives under one global, `Enum`, modeled on Roblox's. Each enum is
+an `Enum` object, and each value is an `EnumItem`:
+
+```lua
+Input:setMouseMode(Enum.MouseMode.Captured)
+print(Enum.MouseMode.Captured) -- Enum.MouseMode.Captured
+print(Enum.MouseMode.Captured.Name) -- Captured
+print(Enum.MouseMode.Captured.Value) -- 2
+print(Enum.MouseMode.Captured.EnumType) -- Enum.MouseMode
+
+print(Enum.MouseMode:fromName("Captured")) -- Enum.MouseMode.Captured, or nil
+print(Enum.MouseMode:fromValue(2)) -- Enum.MouseMode.Captured, or nil
+print(#Enum.MouseMode:getEnumItems()) -- 6
+print(#Enum:getEnums()) -- every engine enum
+
+for name, item in Enum.MouseMode do
+	print(name, item.Value)
+end
+```
+
+`typeof` returns `"EnumItem"` and `"Enum"`. Each item is a single shared value, so
+`==` compares identity, and `Enum.MouseMode.Captured.EnumType.Captured` is the same
+item. Indexing a missing enum or item is an error. User `enum` declarations are not
+part of `Enum`.
+
+Item names drop the words shared by every constant of the enum and use PascalCase:
+`MOUSE_MODE_CONFINED_HIDDEN` becomes `ConfinedHidden`. A name that would start with a
+digit keeps the last shared word, so `KEY_0` is `Enum.Key.Key0`. An enum keeps its
+Godot name when the name is unique, such as `Enum.Key`, `Enum.MouseButton`, and
+`Enum.LayoutPreset`. Same-named enums with the same items are one enum:
+`Input.MouseMode` and `DisplayServer.MouseMode` are both `Enum.MouseMode`, and
+`Control`, `Input`, and `DisplayServer` share `Enum.CursorShape`. Different enums with
+the same name take their class as a prefix, such as `Enum.Light3DParam`,
+`Enum.NodeProcessMode`, and `Enum.VariantType`. Editor-only enums are left out, so
+editor and exported builds see the same names.
+
+Engine methods and properties that take an enum accept an `EnumItem` or its number.
+Those that return a non-bitfield enum return the `EnumItem`, such as
+`Input:getMouseMode()` and `node.ProcessMode`. A value with no matching item, such as a
+key code with modifier bits, stays a number. Bitfield enums, such as
+`Enum.MouseButtonMask`, return numbers, because their values combine. Use `.Value`
+with `bit32` to combine items.
+
+Annotate engine enum types as `Enum.<Name>`, such as `Enum.MouseMode`. `EnumItem`
+and `Enum` are the general types. Engine methods, properties, `fromName`, and
+`getEnumItems` are typed with the specific enum, and matches over engine enums check
+exhaustiveness. An `export` field typed `Enum.<Name>` shows a dropdown and stores the
+number in scenes.
+
+Class enum constants keep Godot's original names, such as
+`Input.MOUSE_MODE_CAPTURED`. Non-bitfield ones are the matching `EnumItem`, so
+`Input.MOUSE_MODE_CAPTURED == Enum.MouseMode.Captured`. Bitfield constants, such as
+`Control.SIZE_EXPAND_FILL`, and builtin value type constants, such as
+`Vector3.AXIS_Z`, stay numbers. The class enum namespaces (`Input.Enums.MouseMode`),
+the global enum tables (`Key.KEY_W`, `MouseButton`, `Variant.Type`), and the
+`Input.MouseMode` style annotations are replaced by `Enum`. Method names follow the
+project method casing and `Name`, `Value`, and `EnumType` follow the property
+casing. Enum and item names do not change with casing. Native bitfield
 parameters/properties continue to accept numeric masks.
+
+## Tasks
+
+The `task` library schedules threads, modeled on Roblox's:
+
+| Function | Behavior |
+| --- | --- |
+| `task.spawn(fnOrThread, ...)` | Runs it now in a new thread, or resumes the given thread, and returns the thread. |
+| `task.defer(fnOrThread, ...)` | Same, but runs it after the current engine callback returns, later in the same frame. |
+| `task.delay(seconds, fnOrThread, ...)` | Resumes it after the delay and returns the thread. |
+| `task.wait(seconds?)` | Yields the current thread and returns the time that actually passed. With no argument, waits one frame. |
+| `task.cancel(thread)` | Stops a scheduled or suspended thread. It cannot cancel a running thread. |
+
+```lua
+class Door extends Node3D = {
+	function _ready()
+		task.wait(1)
+		self:open()
+		task.delay(5, function()
+			self:close()
+		end)
+	end
+}
+```
+
+Engine callbacks, such as `_ready`, `_process`, and signal handlers, start in a
+resumable thread, so they can call `task.wait` directly. When a callback yields, the
+engine gets `nil` back and the rest of the callback runs when the thread resumes.
+Module top-level code and field initializers cannot yield.
+
+Each VM has one scheduler, stepped at the start of every SceneTree process frame,
+before `_process`. Waits and delays use game time: they follow `Engine.time_scale`
+and stop like a Timer while their node cannot process, such as during a pause. A
+node with `PROCESS_MODE_ALWAYS` keeps waiting through a pause. Threads with no node
+stop during a pause. Deferred threads that defer again run in the next round, for at
+most 64 rounds a frame.
+
+A thread belongs to the object whose callback started it. Threads it spawns, and
+signal handlers connected from its code, belong to the same object. When the object
+is freed, its scheduled threads are dropped, never resumed with a freed `self`. An
+error in a resumed thread is printed with its stack trace, and the debugger breaks on
+it when one is attached.
+
+Starting callbacks in threads costs little. Finished threads are reused, so a plain
+callback allocates nothing. On Linux, a GDScript call to a Luau method measured
+0.74 µs, against 0.69 µs with the previous `pcall` path.
 
 ## Match expressions and statements
 
@@ -419,7 +516,9 @@ Functions created by the previous version keep working after a reload and run th
 new code. That includes callbacks connected to signals and functions stored in
 fields or tables. Functions match by name and position within their enclosing
 function. A function keeps its old code while it is running, or if the variables it
-captures changed. A failed edit leaves the previous version running.
+captures changed. A failed edit leaves the previous version running. A thread
+suspended in `task.wait` is still running, so it finishes with the code it started
+with. Functions it calls later, and new calls, use the new code.
 
 ## Debugging and profiling
 
@@ -435,7 +534,12 @@ into Luau wait for it.
 The editor's scripts profiler shows every Luau function, whether the engine called it
 or another Luau function did, including `pcall` targets, metamethods, and coroutine
 bodies. Coroutine time excludes the time spent suspended. With native call profiling
-on, engine methods called from Luau get their own rows.
+on, engine methods called from Luau get their own rows. Code resumed by the task
+scheduler is profiled the same way, and time spent waiting is excluded.
+
+The debugger's globals include `[suspended tasks]`, which lists every scheduled
+thread with its kind (`wait`, `delay`, or `defer`), where it is suspended, its owner,
+and for waits and delays the duration and elapsed time.
 
 ## Function hover help
 

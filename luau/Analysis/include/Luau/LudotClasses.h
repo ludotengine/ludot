@@ -9,4 +9,7 @@ namespace Luau
 TypeId findLudotClass(const Scope& scope, const std::string& name);
 std::vector<std::string> ludotClassNames(const Scope& scope);
 void addLudotIsA(TypeArena& arena, const BuiltinTypes& builtins, TypeId object, ApiCase methodCase);
+struct GlobalTypes;
+// Declares the engine's task library: spawn, defer, delay, wait, and cancel.
+void addLudotTaskLibrary(GlobalTypes& globals);
 } // namespace Luau

@@ -49,6 +49,13 @@ Variant inspect_value(lua_State *L, int index, int limit, int depth) {
             lua_pop(L, 2);
             if (native) return LuauLanguage::to_variant(L, absolute);
         }
+        // EnumItems and Enum namespaces print as Enum.MouseMode.Captured and Enum.MouseMode.
+        if (lua_userdatatag(L, absolute) != 0) {
+            const char *text = luaL_tolstring(L, absolute, nullptr);
+            const String result = String::utf8(text);
+            lua_pop(L, 1);
+            return result;
+        }
         return String("<userdata>");
     }
     if (kind == LUA_TOBJECT) {
@@ -124,6 +131,7 @@ void LuauLanguage::debug_get_globals(List<String> *r_names, List<Variant> *r_val
         lua_pop(L, 1);
     }
     lua_pop(L, 1);
+    debug_get_tasks(r_names, r_values);
 }
 ScriptInstance *LuauLanguage::debug_get_stack_level_instance(int p_level) {
     MutexLock lock(mutex);

@@ -8,6 +8,7 @@
 #include "Luau/LudotEnums.h"
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 
 inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Luau::ApiCase methodCase = Luau::ApiCase::Camel, Luau::ApiCase propertyCase = Luau::ApiCase::Pascal)
 {
@@ -37,6 +38,7 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
     auto scope = frontend.globals.globalScope;
     auto builtins = frontend.builtinTypes;
     std::unordered_map<std::string, TypeId> instances, classes;
+    std::unordered_set<std::string> builtinClasses;
     auto bind = [&](const std::string& name, TypeId type) {
         scope->bindings[frontend.globals.globalNames.names->getOrAdd(name.c_str())] = Binding{type, Location()};
     };
@@ -52,60 +54,57 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
         getMutable<ExternType>(instance)->relation = Klass{cls};
         instances[row[1]] = instance;
         classes[row[1]] = cls;
+        if (row[3] == "1")
+            builtinClasses.insert(row[1]);
         scope->exportedTypeBindings[row[1]] = TypeFun{{}, {}, instance};
         bind(row[1], cls);
     }
-    std::unordered_map<std::string, EnumTypes> enums;
+    std::vector<EngineEnumSource> sources;
     for (const auto& row : rows)
     {
-        if (row[0] != "G" || row.size() < 3 || (row.size() - 3) % 2)
+        bool global = row[0] == "G" && row.size() >= 3 && (row.size() - 3) % 2 == 0;
+        bool member = row[0] == "E" && row.size() >= 4 && (row.size() - 4) % 2 == 0 && classes.count(row[1]);
+        if (!global && !member)
             continue;
-        auto info = std::make_shared<EnumTypeInfo>();
-        info->name = row[1];
-        for (size_t i = 3; i + 1 < row.size(); i += 2)
-            info->members.push_back({row[i], std::stod(row[i + 1]), {}, {}});
-        auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
-        enums[info->name] = enumeration;
-        const auto dot = row[1].find('.');
-        if (dot == std::string::npos)
+        EngineEnumSource source;
+        size_t first = global ? 3 : 4;
+        if (global)
         {
-            scope->exportedTypeBindings[row[1]] = TypeFun{{}, {}, enumeration.value};
-            bind(row[1], enumeration.names);
+            const auto dot = row[1].find('.');
+            source.owner = dot == std::string::npos ? "" : row[1].substr(0, dot);
+            source.name = dot == std::string::npos ? row[1] : row[1].substr(dot + 1);
+            source.global = true;
         }
         else
         {
-            std::string owner = row[1].substr(0, dot), name = row[1].substr(dot + 1);
-            scope->importedTypeBindings[owner][name] = TypeFun{{}, {}, enumeration.value};
-            auto symbol = frontend.globals.globalNames.names->getOrAdd(owner.c_str());
-            auto found = scope->bindings.find(symbol);
-            if (found == scope->bindings.end())
-                bind(owner, arena.addType(TableType{{}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed}));
-            getMutable<TableType>(scope->bindings.at(symbol).typeId)->props[name] = Property::readonly(enumeration.names);
+            source.owner = row[1];
+            source.name = row[2];
         }
+        source.bitfield = row[first - 1] == "1";
+        for (size_t i = first; i + 1 < row.size(); i += 2)
+            source.constants.push_back({row[i], std::stod(row[i + 1])});
+        sources.push_back(std::move(source));
     }
+    const EngineEnumCatalog catalog = buildEngineEnumCatalog(std::move(sources));
+    const EngineEnumTypes enumTypes = addEngineEnumTypes(frontend.globals, catalog, methodCase, propertyCase);
     for (const auto& row : rows)
     {
         if (row[0] != "E" || row.size() < 4 || (row.size() - 4) % 2 || !classes.count(row[1]))
             continue;
-        auto info = std::make_shared<EnumTypeInfo>();
-        info->name = row[1] + "." + row[2];
+        // Class enum constants remain on their class. Non-bitfield ones are the Enum items.
+        // Builtin value type constants, such as Vector3.AXIS_Z, stay numbers.
         for (size_t i = 4; i + 1 < row.size(); i += 2)
-            info->members.push_back({row[i], std::stod(row[i + 1]), {}, {}});
-        auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
-        enums[info->name] = enumeration;
-        scope->importedTypeBindings[row[1]][row[2]] = TypeFun{{}, {}, enumeration.value};
-        auto table = get<TableType>(get<MetatableType>(enumeration.names)->table);
-        for (auto target : {getMutable<ExternType>(classes.at(row[1])), getMutable<ExternType>(instances.at(row[1]))})
         {
-            if (!target->props.count("Enums"))
-                target->props["Enums"] = Property::readonly(arena.addType(TableType{{}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed}));
-            getMutable<TableType>(*target->props.at("Enums").readTy)->props[row[2]] = Property::readonly(enumeration.names);
-            for (const auto& member : info->members)
+            TypeId value = builtins->numberType;
+            auto found = catalog.byConstant.find(row[1] + "." + row[i]);
+            if (row[3] != "1" && !builtinClasses.count(row[1]) && found != catalog.byConstant.end())
+                value = enumTypes.members[found->second.first][found->second.second];
+            auto legacy = Property::readonly(value);
+            legacy.tags.push_back("LudotHiddenAlias");
+            for (auto target : {getMutable<ExternType>(classes.at(row[1])), getMutable<ExternType>(instances.at(row[1]))})
             {
-                auto legacy = table->props.at(member.name);
-                legacy.tags.push_back("LudotHiddenAlias");
-                target->props[engineApiName(member.name, ApiCase::Pascal)] = legacy;
-                target->props[member.name] = table->props.at(member.name);
+                target->props[engineApiName(row[i], ApiCase::Pascal)] = legacy;
+                target->props[row[i]] = Property::readonly(value);
             }
         }
     }
@@ -121,8 +120,8 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
         if (name == "Nil") return builtins->nilType;
         if (name.rfind("enum::", 0) == 0)
         {
-            auto found = enums.find(name.substr(6));
-            return found == enums.end() ? builtins->numberType : found->second.value;
+            auto found = catalog.bySource.find(name.substr(6));
+            return found == catalog.bySource.end() ? builtins->numberType : enumTypes.roots[found->second];
         }
         if (name.rfind("bitfield::", 0) == 0)
             return builtins->numberType;
@@ -169,7 +168,7 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
             }
         }
         else if (row[0] == "P" && row.size() == 4) instance->props[engineApiName(row[2], propertyCase)] = Property::rw(type(type, row[3]));
-        else if (row[0] == "K" && row.size() == 4) cls->props[row[2]] = Property::readonly(type(type, row[3]));
+        else if (row[0] == "K" && row.size() == 4 && !cls->props.count(row[2])) cls->props[row[2]] = Property::readonly(type(type, row[3]));
         else if (row[0] == "F" && row.size() >= 6)
         {
             bool isStatic = row[4] == "1";
@@ -190,5 +189,6 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
     }
     if (instances.count("Object"))
         addLudotIsA(arena, *builtins, instances.at("Object"), methodCase);
+    addLudotTaskLibrary(frontend.globals);
     return true;
 }

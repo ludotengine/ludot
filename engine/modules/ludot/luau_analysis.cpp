@@ -66,7 +66,7 @@ struct Session {
     Luau::Frontend frontend;
     std::unordered_map<std::string, Luau::TypeId> instances;
     std::unordered_map<std::string, Luau::TypeId> classes;
-	std::unordered_map<std::string, Luau::EnumTypes> enums;
+	Luau::EngineEnumTypes engine_enums;
 	String scene_fingerprint;
     ObjectID scene_root;
     ObjectID analysis_owner;
@@ -98,90 +98,8 @@ struct Session {
             scope->bindings[frontend.globals.globalNames.names->getOrAdd(name.c_str())] = Binding{cls, Location()};
             scope->exportedTypeBindings[name] = TypeFun{{}, {}, instance};
         }
-		std::map<std::string, std::shared_ptr<EnumTypeInfo>> globals;
-		for (int i = 0; i < CoreConstants::get_global_constant_count(); ++i) {
-			const std::string name = utf8(CoreConstants::get_global_constant_enum(i));
-			if (name.empty()) {
-				continue;
-			}
-			auto &info = globals[name];
-			if (!info) {
-				info = std::make_shared<EnumTypeInfo>();
-				info->name = name;
-			}
-			info->members.push_back({ CoreConstants::get_global_constant_name(i), double(CoreConstants::get_global_constant_value(i)), {}, {} });
-		}
-		for (const auto &[name, info] : globals) {
-			auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
-			enums[name] = enumeration;
-			const auto dot = name.find('.');
-			if (dot == std::string::npos) {
-				scope->exportedTypeBindings[name] = TypeFun{ {}, {}, enumeration.value };
-				scope->bindings[frontend.globals.globalNames.names->getOrAdd(name.c_str())] = Binding{ enumeration.names, {} };
-			} else {
-				const std::string owner = name.substr(0, dot), member = name.substr(dot + 1);
-				scope->importedTypeBindings[owner][member] = TypeFun{ {}, {}, enumeration.value };
-				auto symbol = frontend.globals.globalNames.names->getOrAdd(owner.c_str());
-				if (!scope->bindings.count(symbol)) {
-					scope->bindings[symbol] = Binding{ arena.addType(TableType{ {}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed }), {} };
-				}
-				getMutable<TableType>(scope->bindings.at(symbol).typeId)->props[member] = Property::readonly(enumeration.names);
-			}
-		}
-		for (int i = ::Variant::VECTOR2; i < ::Variant::VARIANT_MAX; ++i) {
-			const auto kind = ::Variant::Type(i);
-			const std::string owner = utf8(::Variant::get_type_name(kind));
-			List<StringName> declarations;
-			::Variant::get_enums_for_type(kind, &declarations);
-			for (const StringName &name : declarations) {
-				auto info = std::make_shared<EnumTypeInfo>();
-				info->name = owner + "." + utf8(name);
-				List<StringName> constants;
-				::Variant::get_enumerations_for_enum(kind, name, &constants);
-				for (const StringName &constant : constants) {
-					info->members.push_back({ utf8(constant), double(::Variant::get_enum_value(kind, name, constant)), {}, {} });
-				}
-				auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
-				enums[info->name] = enumeration;
-				scope->importedTypeBindings[owner][utf8(name)] = TypeFun{ {}, {}, enumeration.value };
-				for (auto target : { getMutable<ExternType>(this->classes.at(owner)), getMutable<ExternType>(instances.at(owner)) }) {
-					if (!target->props.count("Enums")) {
-						target->props["Enums"] = Property::readonly(arena.addType(TableType{ {}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed }));
-					}
-					getMutable<TableType>(*target->props.at("Enums").readTy)->props[utf8(name)] = Property::readonly(enumeration.names);
-					const auto table = get<TableType>(get<MetatableType>(enumeration.names)->table);
-					for (const StringName &constant : constants) {
-						auto legacy = table->props.at(utf8(constant));
-						legacy.tags.push_back("LudotHiddenAlias");
-						target->props[utf8(LuauLanguage::api_name(constant, true, true))] = legacy;
-						target->props[utf8(constant)] = table->props.at(utf8(constant));
-					}
-				}
-			}
-		}
-		// Allocate enum domains before reflecting signatures that reference them.
-		for (const StringName &name : classes) {
-			List<StringName> declarations;
-			ClassDB::get_enum_list(name, &declarations, true);
-			for (const StringName &declaration : declarations) {
-				auto info = std::make_shared<EnumTypeInfo>();
-				info->name = utf8(String(name) + "." + String(declaration));
-				List<StringName> constants;
-				ClassDB::get_enum_constants(name, declaration, &constants, true);
-				for (const StringName &constant : constants) {
-					info->members.push_back({ utf8(constant), double(ClassDB::get_integer_constant(name, constant)), {}, {} });
-				}
-				auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
-				enums[info->name] = enumeration;
-				scope->importedTypeBindings[utf8(name)][utf8(declaration)] = TypeFun{ {}, {}, enumeration.value };
-				for (auto target : { getMutable<ExternType>(this->classes.at(utf8(name))), getMutable<ExternType>(instances.at(utf8(name))) }) {
-					if (!target->props.count("Enums")) {
-						target->props["Enums"] = Property::readonly(arena.addType(TableType{ {}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed }));
-					}
-					getMutable<TableType>(*target->props.at("Enums").readTy)->props[utf8(declaration)] = Property::readonly(enumeration.names);
-				}
-			}
-		}
+		const auto &catalog = ludot_engine_enum_catalog();
+		engine_enums = addEngineEnumTypes(frontend.globals, catalog, LuauLanguage::get_singleton()->method_casing, LuauLanguage::get_singleton()->property_casing);
 		for (const StringName &name : classes) {
             auto object = getMutable<ExternType>(instances.at(utf8(name)));
             const StringName parent = ClassDB::get_parent_class(name);
@@ -193,7 +111,7 @@ struct Session {
             ClassDB::get_property_list(name, &properties, true);
             for (const PropertyInfo &property : properties) {
                 const String renamed = LuauLanguage::api_name(property.name, true);
-                if (renamed.is_valid_ascii_identifier()) object->props[utf8(renamed)] = Property::rw(type(property));
+                if (renamed.is_valid_ascii_identifier()) object->props[utf8(renamed)] = Property::rw(type(LuauLanguage::enum_property(name, property)));
             }
             List<MethodInfo> methods;
             ClassDB::get_method_list(name, &methods, true);
@@ -206,11 +124,11 @@ struct Session {
             ClassDB::get_integer_constant_list(name, &constants, true);
 			for (const String &constant : constants) {
 				const StringName declaration = ClassDB::get_integer_constant_enum(name, constant, true);
-				auto enumeration = enums.find(utf8(String(name) + "." + String(declaration)));
+				auto found = catalog.byConstant.find(utf8(String(name) + "." + constant));
 				TypeId value = builtins->numberType;
-				if (enumeration != enums.end()) {
-					auto table = get<TableType>(get<MetatableType>(enumeration->second.names)->table);
-					value = *table->props.at(utf8(constant)).readTy;
+				// Non-bitfield class enum constants are their Enum items. Bitfield constants stay numbers.
+				if (declaration != StringName() && !ClassDB::is_enum_bitfield(name, declaration, true) && found != catalog.byConstant.end()) {
+					value = engine_enums.members[found->second.first][found->second.second];
 				}
 				auto legacy = Property::readonly(value);
 				legacy.tags.push_back("LudotHiddenAlias");
@@ -246,12 +164,9 @@ struct Session {
             for (const auto &constant : constants) {
                 const ::Variant value = ::Variant::get_constant_value(::Variant::Type(i), constant);
 				TypeId member_type = type(PropertyInfo(value.get_type(), ""));
-				const StringName declaration = ::Variant::get_enum_for_enumeration(::Variant::Type(i), constant);
-				auto enumeration = enums.find(it->first + "." + utf8(declaration));
 				auto target = getMutable<ExternType>(this->classes.at(it->first));
-				if (enumeration != enums.end()) {
-					auto table = get<TableType>(get<MetatableType>(enumeration->second.names)->table);
-					member_type = *table->props.at(utf8(constant)).readTy;
+				// Builtin type enum constants, such as Vector3.AXIS_X, stay numbers. Enum.Axis holds the items.
+				if (!::Variant::get_enum_for_enumeration(::Variant::Type(i), constant).is_empty()) {
 					auto legacy = Property::readonly(member_type);
 					legacy.tags.push_back("LudotHiddenAlias");
 					for (auto destination : { target, object }) {
@@ -262,6 +177,20 @@ struct Session {
 					target->props[utf8(LuauLanguage::api_name(constant, true, true))] = Property::readonly(member_type);
 				}
 			}
+            List<StringName> declarations;
+            ::Variant::get_enums_for_type(::Variant::Type(i), &declarations);
+            for (const StringName &declaration : declarations) {
+                List<StringName> values;
+                ::Variant::get_enumerations_for_enum(::Variant::Type(i), declaration, &values);
+                for (const StringName &constant : values) {
+                    auto legacy = Property::readonly(builtins->numberType);
+                    legacy.tags.push_back("LudotHiddenAlias");
+                    for (auto destination : { getMutable<ExternType>(this->classes.at(it->first)), object }) {
+                        destination->props[utf8(LuauLanguage::api_name(constant, true, true))] = legacy;
+                        destination->props[utf8(constant)] = Property::readonly(builtins->numberType);
+                    }
+                }
+            }
             TableType::Props operations;
             const std::pair<const char *, ::Variant::Operator> arithmetic[] = {
                 {"__add", ::Variant::OP_ADD}, {"__sub", ::Variant::OP_SUBTRACT},
@@ -296,6 +225,7 @@ struct Session {
             fn->magic = std::make_shared<SceneNodeLookup>([this](const MagicFunctionCallContext &context) { return scene_result(context); });
         }
 		addLudotIsA(arena, *builtins, instances.at("Object"), LuauLanguage::get_singleton()->method_casing);
+		addLudotTaskLibrary(frontend.globals);
 		function_docs[*getMutable<ExternType>(instances.at("Object"))->props.at(utf8(LuauLanguage::api_name("is_a"))).readTy] = { "Object", "is_class" };
 		freeze(arena);
     }
@@ -381,9 +311,10 @@ struct Session {
     Luau::TypeId type(const PropertyInfo &info) {
         const auto builtin = frontend.builtinTypes;
 		if ((info.usage & PROPERTY_USAGE_CLASS_IS_ENUM) != 0 && (info.usage & PROPERTY_USAGE_CLASS_IS_BITFIELD) == 0) {
-			auto found = enums.find(utf8(info.class_name));
-			if (found != enums.end()) {
-				return found->second.value;
+			const auto &catalog = ludot_engine_enum_catalog();
+			auto found = catalog.bySource.find(utf8(info.class_name));
+			if (found != catalog.bySource.end()) {
+				return engine_enums.roots[found->second];
 			}
 		}
 		switch (info.type) {

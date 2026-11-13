@@ -14,6 +14,15 @@ def generate(api):
         for constant in enum.get('values', []):
             fields.extend([constant['name'], str(constant['value'])])
         rows.append('\t'.join(fields))
+    classes = {entry['name']: entry for entry in api['classes']}
+    def getter_type(owner, getter):
+        # Many properties declare int; their getter returns the enum type.
+        while owner in classes:
+            for method in classes[owner].get('methods', []):
+                if method['name'] == getter and not method.get('arguments'):
+                    return method.get('return_value', {}).get('type')
+            owner = classes[owner].get('inherits')
+        return None
     for entry in api['builtin_classes'] + api['classes']:
         name = entry['name']
         if name in primitives:
@@ -30,7 +39,11 @@ def generate(api):
         for prop in entry.get('members', []) + entry.get('properties', []):
             renamed = prop['name']
             if renamed.isidentifier():
-                rows.append('\t'.join(['P', name, renamed, prop.get('type', 'Variant')]))
+                kind = prop.get('type', 'Variant')
+                returned = getter_type(name, prop['getter']) if kind == 'int' and prop.get('getter') else None
+                if returned and returned.startswith('enum::'):
+                    kind = returned
+                rows.append('\t'.join(['P', name, renamed, kind]))
         for method in entry.get('methods', []):
             renamed = method['name']
             if not renamed.isidentifier() or renamed.startswith('__'):
@@ -40,7 +53,8 @@ def generate(api):
             rows.append('\t'.join(['F', name, renamed, result, str(int(method.get('is_static', False))), str(int(method.get('is_vararg', False))), *args]))
         for constant in entry.get('constants', []):
             rows.append('\t'.join(['K', name, casing(constant['name'], True), constant.get('type', 'int')]))
-        for enum in entry.get('enums', []):
+        # Editor-only enums stay out of the Enum catalog, so exported games see the same names.
+        for enum in entry.get('enums', []) if entry.get('api_type') != 'editor' else []:
             fields = ['E', name, enum['name'], str(int(enum.get('is_bitfield', False)))]
             for constant in enum.get('values', []):
                 fields.extend([constant['name'], str(constant['value'])])

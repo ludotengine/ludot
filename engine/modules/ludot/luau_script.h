@@ -6,6 +6,12 @@
 #include "core/os/mutex.h"
 #include "lua.h"
 #include "Luau/LudotNaming.h"
+#include "Luau/LudotEngineEnums.h"
+
+// Registers the task library. Defined in luau_task.cpp.
+void ludot_open_task(lua_State *L);
+// Every exposed, non-editor engine enum, named for the Enum global. Built on first use.
+const Luau::EngineEnumCatalog &ludot_engine_enum_catalog();
 
 class LuauLanguage;
 class LuauScriptInstance;
@@ -131,12 +137,13 @@ public:
 		enum Kind { PROPERTY,
 			SIGNAL,
 			METHOD,
-			CONSTANT,
-			ENUM };
+			CONSTANT };
 		Kind kind = PROPERTY;
         StringName name;
         Variant::Type type = Variant::NIL;
         int method_ref = LUA_NOREF;
+        // Catalog index when the property or constant is a non-bitfield engine enum, else -1.
+        int enumeration = -1;
     };
     // Static members of native classes and builtin types, keyed by class or type name and then Luau name.
     HashMap<StringName, HashMap<String, NativeMember>> native_members;
@@ -148,6 +155,20 @@ public:
     static String callback_name(const StringName &p_base, const StringName &p_name);
     static String api_name(const String &p_name, bool p_property = false, bool p_constant = false);
     static void push_variant(lua_State *L, const Variant &p_value);
+    // Engine enum values. Each item is one shared userdata, so identity equality holds.
+    int enum_items_ref = LUA_NOREF;
+    int enum_names_ref = LUA_NOREF;
+    int enum_by_name_ref = LUA_NOREF;
+    int enum_spaces_ref = LUA_NOREF;
+    HashMap<StringName, int> enum_by_source;
+    void ensure_enums(lua_State *L);
+    // Catalog index for a PropertyInfo of a non-bitfield enum type, else -1.
+    int enum_index(const PropertyInfo &p_info);
+    // Pushes the EnumItem for p_value, or the plain value when no item matches.
+    void push_enum(lua_State *L, int p_enumeration, const Variant &p_value);
+    void push_typed(lua_State *L, const Variant &p_value, const PropertyInfo &p_info);
+    // Many engine properties declare a plain int; their getter carries the enum type.
+    static PropertyInfo enum_property(const StringName &p_class, const PropertyInfo &p_property);
     static Variant to_variant(lua_State *L, int p_index, int p_depth = 0);
     // Converts without raising a Luau error. On failure last_error holds the reason.
     static bool try_variant(lua_State *L, int p_index, Variant &r_value);
@@ -184,6 +205,44 @@ public:
     void profile_close();
     // Closes frames of p_state at or below p_depth that ended without a RETURN, such as after an error.
     void profile_unwind(lua_State *p_state, int p_depth);
+    // Task scheduler. One per VM, stepped from SceneTree::process_frame. Engine calls
+    // into Luau start in resumable threads, so task.wait can yield from callbacks.
+    struct Task {
+        enum Kind { DEFER, WAIT, DELAY };
+        int ref = LUA_NOREF;
+        Kind kind = DEFER;
+        ObjectID owner;
+        double duration = 0.0;
+        double elapsed = 0.0;
+        // Values already on the thread stack for its next resume. Waits push the elapsed time instead.
+        int arguments = 0;
+        uint64_t order = 0;
+    };
+    HashMap<lua_State *, Task> tasks;
+    uint64_t task_order = 0;
+    int call_depth = 0;
+    bool running_deferred = false;
+    LocalVector<ObjectID> task_owners;
+    LocalVector<int> idle_threads;
+    HashSet<lua_State *> running_threads;
+    ObjectID task_tree;
+    ObjectID current_task_owner() const { return task_owners.is_empty() ? ObjectID() : task_owners[task_owners.size() - 1]; }
+    // Calls the function below p_count arguments on the main state in a resumable thread and
+    // pushes its first result, or nil when it yielded or failed. Returns false after an error,
+    // which is reported with a stack trace prefixed by p_where.
+    bool invoke(int p_count, ObjectID p_owner, const String &p_where = String());
+    int resume_thread(lua_State *p_thread, lua_State *p_from, int p_arguments, ObjectID p_owner, const String &p_where = String());
+    void report_thread_error(lua_State *p_thread, const String &p_where);
+    void schedule_task(lua_State *p_thread, Task::Kind p_kind, double p_duration, int p_arguments);
+    // Removes a pending schedule and its queued arguments, keeping the thread itself.
+    void unschedule_task(lua_State *p_thread);
+    void drop_task(lua_State *p_thread);
+    void drop_owner_tasks(ObjectID p_owner);
+    void resume_task(lua_State *p_thread);
+    void run_deferred();
+    void step_tasks();
+    // Lists scheduled threads with where each one is suspended, for the debugger globals.
+    void debug_get_tasks(List<String> *r_names, List<Variant> *r_values);
     Error ensure_native_class(const StringName &p_name);
     Error load_chunk(const String &p_source, const String &p_path, lua_State *p_state = nullptr);
     Dictionary module_aliases(const String &p_from) const;

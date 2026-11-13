@@ -38,4 +38,16 @@ class DebuggerProbe extends Node = {
         local doubled = amount * 2
         return doubled
     end
+    function startTasks()
+        task.delay(1000, function() end)
+        task.spawn(function()
+            while true do
+                task.wait()
+                self:taskWorker()
+            end
+        end)
+    end
+    function taskWorker(): number
+        return self.Health
+    end
 }

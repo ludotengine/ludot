@@ -1258,11 +1258,11 @@ P	AStarGrid2D	region	Rect2i
 P	AStarGrid2D	size	Vector2i
 P	AStarGrid2D	offset	Vector2
 P	AStarGrid2D	cell_size	Vector2
-P	AStarGrid2D	cell_shape	int
+P	AStarGrid2D	cell_shape	enum::AStarGrid2D.CellShape
 P	AStarGrid2D	jumping_enabled	bool
-P	AStarGrid2D	default_compute_heuristic	int
-P	AStarGrid2D	default_estimate_heuristic	int
-P	AStarGrid2D	diagonal_mode	int
+P	AStarGrid2D	default_compute_heuristic	enum::AStarGrid2D.Heuristic
+P	AStarGrid2D	default_estimate_heuristic	enum::AStarGrid2D.Heuristic
+P	AStarGrid2D	diagonal_mode	enum::AStarGrid2D.DiagonalMode
 F	AStarGrid2D	_estimate_cost	float	0	0	Vector2i	Vector2i
 F	AStarGrid2D	_compute_cost	float	0	0	Vector2i	Vector2i
 F	AStarGrid2D	set_region	void	0	0	Rect2i
@@ -1526,7 +1526,7 @@ F	AnimatedTexture	get_frame_duration	float	0	0	int
 K	AnimatedTexture	MAXFRAMES	int
 C	Animation	Resource	0
 P	Animation	length	float
-P	Animation	loop_mode	int
+P	Animation	loop_mode	enum::Animation.LoopMode
 P	Animation	step	float
 P	Animation	capture_included	bool
 F	Animation	add_track	int	0	0	enum::Animation.TrackType	int?
@@ -1640,9 +1640,9 @@ P	AnimationMixer	root_node	NodePath
 P	AnimationMixer	root_motion_track	NodePath
 P	AnimationMixer	root_motion_local	bool
 P	AnimationMixer	audio_max_polyphony	int
-P	AnimationMixer	callback_mode_process	int
-P	AnimationMixer	callback_mode_method	int
-P	AnimationMixer	callback_mode_discrete	int
+P	AnimationMixer	callback_mode_process	enum::AnimationMixer.AnimationCallbackModeProcess
+P	AnimationMixer	callback_mode_method	enum::AnimationMixer.AnimationCallbackModeMethod
+P	AnimationMixer	callback_mode_discrete	enum::AnimationMixer.AnimationCallbackModeDiscrete
 F	AnimationMixer	_post_process_key_value	Variant	0	0	Animation	int	Variant	int	int
 F	AnimationMixer	add_animation_library	enum::Error	0	0	StringName	AnimationLibrary
 F	AnimationMixer	remove_animation_library	void	0	0	StringName
@@ -1731,13 +1731,13 @@ C	AnimationNodeAdd2	AnimationNodeSync	0
 C	AnimationNodeAdd3	AnimationNodeSync	0
 C	AnimationNodeAnimation	AnimationRootNode	0
 P	AnimationNodeAnimation	animation	StringName
-P	AnimationNodeAnimation	play_mode	int
+P	AnimationNodeAnimation	play_mode	enum::AnimationNodeAnimation.PlayMode
 P	AnimationNodeAnimation	advance_on_start	bool
 P	AnimationNodeAnimation	use_custom_timeline	bool
 P	AnimationNodeAnimation	timeline_length	float
 P	AnimationNodeAnimation	stretch_time_scale	bool
 P	AnimationNodeAnimation	start_offset	float
-P	AnimationNodeAnimation	loop_mode	int
+P	AnimationNodeAnimation	loop_mode	enum::Animation.LoopMode
 F	AnimationNodeAnimation	set_animation	void	0	0	StringName
 F	AnimationNodeAnimation	get_animation	StringName	0	0
 F	AnimationNodeAnimation	set_play_mode	void	0	0	enum::AnimationNodeAnimation.PlayMode
@@ -1762,9 +1762,9 @@ P	AnimationNodeBlendSpace1D	min_space	float
 P	AnimationNodeBlendSpace1D	max_space	float
 P	AnimationNodeBlendSpace1D	snap	float
 P	AnimationNodeBlendSpace1D	value_label	String
-P	AnimationNodeBlendSpace1D	blend_mode	int
+P	AnimationNodeBlendSpace1D	blend_mode	enum::AnimationNodeBlendSpace1D.BlendMode
 P	AnimationNodeBlendSpace1D	sync	bool
-P	AnimationNodeBlendSpace1D	sync_mode	int
+P	AnimationNodeBlendSpace1D	sync_mode	enum::AnimationNodeBlendSpace1D.SyncMode
 P	AnimationNodeBlendSpace1D	cyclic_length	float
 F	AnimationNodeBlendSpace1D	add_blend_point	void	0	0	AnimationRootNode	float	int?	StringName?
 F	AnimationNodeBlendSpace1D	set_blend_point_position	void	0	0	int	float
@@ -1803,9 +1803,9 @@ P	AnimationNodeBlendSpace2D	max_space	Vector2
 P	AnimationNodeBlendSpace2D	snap	Vector2
 P	AnimationNodeBlendSpace2D	x_label	String
 P	AnimationNodeBlendSpace2D	y_label	String
-P	AnimationNodeBlendSpace2D	blend_mode	int
+P	AnimationNodeBlendSpace2D	blend_mode	enum::AnimationNodeBlendSpace2D.BlendMode
 P	AnimationNodeBlendSpace2D	sync	bool
-P	AnimationNodeBlendSpace2D	sync_mode	int
+P	AnimationNodeBlendSpace2D	sync_mode	enum::AnimationNodeBlendSpace2D.SyncMode
 P	AnimationNodeBlendSpace2D	cyclic_length	float
 F	AnimationNodeBlendSpace2D	add_blend_point	void	0	0	AnimationRootNode	Vector2	int?	StringName?
 F	AnimationNodeBlendSpace2D	set_blend_point_position	void	0	0	int	Vector2
@@ -1871,7 +1871,7 @@ F	AnimationNodeExtension	_process_animation_node	PackedFloat32Array	0	0	PackedFl
 F	AnimationNodeExtension	is_looping	bool	1	0	PackedFloat32Array
 F	AnimationNodeExtension	get_remaining_time	float	1	0	PackedFloat32Array	bool
 C	AnimationNodeOneShot	AnimationNodeSync	0
-P	AnimationNodeOneShot	mix_mode	int
+P	AnimationNodeOneShot	mix_mode	enum::AnimationNodeOneShot.MixMode
 P	AnimationNodeOneShot	fadein_time	float
 P	AnimationNodeOneShot	fadein_curve	Curve
 P	AnimationNodeOneShot	fadeout_time	float
@@ -1905,7 +1905,7 @@ E	AnimationNodeOneShot	OneShotRequest	0	ONE_SHOT_REQUEST_NONE	0	ONE_SHOT_REQUEST
 E	AnimationNodeOneShot	MixMode	0	MIX_MODE_BLEND	0	MIX_MODE_ADD	1
 C	AnimationNodeOutput	AnimationNode	0
 C	AnimationNodeStateMachine	AnimationRootNode	0
-P	AnimationNodeStateMachine	state_machine_type	int
+P	AnimationNodeStateMachine	state_machine_type	enum::AnimationNodeStateMachine.StateMachineType
 P	AnimationNodeStateMachine	allow_transition_to_self	bool
 P	AnimationNodeStateMachine	reset_ends	bool
 F	AnimationNodeStateMachine	add_node	void	0	0	StringName	AnimationNode	Vector2?
@@ -1958,8 +1958,8 @@ P	AnimationNodeStateMachineTransition	xfade_curve	Curve
 P	AnimationNodeStateMachineTransition	break_loop_at_end	bool
 P	AnimationNodeStateMachineTransition	reset	bool
 P	AnimationNodeStateMachineTransition	priority	int
-P	AnimationNodeStateMachineTransition	switch_mode	int
-P	AnimationNodeStateMachineTransition	advance_mode	int
+P	AnimationNodeStateMachineTransition	switch_mode	enum::AnimationNodeStateMachineTransition.SwitchMode
+P	AnimationNodeStateMachineTransition	advance_mode	enum::AnimationNodeStateMachineTransition.AdvanceMode
 P	AnimationNodeStateMachineTransition	advance_condition	StringName
 P	AnimationNodeStateMachineTransition	advance_expression	String
 F	AnimationNodeStateMachineTransition	set_switch_mode	void	0	0	enum::AnimationNodeStateMachineTransition.SwitchMode
@@ -2019,8 +2019,8 @@ P	AnimationPlayer	current_animation_length	float
 P	AnimationPlayer	current_animation_position	float
 P	AnimationPlayer	playback_auto_capture	bool
 P	AnimationPlayer	playback_auto_capture_duration	float
-P	AnimationPlayer	playback_auto_capture_transition_type	int
-P	AnimationPlayer	playback_auto_capture_ease_type	int
+P	AnimationPlayer	playback_auto_capture_transition_type	enum::Tween.TransitionType
+P	AnimationPlayer	playback_auto_capture_ease_type	enum::Tween.EaseType
 P	AnimationPlayer	playback_default_blend_time	float
 P	AnimationPlayer	speed_scale	float
 P	AnimationPlayer	movie_quit_on_finish	bool
@@ -2101,15 +2101,15 @@ C	Area2D	CollisionObject2D	0
 P	Area2D	monitoring	bool
 P	Area2D	monitorable	bool
 P	Area2D	priority	int
-P	Area2D	gravity_space_override	int
+P	Area2D	gravity_space_override	enum::Area2D.SpaceOverride
 P	Area2D	gravity_point	bool
 P	Area2D	gravity_point_unit_distance	float
 P	Area2D	gravity_point_center	Vector2
 P	Area2D	gravity_direction	Vector2
 P	Area2D	gravity	float
-P	Area2D	linear_damp_space_override	int
+P	Area2D	linear_damp_space_override	enum::Area2D.SpaceOverride
 P	Area2D	linear_damp	float
-P	Area2D	angular_damp_space_override	int
+P	Area2D	angular_damp_space_override	enum::Area2D.SpaceOverride
 P	Area2D	angular_damp	float
 P	Area2D	audio_bus_override	bool
 P	Area2D	audio_bus_name	StringName
@@ -2162,15 +2162,15 @@ C	Area3D	CollisionObject3D	0
 P	Area3D	monitoring	bool
 P	Area3D	monitorable	bool
 P	Area3D	priority	int
-P	Area3D	gravity_space_override	int
+P	Area3D	gravity_space_override	enum::Area3D.SpaceOverride
 P	Area3D	gravity_point	bool
 P	Area3D	gravity_point_unit_distance	float
 P	Area3D	gravity_point_center	Vector3
 P	Area3D	gravity_direction	Vector3
 P	Area3D	gravity	float
-P	Area3D	linear_damp_space_override	int
+P	Area3D	linear_damp_space_override	enum::Area3D.SpaceOverride
 P	Area3D	linear_damp	float
-P	Area3D	angular_damp_space_override	int
+P	Area3D	angular_damp_space_override	enum::Area3D.SpaceOverride
 P	Area3D	angular_damp	float
 P	Area3D	wind_force_magnitude	float
 P	Area3D	wind_attenuation_factor	float
@@ -2253,7 +2253,7 @@ F	AreaLight3D	get_area_size	Vector2	0	0
 F	AreaLight3D	set_area_normalize_energy	void	0	0	bool
 F	AreaLight3D	is_area_normalizing_energy	bool	0	0
 C	ArrayMesh	Mesh	0
-P	ArrayMesh	blend_shape_mode	int
+P	ArrayMesh	blend_shape_mode	enum::Mesh.BlendShapeMode
 P	ArrayMesh	custom_aabb	AABB
 P	ArrayMesh	shadow_mesh	ArrayMesh
 F	ArrayMesh	add_blend_shape	void	0	0	StringName
@@ -2290,9 +2290,9 @@ F	ArrayOccluder3D	set_vertices	void	0	0	PackedVector3Array
 F	ArrayOccluder3D	set_indices	void	0	0	PackedInt32Array
 C	AspectRatioContainer	Container	0
 P	AspectRatioContainer	ratio	float
-P	AspectRatioContainer	stretch_mode	int
-P	AspectRatioContainer	alignment_horizontal	int
-P	AspectRatioContainer	alignment_vertical	int
+P	AspectRatioContainer	stretch_mode	enum::AspectRatioContainer.StretchMode
+P	AspectRatioContainer	alignment_horizontal	enum::AspectRatioContainer.AlignmentMode
+P	AspectRatioContainer	alignment_vertical	enum::AspectRatioContainer.AlignmentMode
 F	AspectRatioContainer	set_ratio	void	0	0	float
 F	AspectRatioContainer	get_ratio	float	0	0
 F	AspectRatioContainer	set_stretch_mode	void	0	0	enum::AspectRatioContainer.StretchMode
@@ -2424,7 +2424,7 @@ F	AudioEffectDelay	get_feedback_level_db	float	0	0
 F	AudioEffectDelay	set_feedback_lowpass	void	0	0	float
 F	AudioEffectDelay	get_feedback_lowpass	float	0	0
 C	AudioEffectDistortion	AudioEffect	0
-P	AudioEffectDistortion	mode	int
+P	AudioEffectDistortion	mode	enum::AudioEffectDistortion.Mode
 P	AudioEffectDistortion	pre_gain	float
 P	AudioEffectDistortion	keep_hf_hz	float
 P	AudioEffectDistortion	drive	float
@@ -2451,7 +2451,7 @@ C	AudioEffectFilter	AudioEffect	0
 P	AudioEffectFilter	cutoff_hz	float
 P	AudioEffectFilter	resonance	float
 P	AudioEffectFilter	gain	float
-P	AudioEffectFilter	db	int
+P	AudioEffectFilter	db	enum::AudioEffectFilter.FilterDB
 F	AudioEffectFilter	set_cutoff	void	0	0	float
 F	AudioEffectFilter	get_cutoff	float	0	0
 F	AudioEffectFilter	set_resonance	void	0	0	float
@@ -2515,7 +2515,7 @@ F	AudioEffectPhaser	get_depth	float	0	0
 C	AudioEffectPitchShift	AudioEffect	0
 P	AudioEffectPitchShift	pitch_scale	float
 P	AudioEffectPitchShift	oversampling	float
-P	AudioEffectPitchShift	fft_size	int
+P	AudioEffectPitchShift	fft_size	enum::AudioEffectPitchShift.FFTSize
 F	AudioEffectPitchShift	set_pitch_scale	void	0	0	float
 F	AudioEffectPitchShift	get_pitch_scale	float	0	0
 F	AudioEffectPitchShift	set_oversampling	void	0	0	int
@@ -2524,7 +2524,7 @@ F	AudioEffectPitchShift	set_fft_size	void	0	0	enum::AudioEffectPitchShift.FFTSiz
 F	AudioEffectPitchShift	get_fft_size	enum::AudioEffectPitchShift.FFTSize	0	0
 E	AudioEffectPitchShift	FFTSize	0	FFT_SIZE_256	0	FFT_SIZE_512	1	FFT_SIZE_1024	2	FFT_SIZE_2048	3	FFT_SIZE_4096	4	FFT_SIZE_MAX	5
 C	AudioEffectRecord	AudioEffect	0
-P	AudioEffectRecord	format	int
+P	AudioEffectRecord	format	enum::AudioStreamWAV.Format
 F	AudioEffectRecord	set_recording_active	void	0	0	bool
 F	AudioEffectRecord	is_recording_active	bool	0	0
 F	AudioEffectRecord	set_format	void	0	0	enum::AudioStreamWAV.Format
@@ -2557,7 +2557,7 @@ F	AudioEffectReverb	set_hpf	void	0	0	float
 F	AudioEffectReverb	get_hpf	float	0	0
 C	AudioEffectSpectrumAnalyzer	AudioEffect	0
 P	AudioEffectSpectrumAnalyzer	buffer_length	float
-P	AudioEffectSpectrumAnalyzer	fft_size	int
+P	AudioEffectSpectrumAnalyzer	fft_size	enum::AudioEffectSpectrumAnalyzer.FFTSize
 F	AudioEffectSpectrumAnalyzer	set_buffer_length	void	0	0	float
 F	AudioEffectSpectrumAnalyzer	get_buffer_length	float	0	0
 F	AudioEffectSpectrumAnalyzer	set_fft_size	void	0	0	enum::AudioEffectSpectrumAnalyzer.FFTSize
@@ -2581,7 +2581,7 @@ F	AudioListener2D	make_current	void	0	0
 F	AudioListener2D	clear_current	void	0	0
 F	AudioListener2D	is_current	bool	0	0
 C	AudioListener3D	Node3D	0
-P	AudioListener3D	doppler_tracking	int
+P	AudioListener3D	doppler_tracking	enum::AudioListener3D.DopplerTracking
 F	AudioListener3D	make_current	void	0	0
 F	AudioListener3D	clear_current	void	0	0
 F	AudioListener3D	is_current	bool	0	0
@@ -2676,7 +2676,7 @@ F	AudioStream	generate_sample	AudioSample	0	0
 F	AudioStream	is_meta_stream	bool	0	0
 P	AudioStream	parameter_list_changed	Signal
 C	AudioStreamGenerator	AudioStream	0
-P	AudioStreamGenerator	mix_rate_mode	int
+P	AudioStreamGenerator	mix_rate_mode	enum::AudioStreamGenerator.AudioStreamGeneratorMixRate
 P	AudioStreamGenerator	mix_rate	float
 P	AudioStreamGenerator	buffer_length	float
 F	AudioStreamGenerator	set_mix_rate	void	0	0	float
@@ -2816,10 +2816,10 @@ P	AudioStreamPlayer	pitch_scale	float
 P	AudioStreamPlayer	playing	bool
 P	AudioStreamPlayer	autoplay	bool
 P	AudioStreamPlayer	stream_paused	bool
-P	AudioStreamPlayer	mix_target	int
+P	AudioStreamPlayer	mix_target	enum::AudioStreamPlayer.MixTarget
 P	AudioStreamPlayer	max_polyphony	int
 P	AudioStreamPlayer	bus	StringName
-P	AudioStreamPlayer	playback_type	int
+P	AudioStreamPlayer	playback_type	enum::AudioServer.PlaybackType
 F	AudioStreamPlayer	set_stream	void	0	0	AudioStream
 F	AudioStreamPlayer	get_stream	AudioStream	0	0
 F	AudioStreamPlayer	set_volume_db	void	0	0	float
@@ -2864,7 +2864,7 @@ P	AudioStreamPlayer2D	max_polyphony	int
 P	AudioStreamPlayer2D	panning_strength	float
 P	AudioStreamPlayer2D	bus	StringName
 P	AudioStreamPlayer2D	area_mask	int
-P	AudioStreamPlayer2D	playback_type	int
+P	AudioStreamPlayer2D	playback_type	enum::AudioServer.PlaybackType
 F	AudioStreamPlayer2D	set_stream	void	0	0	AudioStream
 F	AudioStreamPlayer2D	get_stream	AudioStream	0	0
 F	AudioStreamPlayer2D	set_volume_db	void	0	0	float
@@ -2902,7 +2902,7 @@ F	AudioStreamPlayer2D	get_playback_type	enum::AudioServer.PlaybackType	0	0
 P	AudioStreamPlayer2D	finished	Signal
 C	AudioStreamPlayer3D	Node3D	0
 P	AudioStreamPlayer3D	stream	AudioStream
-P	AudioStreamPlayer3D	attenuation_model	int
+P	AudioStreamPlayer3D	attenuation_model	enum::AudioStreamPlayer3D.AttenuationModel
 P	AudioStreamPlayer3D	volume_db	float
 P	AudioStreamPlayer3D	volume_linear	float
 P	AudioStreamPlayer3D	unit_size	float
@@ -2916,13 +2916,13 @@ P	AudioStreamPlayer3D	max_polyphony	int
 P	AudioStreamPlayer3D	panning_strength	float
 P	AudioStreamPlayer3D	bus	StringName
 P	AudioStreamPlayer3D	area_mask	int
-P	AudioStreamPlayer3D	playback_type	int
+P	AudioStreamPlayer3D	playback_type	enum::AudioServer.PlaybackType
 P	AudioStreamPlayer3D	emission_angle_enabled	bool
 P	AudioStreamPlayer3D	emission_angle_degrees	float
 P	AudioStreamPlayer3D	emission_angle_filter_attenuation_db	float
 P	AudioStreamPlayer3D	attenuation_filter_cutoff_hz	float
 P	AudioStreamPlayer3D	attenuation_filter_db	float
-P	AudioStreamPlayer3D	doppler_tracking	int
+P	AudioStreamPlayer3D	doppler_tracking	enum::AudioStreamPlayer3D.DopplerTracking
 F	AudioStreamPlayer3D	set_stream	void	0	0	AudioStream
 F	AudioStreamPlayer3D	get_stream	AudioStream	0	0
 F	AudioStreamPlayer3D	set_volume_db	void	0	0	float
@@ -3062,7 +3062,7 @@ P	AudioStreamPolyphonic	polyphony	int
 F	AudioStreamPolyphonic	set_polyphony	void	0	0	int
 F	AudioStreamPolyphonic	get_polyphony	int	0	0
 C	AudioStreamRandomizer	AudioStream	0
-P	AudioStreamRandomizer	playback_mode	int
+P	AudioStreamRandomizer	playback_mode	enum::AudioStreamRandomizer.PlaybackMode
 P	AudioStreamRandomizer	random_pitch	float
 P	AudioStreamRandomizer	random_pitch_semitones	float
 P	AudioStreamRandomizer	random_volume_offset_db	float
@@ -3096,8 +3096,8 @@ F	AudioStreamSynchronized	get_sync_stream_volume	float	0	0	int
 K	AudioStreamSynchronized	MAXSTREAMS	int
 C	AudioStreamWAV	AudioStream	0
 P	AudioStreamWAV	data	PackedByteArray
-P	AudioStreamWAV	format	int
-P	AudioStreamWAV	loop_mode	int
+P	AudioStreamWAV	format	enum::AudioStreamWAV.Format
+P	AudioStreamWAV	loop_mode	enum::AudioStreamWAV.LoopMode
 P	AudioStreamWAV	loop_begin	int
 P	AudioStreamWAV	loop_end	int
 P	AudioStreamWAV	mix_rate	int
@@ -3127,7 +3127,7 @@ E	AudioStreamWAV	LoopMode	0	LOOP_DISABLED	0	LOOP_FORWARD	1	LOOP_PINGPONG	2	LOOP_
 C	AwaitTweener	Tweener	0
 F	AwaitTweener	set_timeout	AwaitTweener	0	0	float
 C	BackBufferCopy	Node2D	0
-P	BackBufferCopy	copy_mode	int
+P	BackBufferCopy	copy_mode	enum::BackBufferCopy.CopyMode
 P	BackBufferCopy	rect	Rect2
 F	BackBufferCopy	set_rect	void	0	0	Rect2
 F	BackBufferCopy	get_rect	Rect2	0	0
@@ -3138,7 +3138,7 @@ C	BaseButton	Control	0
 P	BaseButton	disabled	bool
 P	BaseButton	toggle_mode	bool
 P	BaseButton	button_pressed	bool
-P	BaseButton	action_mode	int
+P	BaseButton	action_mode	enum::BaseButton.ActionMode
 P	BaseButton	button_mask	int
 P	BaseButton	keep_pressed_outside	bool
 P	BaseButton	button_group	ButtonGroup
@@ -3177,19 +3177,19 @@ P	BaseButton	button_up	Signal
 P	BaseButton	button_down	Signal
 P	BaseButton	toggled	Signal
 C	BaseMaterial3D	Material	0
-P	BaseMaterial3D	transparency	int
+P	BaseMaterial3D	transparency	enum::BaseMaterial3D.Transparency
 P	BaseMaterial3D	alpha_scissor_threshold	float
 P	BaseMaterial3D	alpha_hash_scale	float
-P	BaseMaterial3D	alpha_antialiasing_mode	int
+P	BaseMaterial3D	alpha_antialiasing_mode	enum::BaseMaterial3D.AlphaAntiAliasing
 P	BaseMaterial3D	alpha_antialiasing_edge	float
-P	BaseMaterial3D	blend_mode	int
-P	BaseMaterial3D	cull_mode	int
-P	BaseMaterial3D	depth_draw_mode	int
+P	BaseMaterial3D	blend_mode	enum::BaseMaterial3D.BlendMode
+P	BaseMaterial3D	cull_mode	enum::BaseMaterial3D.CullMode
+P	BaseMaterial3D	depth_draw_mode	enum::BaseMaterial3D.DepthDrawMode
 P	BaseMaterial3D	no_depth_test	bool
-P	BaseMaterial3D	depth_test	int
-P	BaseMaterial3D	shading_mode	int
-P	BaseMaterial3D	diffuse_mode	int
-P	BaseMaterial3D	specular_mode	int
+P	BaseMaterial3D	depth_test	enum::BaseMaterial3D.DepthTest
+P	BaseMaterial3D	shading_mode	enum::BaseMaterial3D.ShadingMode
+P	BaseMaterial3D	diffuse_mode	enum::BaseMaterial3D.DiffuseMode
+P	BaseMaterial3D	specular_mode	enum::BaseMaterial3D.SpecularMode
 P	BaseMaterial3D	disable_ambient_light	bool
 P	BaseMaterial3D	disable_fog	bool
 P	BaseMaterial3D	disable_specular_occlusion	bool
@@ -3203,15 +3203,15 @@ P	BaseMaterial3D	orm_texture	Texture2D
 P	BaseMaterial3D	metallic	float
 P	BaseMaterial3D	metallic_specular	float
 P	BaseMaterial3D	metallic_texture	Texture2D
-P	BaseMaterial3D	metallic_texture_channel	int
+P	BaseMaterial3D	metallic_texture_channel	enum::BaseMaterial3D.TextureChannel
 P	BaseMaterial3D	roughness	float
 P	BaseMaterial3D	roughness_texture	Texture2D
-P	BaseMaterial3D	roughness_texture_channel	int
+P	BaseMaterial3D	roughness_texture_channel	enum::BaseMaterial3D.TextureChannel
 P	BaseMaterial3D	emission_enabled	bool
 P	BaseMaterial3D	emission	Color
 P	BaseMaterial3D	emission_energy_multiplier	float
 P	BaseMaterial3D	emission_intensity	float
-P	BaseMaterial3D	emission_operator	int
+P	BaseMaterial3D	emission_operator	enum::BaseMaterial3D.EmissionOperator
 P	BaseMaterial3D	emission_on_uv2	bool
 P	BaseMaterial3D	emission_texture	Texture2D
 P	BaseMaterial3D	normal_enabled	bool
@@ -3234,7 +3234,7 @@ P	BaseMaterial3D	ao_enabled	bool
 P	BaseMaterial3D	ao_light_affect	float
 P	BaseMaterial3D	ao_texture	Texture2D
 P	BaseMaterial3D	ao_on_uv2	bool
-P	BaseMaterial3D	ao_texture_channel	int
+P	BaseMaterial3D	ao_texture_channel	enum::BaseMaterial3D.TextureChannel
 P	BaseMaterial3D	heightmap_enabled	bool
 P	BaseMaterial3D	heightmap_scale	float
 P	BaseMaterial3D	heightmap_deep_parallax	bool
@@ -3259,11 +3259,11 @@ P	BaseMaterial3D	backlight_texture	Texture2D
 P	BaseMaterial3D	refraction_enabled	bool
 P	BaseMaterial3D	refraction_scale	float
 P	BaseMaterial3D	refraction_texture	Texture2D
-P	BaseMaterial3D	refraction_texture_channel	int
+P	BaseMaterial3D	refraction_texture_channel	enum::BaseMaterial3D.TextureChannel
 P	BaseMaterial3D	detail_enabled	bool
 P	BaseMaterial3D	detail_mask	Texture2D
-P	BaseMaterial3D	detail_blend_mode	int
-P	BaseMaterial3D	detail_uv_layer	int
+P	BaseMaterial3D	detail_blend_mode	enum::BaseMaterial3D.BlendMode
+P	BaseMaterial3D	detail_uv_layer	enum::BaseMaterial3D.DetailUV
 P	BaseMaterial3D	detail_albedo	Texture2D
 P	BaseMaterial3D	detail_normal	Texture2D
 P	BaseMaterial3D	uv1_scale	Vector3
@@ -3276,11 +3276,11 @@ P	BaseMaterial3D	uv2_offset	Vector3
 P	BaseMaterial3D	uv2_triplanar	bool
 P	BaseMaterial3D	uv2_triplanar_sharpness	float
 P	BaseMaterial3D	uv2_world_triplanar	bool
-P	BaseMaterial3D	texture_filter	int
+P	BaseMaterial3D	texture_filter	enum::BaseMaterial3D.TextureFilter
 P	BaseMaterial3D	texture_repeat	bool
 P	BaseMaterial3D	disable_receive_shadows	bool
 P	BaseMaterial3D	shadow_to_opacity	bool
-P	BaseMaterial3D	billboard_mode	int
+P	BaseMaterial3D	billboard_mode	enum::BaseMaterial3D.BillboardMode
 P	BaseMaterial3D	billboard_keep_scale	bool
 P	BaseMaterial3D	particles_anim_h_frames	int
 P	BaseMaterial3D	particles_anim_v_frames	int
@@ -3299,12 +3299,12 @@ P	BaseMaterial3D	proximity_fade_enabled	bool
 P	BaseMaterial3D	proximity_fade_distance	float
 P	BaseMaterial3D	msdf_pixel_range	float
 P	BaseMaterial3D	msdf_outline_size	float
-P	BaseMaterial3D	distance_fade_mode	int
+P	BaseMaterial3D	distance_fade_mode	enum::BaseMaterial3D.DistanceFadeMode
 P	BaseMaterial3D	distance_fade_min_distance	float
 P	BaseMaterial3D	distance_fade_max_distance	float
-P	BaseMaterial3D	stencil_mode	int
+P	BaseMaterial3D	stencil_mode	enum::BaseMaterial3D.StencilMode
 P	BaseMaterial3D	stencil_flags	int
-P	BaseMaterial3D	stencil_compare	int
+P	BaseMaterial3D	stencil_compare	enum::BaseMaterial3D.StencilCompare
 P	BaseMaterial3D	stencil_reference	int
 P	BaseMaterial3D	stencil_color	Color
 P	BaseMaterial3D	stencil_outline_thickness	float
@@ -3499,7 +3499,7 @@ F	BitMap	grow_mask	void	0	0	int	Rect2i
 F	BitMap	convert_to_image	Image	0	0
 F	BitMap	opaque_to_polygons	typedarray::PackedVector2Array	0	0	Rect2i	float?
 C	BlitMaterial	Material	0
-P	BlitMaterial	blend_mode	int
+P	BlitMaterial	blend_mode	enum::BlitMaterial.BlendMode
 F	BlitMaterial	set_blend_mode	void	0	0	enum::BlitMaterial.BlendMode
 F	BlitMaterial	get_blend_mode	enum::BlitMaterial.BlendMode	0	0
 E	BlitMaterial	BlendMode	0	BLEND_MODE_MIX	0	BLEND_MODE_ADD	1	BLEND_MODE_SUB	2	BLEND_MODE_MUL	3	BLEND_MODE_DISABLED	4
@@ -3601,7 +3601,7 @@ F	BoneTwistDisperser3D	set_joint_twist_amount	void	0	0	int	int	float
 F	BoneTwistDisperser3D	get_joint_count	int	0	0	int
 E	BoneTwistDisperser3D	DisperseMode	0	DISPERSE_MODE_EVEN	0	DISPERSE_MODE_WEIGHTED	1	DISPERSE_MODE_CUSTOM	2
 C	BoxContainer	Container	0
-P	BoxContainer	alignment	int
+P	BoxContainer	alignment	enum::BoxContainer.AlignmentMode
 P	BoxContainer	vertical	bool
 F	BoxContainer	add_spacer	Control	0	0	bool
 F	BoxContainer	set_alignment	void	0	0	enum::BoxContainer.AlignmentMode
@@ -3634,15 +3634,15 @@ C	Button	BaseButton	0
 P	Button	text	String
 P	Button	icon	Texture2D
 P	Button	flat	bool
-P	Button	alignment	int
-P	Button	text_overrun_behavior	int
-P	Button	autowrap_mode	int
+P	Button	alignment	enum::HorizontalAlignment
+P	Button	text_overrun_behavior	enum::TextServer.OverrunBehavior
+P	Button	autowrap_mode	enum::TextServer.AutowrapMode
 P	Button	autowrap_trim_flags	int
 P	Button	clip_text	bool
-P	Button	icon_alignment	int
-P	Button	vertical_icon_alignment	int
+P	Button	icon_alignment	enum::HorizontalAlignment
+P	Button	vertical_icon_alignment	enum::VerticalAlignment
 P	Button	expand_icon	bool
-P	Button	text_direction	int
+P	Button	text_direction	enum::Control.TextDirection
 P	Button	language	String
 F	Button	set_text	void	0	0	String
 F	Button	get_text	String	0	0
@@ -3694,8 +3694,8 @@ P	CPUParticles2D	lifetime_randomness	float
 P	CPUParticles2D	fixed_fps	int
 P	CPUParticles2D	fract_delta	bool
 P	CPUParticles2D	local_coords	bool
-P	CPUParticles2D	draw_order	int
-P	CPUParticles2D	emission_shape	int
+P	CPUParticles2D	draw_order	enum::CPUParticles2D.DrawOrder
+P	CPUParticles2D	emission_shape	enum::CPUParticles2D.EmissionShape
 P	CPUParticles2D	emission_sphere_radius	float
 P	CPUParticles2D	emission_rect_extents	Vector2
 P	CPUParticles2D	emission_points	PackedVector2Array
@@ -3846,9 +3846,9 @@ P	CPUParticles3D	fixed_fps	int
 P	CPUParticles3D	fract_delta	bool
 P	CPUParticles3D	visibility_aabb	AABB
 P	CPUParticles3D	local_coords	bool
-P	CPUParticles3D	draw_order	int
+P	CPUParticles3D	draw_order	enum::CPUParticles3D.DrawOrder
 P	CPUParticles3D	mesh	Mesh
-P	CPUParticles3D	emission_shape	int
+P	CPUParticles3D	emission_shape	enum::CPUParticles3D.EmissionShape
 P	CPUParticles3D	emission_sphere_radius	float
 P	CPUParticles3D	emission_box_extents	Vector3
 P	CPUParticles3D	emission_points	PackedVector3Array
@@ -4039,15 +4039,15 @@ F	CSGMesh3D	set_material	void	0	0	Material
 F	CSGMesh3D	get_material	Material	0	0
 C	CSGPolygon3D	CSGPrimitive3D	0
 P	CSGPolygon3D	polygon	PackedVector2Array
-P	CSGPolygon3D	mode	int
+P	CSGPolygon3D	mode	enum::CSGPolygon3D.Mode
 P	CSGPolygon3D	depth	float
 P	CSGPolygon3D	spin_degrees	float
 P	CSGPolygon3D	spin_sides	int
 P	CSGPolygon3D	path_node	NodePath
-P	CSGPolygon3D	path_interval_type	int
+P	CSGPolygon3D	path_interval_type	enum::CSGPolygon3D.PathIntervalType
 P	CSGPolygon3D	path_interval	float
 P	CSGPolygon3D	path_simplify_angle	float
-P	CSGPolygon3D	path_rotation	int
+P	CSGPolygon3D	path_rotation	enum::CSGPolygon3D.PathRotation
 P	CSGPolygon3D	path_rotation_accurate	bool
 P	CSGPolygon3D	path_local	bool
 P	CSGPolygon3D	path_continuous_u	bool
@@ -4099,7 +4099,7 @@ F	CSGPrimitive3D	get_flip_faces	bool	0	0
 C	CSGShape3D	GeometryInstance3D	0
 P	CSGShape3D	autosmooth	bool
 P	CSGShape3D	smoothing_angle	float
-P	CSGShape3D	operation	int
+P	CSGShape3D	operation	enum::CSGShape3D.Operation
 P	CSGShape3D	snap	float
 P	CSGShape3D	calculate_tangents	bool
 P	CSGShape3D	use_collision	bool
@@ -4172,12 +4172,12 @@ C	CallbackTweener	Tweener	0
 F	CallbackTweener	set_delay	CallbackTweener	0	0	float
 C	Camera2D	Node2D	0
 P	Camera2D	offset	Vector2
-P	Camera2D	anchor_mode	int
+P	Camera2D	anchor_mode	enum::Camera2D.AnchorMode
 P	Camera2D	ignore_rotation	bool
 P	Camera2D	enabled	bool
 P	Camera2D	zoom	Vector2
 P	Camera2D	custom_viewport	Viewport
-P	Camera2D	process_callback	int
+P	Camera2D	process_callback	enum::Camera2D.Camera2DProcessCallback
 P	Camera2D	limit_enabled	bool
 P	Camera2D	limit_left	int
 P	Camera2D	limit_top	int
@@ -4254,15 +4254,15 @@ F	Camera2D	is_margin_drawing_enabled	bool	0	0
 E	Camera2D	AnchorMode	0	ANCHOR_MODE_FIXED_TOP_LEFT	0	ANCHOR_MODE_DRAG_CENTER	1
 E	Camera2D	Camera2DProcessCallback	0	CAMERA2D_PROCESS_PHYSICS	0	CAMERA2D_PROCESS_IDLE	1
 C	Camera3D	Node3D	0
-P	Camera3D	keep_aspect	int
+P	Camera3D	keep_aspect	enum::Camera3D.KeepAspect
 P	Camera3D	cull_mask	int
 P	Camera3D	environment	Environment
 P	Camera3D	attributes	CameraAttributesPractical,CameraAttributesPhysical
 P	Camera3D	compositor	Compositor
 P	Camera3D	h_offset	float
 P	Camera3D	v_offset	float
-P	Camera3D	doppler_tracking	int
-P	Camera3D	projection	int
+P	Camera3D	doppler_tracking	enum::Camera3D.DopplerTracking
+P	Camera3D	projection	enum::Camera3D.ProjectionType
 P	Camera3D	current	bool
 P	Camera3D	fov	float
 P	Camera3D	size	float
@@ -4435,7 +4435,7 @@ P	CameraServer	camera_feed_removed	Signal
 P	CameraServer	camera_feeds_updated	Signal
 C	CameraTexture	Texture2D	0
 P	CameraTexture	camera_feed_id	int
-P	CameraTexture	which_feed	int
+P	CameraTexture	which_feed	enum::CameraServer.FeedImage
 P	CameraTexture	camera_is_active	bool
 F	CameraTexture	set_camera_feed_id	void	0	0	int
 F	CameraTexture	get_camera_feed_id	int	0	0
@@ -4459,15 +4459,15 @@ P	CanvasItem	modulate	Color
 P	CanvasItem	self_modulate	Color
 P	CanvasItem	show_behind_parent	bool
 P	CanvasItem	top_level	bool
-P	CanvasItem	clip_children	int
-P	CanvasItem	oversampling_with_scale	int
+P	CanvasItem	clip_children	enum::CanvasItem.ClipChildrenMode
+P	CanvasItem	oversampling_with_scale	enum::CanvasItem.OversamplingWithScale
 P	CanvasItem	light_mask	int
 P	CanvasItem	visibility_layer	int
 P	CanvasItem	z_index	int
 P	CanvasItem	z_as_relative	bool
 P	CanvasItem	y_sort_enabled	bool
-P	CanvasItem	texture_filter	int
-P	CanvasItem	texture_repeat	int
+P	CanvasItem	texture_filter	enum::CanvasItem.TextureFilter
+P	CanvasItem	texture_repeat	enum::CanvasItem.TextureRepeat
 P	CanvasItem	material	CanvasItemMaterial,ShaderMaterial
 P	CanvasItem	use_parent_material	bool
 F	CanvasItem	_draw	void	0	0
@@ -4580,8 +4580,8 @@ P	CanvasItem	visibility_changed	Signal
 P	CanvasItem	hidden	Signal
 P	CanvasItem	item_rect_changed	Signal
 C	CanvasItemMaterial	Material	0
-P	CanvasItemMaterial	blend_mode	int
-P	CanvasItemMaterial	light_mode	int
+P	CanvasItemMaterial	blend_mode	enum::CanvasItemMaterial.BlendMode
+P	CanvasItemMaterial	light_mode	enum::CanvasItemMaterial.LightMode
 P	CanvasItemMaterial	particles_animation	bool
 P	CanvasItemMaterial	particles_anim_h_frames	int
 P	CanvasItemMaterial	particles_anim_v_frames	int
@@ -4643,8 +4643,8 @@ P	CanvasTexture	normal_texture	Texture2D
 P	CanvasTexture	specular_texture	Texture2D
 P	CanvasTexture	specular_color	Color
 P	CanvasTexture	specular_shininess	float
-P	CanvasTexture	texture_filter	int
-P	CanvasTexture	texture_repeat	int
+P	CanvasTexture	texture_filter	enum::CanvasItem.TextureFilter
+P	CanvasTexture	texture_repeat	enum::CanvasItem.TextureRepeat
 F	CanvasTexture	set_diffuse_texture	void	0	0	Texture2D
 F	CanvasTexture	get_diffuse_texture	Texture2D	0	0
 F	CanvasTexture	set_normal_texture	void	0	0	Texture2D
@@ -4755,7 +4755,7 @@ F	CharFXTransform	set_glyph_flags	void	0	0	int
 F	CharFXTransform	get_font	RID	0	0
 F	CharFXTransform	set_font	void	0	0	RID
 C	CharacterBody2D	PhysicsBody2D	0
-P	CharacterBody2D	motion_mode	int
+P	CharacterBody2D	motion_mode	enum::CharacterBody2D.MotionMode
 P	CharacterBody2D	up_direction	Vector2
 P	CharacterBody2D	velocity	Vector2
 P	CharacterBody2D	slide_on_ceiling	bool
@@ -4766,7 +4766,7 @@ P	CharacterBody2D	floor_constant_speed	bool
 P	CharacterBody2D	floor_block_on_wall	bool
 P	CharacterBody2D	floor_max_angle	float
 P	CharacterBody2D	floor_snap_length	float
-P	CharacterBody2D	platform_on_leave	int
+P	CharacterBody2D	platform_on_leave	enum::CharacterBody2D.PlatformOnLeave
 P	CharacterBody2D	platform_floor_layers	int
 P	CharacterBody2D	platform_wall_layers	int
 P	CharacterBody2D	safe_margin	float
@@ -4821,7 +4821,7 @@ F	CharacterBody2D	get_last_slide_collision	KinematicCollision2D	0	0
 E	CharacterBody2D	MotionMode	0	MOTION_MODE_GROUNDED	0	MOTION_MODE_FLOATING	1
 E	CharacterBody2D	PlatformOnLeave	0	PLATFORM_ON_LEAVE_ADD_VELOCITY	0	PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY	1	PLATFORM_ON_LEAVE_DO_NOTHING	2
 C	CharacterBody3D	PhysicsBody3D	0
-P	CharacterBody3D	motion_mode	int
+P	CharacterBody3D	motion_mode	enum::CharacterBody3D.MotionMode
 P	CharacterBody3D	up_direction	Vector3
 P	CharacterBody3D	slide_on_ceiling	bool
 P	CharacterBody3D	velocity	Vector3
@@ -4832,7 +4832,7 @@ P	CharacterBody3D	floor_constant_speed	bool
 P	CharacterBody3D	floor_block_on_wall	bool
 P	CharacterBody3D	floor_max_angle	float
 P	CharacterBody3D	floor_snap_length	float
-P	CharacterBody3D	platform_on_leave	int
+P	CharacterBody3D	platform_on_leave	enum::CharacterBody3D.PlatformOnLeave
 P	CharacterBody3D	platform_floor_layers	int
 P	CharacterBody3D	platform_wall_layers	int
 P	CharacterBody3D	safe_margin	float
@@ -5109,7 +5109,7 @@ F	CodeHighlighter	get_symbol_color	Color	0	0
 F	CodeHighlighter	set_member_variable_color	void	0	0	Color
 F	CodeHighlighter	get_member_variable_color	Color	0	0
 C	CollisionObject2D	Node2D	0
-P	CollisionObject2D	disable_mode	int
+P	CollisionObject2D	disable_mode	enum::CollisionObject2D.DisableMode
 P	CollisionObject2D	collision_layer	int
 P	CollisionObject2D	collision_mask	int
 P	CollisionObject2D	collision_priority	float
@@ -5162,7 +5162,7 @@ P	CollisionObject2D	mouse_exited	Signal
 P	CollisionObject2D	mouse_shape_entered	Signal
 P	CollisionObject2D	mouse_shape_exited	Signal
 C	CollisionObject3D	Node3D	0
-P	CollisionObject3D	disable_mode	int
+P	CollisionObject3D	disable_mode	enum::CollisionObject3D.DisableMode
 P	CollisionObject3D	collision_layer	int
 P	CollisionObject3D	collision_mask	int
 P	CollisionObject3D	collision_priority	float
@@ -5208,7 +5208,7 @@ P	CollisionObject3D	input_event	Signal
 P	CollisionObject3D	mouse_entered	Signal
 P	CollisionObject3D	mouse_exited	Signal
 C	CollisionPolygon2D	Node2D	0
-P	CollisionPolygon2D	build_mode	int
+P	CollisionPolygon2D	build_mode	enum::CollisionPolygon2D.BuildMode
 P	CollisionPolygon2D	polygon	PackedVector2Array
 P	CollisionPolygon2D	disabled	bool
 P	CollisionPolygon2D	one_way_collision	bool
@@ -5288,9 +5288,9 @@ C	ColorPicker	VBoxContainer	0
 P	ColorPicker	color	Color
 P	ColorPicker	edit_alpha	bool
 P	ColorPicker	edit_intensity	bool
-P	ColorPicker	color_mode	int
+P	ColorPicker	color_mode	enum::ColorPicker.ColorModeType
 P	ColorPicker	deferred_mode	bool
-P	ColorPicker	picker_shape	int
+P	ColorPicker	picker_shape	enum::ColorPicker.PickerShapeType
 P	ColorPicker	can_add_swatches	bool
 P	ColorPicker	sampler_visible	bool
 P	ColorPicker	color_modes_visible	bool
@@ -5357,7 +5357,7 @@ F	Compositor	set_compositor_effects	void	0	0	typedarray::CompositorEffect
 F	Compositor	get_compositor_effects	typedarray::CompositorEffect	0	0
 C	CompositorEffect	Resource	0
 P	CompositorEffect	enabled	bool
-P	CompositorEffect	effect_callback_type	int
+P	CompositorEffect	effect_callback_type	enum::CompositorEffect.EffectCallbackType
 P	CompositorEffect	access_resolved_color	bool
 P	CompositorEffect	access_resolved_depth	bool
 P	CompositorEffect	needs_motion_vectors	bool
@@ -5464,8 +5464,8 @@ P	Control	offset_left	float
 P	Control	offset_top	float
 P	Control	offset_right	float
 P	Control	offset_bottom	float
-P	Control	grow_horizontal	int
-P	Control	grow_vertical	int
+P	Control	grow_horizontal	enum::Control.GrowDirection
+P	Control	grow_vertical	enum::Control.GrowDirection
 P	Control	size	Vector2
 P	Control	position	Vector2
 P	Control	global_position	Vector2
@@ -5486,27 +5486,27 @@ P	Control	offset_transform_pivot	Vector2
 P	Control	offset_transform_pivot_ratio	Vector2
 P	Control	offset_transform_visual_only	bool
 P	Control	localize_numeral_system	bool
-P	Control	layout_direction	int
+P	Control	layout_direction	enum::Control.LayoutDirection
 P	Control	translation_context	StringName
 P	Control	auto_translate	bool
 P	Control	tooltip_text	String
-P	Control	tooltip_auto_translate_mode	int
+P	Control	tooltip_auto_translate_mode	enum::Node.AutoTranslateMode
 P	Control	focus_neighbor_left	NodePath
 P	Control	focus_neighbor_top	NodePath
 P	Control	focus_neighbor_right	NodePath
 P	Control	focus_neighbor_bottom	NodePath
 P	Control	focus_next	NodePath
 P	Control	focus_previous	NodePath
-P	Control	focus_mode	int
-P	Control	focus_behavior_recursive	int
-P	Control	mouse_filter	int
-P	Control	mouse_behavior_recursive	int
+P	Control	focus_mode	enum::Control.FocusMode
+P	Control	focus_behavior_recursive	enum::Control.FocusBehaviorRecursive
+P	Control	mouse_filter	enum::Control.MouseFilter
+P	Control	mouse_behavior_recursive	enum::Control.MouseBehaviorRecursive
 P	Control	mouse_force_pass_scroll_events	bool
-P	Control	mouse_default_cursor_shape	int
+P	Control	mouse_default_cursor_shape	enum::Control.CursorShape
 P	Control	shortcut_context	Object
 P	Control	accessibility_name	String
 P	Control	accessibility_description	String
-P	Control	accessibility_live	int
+P	Control	accessibility_live	enum::AccessibilityServer.AccessibilityLiveMode
 P	Control	accessibility_controls_nodes	typedarray::NodePath
 P	Control	accessibility_described_by_nodes	typedarray::NodePath
 P	Control	accessibility_labeled_by_nodes	typedarray::NodePath
@@ -5932,7 +5932,7 @@ F	Curve3D	tessellate	PackedVector3Array	0	0	int?	float?
 F	Curve3D	tessellate_even_length	PackedVector3Array	0	0	int?	float?
 C	CurveTexture	Texture2D	0
 P	CurveTexture	width	int
-P	CurveTexture	texture_mode	int
+P	CurveTexture	texture_mode	enum::CurveTexture.TextureMode
 P	CurveTexture	curve	Curve
 F	CurveTexture	set_width	void	0	0	int
 F	CurveTexture	set_curve	void	0	0	Curve
@@ -6110,7 +6110,7 @@ P	DirectionalLight2D	max_distance	float
 F	DirectionalLight2D	set_max_distance	void	0	0	float
 F	DirectionalLight2D	get_max_distance	float	0	0
 C	DirectionalLight3D	Light3D	0
-P	DirectionalLight3D	directional_shadow_mode	int
+P	DirectionalLight3D	directional_shadow_mode	enum::DirectionalLight3D.ShadowMode
 P	DirectionalLight3D	directional_shadow_split_1	float
 P	DirectionalLight3D	directional_shadow_split_2	float
 P	DirectionalLight3D	directional_shadow_split_3	float
@@ -6118,7 +6118,7 @@ P	DirectionalLight3D	directional_shadow_blend_splits	bool
 P	DirectionalLight3D	directional_shadow_fade_start	float
 P	DirectionalLight3D	directional_shadow_max_distance	float
 P	DirectionalLight3D	directional_shadow_pancake_size	float
-P	DirectionalLight3D	sky_mode	int
+P	DirectionalLight3D	sky_mode	enum::DirectionalLight3D.SkyMode
 F	DirectionalLight3D	set_shadow_mode	void	0	0	enum::DirectionalLight3D.ShadowMode
 F	DirectionalLight3D	get_shadow_mode	enum::DirectionalLight3D.ShadowMode	0	0
 F	DirectionalLight3D	set_blend_splits	void	0	0	bool
@@ -6518,7 +6518,6 @@ F	EditorContextMenuPlugin	add_menu_shortcut	void	0	0	Shortcut	Callable
 F	EditorContextMenuPlugin	add_context_menu_item	void	0	0	String	Callable	Texture2D?
 F	EditorContextMenuPlugin	add_context_menu_item_from_shortcut	void	0	0	String	Shortcut	Texture2D?
 F	EditorContextMenuPlugin	add_context_submenu_item	void	0	0	String	PopupMenu	Texture2D?
-E	EditorContextMenuPlugin	ContextMenuSlot	0	CONTEXT_SLOT_SCENE_TREE	0	CONTEXT_SLOT_FILESYSTEM	1	CONTEXT_SLOT_SCRIPT_EDITOR	2	CONTEXT_SLOT_FILESYSTEM_CREATE	3	CONTEXT_SLOT_SCRIPT_EDITOR_CODE	4	CONTEXT_SLOT_SCENE_TABS	5	CONTEXT_SLOT_2D_EDITOR	6	CONTEXT_SLOT_INSPECTOR_PROPERTY	7
 C	EditorDebuggerPlugin	RefCounted	0
 F	EditorDebuggerPlugin	_setup_session	void	0	0	int
 F	EditorDebuggerPlugin	_has_capture	bool	0	0	String
@@ -6552,7 +6551,7 @@ P	EditorDock	dock_icon	Texture2D
 P	EditorDock	force_show_icon	bool
 P	EditorDock	title_color	Color
 P	EditorDock	dock_shortcut	Shortcut
-P	EditorDock	default_slot	int
+P	EditorDock	default_slot	enum::EditorDock.DockSlot
 P	EditorDock	available_layouts	int
 F	EditorDock	_update_layout	void	0	0	int
 F	EditorDock	_save_layout_to_config	void	0	0	ConfigFile	String
@@ -6584,8 +6583,6 @@ F	EditorDock	set_default_slot	void	0	0	enum::EditorDock.DockSlot
 F	EditorDock	get_default_slot	enum::EditorDock.DockSlot	0	0
 F	EditorDock	set_available_layouts	void	0	0	bitfield::EditorDock.DockLayout
 F	EditorDock	get_available_layouts	bitfield::EditorDock.DockLayout	0	0
-E	EditorDock	DockLayout	1	DOCK_LAYOUT_VERTICAL	1	DOCK_LAYOUT_HORIZONTAL	2	DOCK_LAYOUT_FLOATING	4	DOCK_LAYOUT_ALL	7
-E	EditorDock	DockSlot	0	DOCK_SLOT_NONE	-1	DOCK_SLOT_LEFT_UL	0	DOCK_SLOT_LEFT_BL	1	DOCK_SLOT_LEFT_UR	2	DOCK_SLOT_LEFT_BR	3	DOCK_SLOT_RIGHT_UL	4	DOCK_SLOT_RIGHT_BL	5	DOCK_SLOT_RIGHT_UR	6	DOCK_SLOT_RIGHT_BR	7	DOCK_SLOT_BOTTOM	8	DOCK_SLOT_BOTTOM_L	9	DOCK_SLOT_BOTTOM_R	10	DOCK_SLOT_MAX	11
 P	EditorDock	opened	Signal
 P	EditorDock	closed	Signal
 C	EditorExportPlatform	RefCounted	0
@@ -6616,8 +6613,6 @@ F	EditorExportPlatform	ssh_run_on_remote_no_wait	int	0	0	String	String	PackedStr
 F	EditorExportPlatform	ssh_push_to_remote	enum::Error	0	0	String	String	PackedStringArray	String	String
 F	EditorExportPlatform	get_internal_export_files	Dictionary	0	0	EditorExportPreset	bool
 F	EditorExportPlatform	get_forced_export_files	PackedStringArray	1	0	EditorExportPreset?
-E	EditorExportPlatform	ExportMessageType	0	EXPORT_MESSAGE_NONE	0	EXPORT_MESSAGE_INFO	1	EXPORT_MESSAGE_WARNING	2	EXPORT_MESSAGE_ERROR	3
-E	EditorExportPlatform	DebugFlags	1	DEBUG_FLAG_DUMB_CLIENT	1	DEBUG_FLAG_REMOTE_DEBUG	2	DEBUG_FLAG_REMOTE_DEBUG_LOCALHOST	4	DEBUG_FLAG_VIEW_COLLISIONS	8	DEBUG_FLAG_VIEW_NAVIGATION	16
 C	EditorExportPlatformAndroid	EditorExportPlatform	0
 C	EditorExportPlatformAppleEmbedded	EditorExportPlatform	0
 C	EditorExportPlatformExtension	EditorExportPlatform	0
@@ -6737,9 +6732,6 @@ F	EditorExportPreset	get_encryption_key	String	0	0
 F	EditorExportPreset	get_script_export_mode	enum::EditorExportPreset.ScriptExportMode	0	0
 F	EditorExportPreset	get_or_env	Variant	0	0	StringName	String
 F	EditorExportPreset	get_version	String	0	0	StringName	bool
-E	EditorExportPreset	ExportFilter	0	EXPORT_ALL_RESOURCES	0	EXPORT_SELECTED_SCENES	1	EXPORT_SELECTED_RESOURCES	2	EXCLUDE_SELECTED_RESOURCES	3	EXPORT_CUSTOMIZED	4
-E	EditorExportPreset	FileExportMode	0	MODE_FILE_NOT_CUSTOMIZED	0	MODE_FILE_STRIP	1	MODE_FILE_KEEP	2	MODE_FILE_REMOVE	3
-E	EditorExportPreset	ScriptExportMode	0	MODE_SCRIPT_TEXT	0	MODE_SCRIPT_BINARY_TOKENS	1	MODE_SCRIPT_BINARY_TOKENS_COMPRESSED	2
 C	EditorFeatureProfile	RefCounted	0
 F	EditorFeatureProfile	set_disable_class	void	0	0	StringName	bool
 F	EditorFeatureProfile	is_class_disabled	bool	0	0	StringName
@@ -6752,7 +6744,6 @@ F	EditorFeatureProfile	is_feature_disabled	bool	0	0	enum::EditorFeatureProfile.F
 F	EditorFeatureProfile	get_feature_name	String	0	0	enum::EditorFeatureProfile.Feature
 F	EditorFeatureProfile	save_to_file	enum::Error	0	0	String
 F	EditorFeatureProfile	load_from_file	enum::Error	0	0	String
-E	EditorFeatureProfile	Feature	0	FEATURE_3D	0	FEATURE_SCRIPT	1	FEATURE_ASSET_LIB	2	FEATURE_SCENE_TREE	3	FEATURE_NODE_DOCK	4	FEATURE_FILESYSTEM_DOCK	5	FEATURE_IMPORT_DOCK	6	FEATURE_HISTORY_DOCK	7	FEATURE_GAME	8	FEATURE_SIGNALS_DOCK	9	FEATURE_GROUPS_DOCK	10	FEATURE_MAX	11
 C	EditorFileDialog	FileDialog	0
 P	EditorFileDialog	disable_overwrite_warning	bool
 F	EditorFileDialog	add_side_menu	void	0	0	Control	String?
@@ -7047,9 +7038,6 @@ F	EditorPlugin	get_script_create_dialog	ScriptCreateDialog	0	0
 F	EditorPlugin	add_debugger_plugin	void	0	0	EditorDebuggerPlugin
 F	EditorPlugin	remove_debugger_plugin	void	0	0	EditorDebuggerPlugin
 F	EditorPlugin	get_plugin_version	String	0	0
-E	EditorPlugin	CustomControlContainer	0	CONTAINER_TOOLBAR	0	CONTAINER_SPATIAL_EDITOR_MENU	1	CONTAINER_SPATIAL_EDITOR_SIDE_LEFT	2	CONTAINER_SPATIAL_EDITOR_SIDE_RIGHT	3	CONTAINER_SPATIAL_EDITOR_BOTTOM	4	CONTAINER_CANVAS_EDITOR_MENU	5	CONTAINER_CANVAS_EDITOR_SIDE_LEFT	6	CONTAINER_CANVAS_EDITOR_SIDE_RIGHT	7	CONTAINER_CANVAS_EDITOR_BOTTOM	8	CONTAINER_INSPECTOR_BOTTOM	9	CONTAINER_PROJECT_SETTING_TAB_LEFT	10	CONTAINER_PROJECT_SETTING_TAB_RIGHT	11
-E	EditorPlugin	DockSlot	0	DOCK_SLOT_NONE	-1	DOCK_SLOT_LEFT_UL	0	DOCK_SLOT_LEFT_BL	1	DOCK_SLOT_LEFT_UR	2	DOCK_SLOT_LEFT_BR	3	DOCK_SLOT_RIGHT_UL	4	DOCK_SLOT_RIGHT_BL	5	DOCK_SLOT_RIGHT_UR	6	DOCK_SLOT_RIGHT_BR	7	DOCK_SLOT_BOTTOM	8	DOCK_SLOT_MAX	9
-E	EditorPlugin	AfterGUIInput	0	AFTER_GUI_INPUT_PASS	0	AFTER_GUI_INPUT_STOP	1	AFTER_GUI_INPUT_CUSTOM	2
 P	EditorPlugin	scene_changed	Signal
 P	EditorPlugin	scene_closed	Signal
 P	EditorPlugin	main_screen_changed	Signal
@@ -7167,7 +7155,6 @@ F	EditorSceneFormatImporter	_get_import_options	void	0	0	String
 F	EditorSceneFormatImporter	_get_option_visibility	Variant	0	0	String	bool	String
 F	EditorSceneFormatImporter	add_import_option	void	0	0	String	Variant
 F	EditorSceneFormatImporter	add_import_option_advanced	void	0	0	enum::Variant.Type	String	Variant	enum::PropertyHint?	String?	int?
-E	EditorSceneFormatImporter	ImportFlags	1	IMPORT_SCENE	1	IMPORT_ANIMATION	2	IMPORT_FAIL_ON_MISSING_DEPENDENCIES	4	IMPORT_GENERATE_TANGENT_ARRAYS	8	IMPORT_USE_NAMED_SKIN_BINDS	16	IMPORT_DISCARD_MESHES_AND_MATERIALS	32	IMPORT_FORCE_DISABLE_MESH_COMPRESSION	64
 C	EditorSceneFormatImporterBlend	EditorSceneFormatImporter	0
 C	EditorSceneFormatImporterFBX2GLTF	EditorSceneFormatImporter	0
 C	EditorSceneFormatImporterGLTF	EditorSceneFormatImporter	0
@@ -7187,7 +7174,6 @@ F	EditorScenePostImportPlugin	_post_process	void	0	0	Node
 F	EditorScenePostImportPlugin	get_option_value	Variant	0	0	StringName
 F	EditorScenePostImportPlugin	add_import_option	void	0	0	String	Variant
 F	EditorScenePostImportPlugin	add_import_option_advanced	void	0	0	enum::Variant.Type	String	Variant	enum::PropertyHint?	String?	int?
-E	EditorScenePostImportPlugin	InternalImportCategory	0	INTERNAL_IMPORT_CATEGORY_NODE	0	INTERNAL_IMPORT_CATEGORY_MESH_3D_NODE	1	INTERNAL_IMPORT_CATEGORY_MESH	2	INTERNAL_IMPORT_CATEGORY_MATERIAL	3	INTERNAL_IMPORT_CATEGORY_ANIMATION	4	INTERNAL_IMPORT_CATEGORY_ANIMATION_NODE	5	INTERNAL_IMPORT_CATEGORY_SKELETON_3D_NODE	6	INTERNAL_IMPORT_CATEGORY_MAX	7
 C	EditorScript	RefCounted	0
 F	EditorScript	_run	void	0	0
 F	EditorScript	add_root_node	void	0	0	Node
@@ -7255,7 +7241,6 @@ F	EditorSpinSlider	set_editing_integer	void	0	0	bool
 F	EditorSpinSlider	is_editing_integer	bool	0	0
 F	EditorSpinSlider	set_deferred_drag_mode_enabled	void	0	0	bool?
 F	EditorSpinSlider	is_deferred_drag_mode_enabled	bool	0	0
-E	EditorSpinSlider	ControlState	0	CONTROL_STATE_DEFAULT	0	CONTROL_STATE_PREFER_SLIDER	1	CONTROL_STATE_HIDE	2
 P	EditorSpinSlider	grabbed	Signal
 P	EditorSpinSlider	ungrabbed	Signal
 P	EditorSpinSlider	updown_pressed	Signal
@@ -7267,7 +7252,6 @@ F	EditorSyntaxHighlighter	_get_supported_languages	PackedStringArray	0	0
 F	EditorSyntaxHighlighter	_create	EditorSyntaxHighlighter	0	0
 C	EditorToaster	HBoxContainer	0
 F	EditorToaster	push_toast	void	0	0	String	enum::EditorToaster.Severity?	String?
-E	EditorToaster	Severity	0	SEVERITY_INFO	0	SEVERITY_WARNING	1	SEVERITY_ERROR	2
 C	EditorTranslationParserPlugin	RefCounted	0
 F	EditorTranslationParserPlugin	_parse_file	typedarray::PackedStringArray	0	0	String
 F	EditorTranslationParserPlugin	_get_recognized_extensions	PackedStringArray	0	0
@@ -7286,7 +7270,6 @@ F	EditorUndoRedoManager	add_undo_reference	void	0	0	Object
 F	EditorUndoRedoManager	get_object_history_id	int	0	0	Object
 F	EditorUndoRedoManager	get_history_undo_redo	UndoRedo	0	0	int
 F	EditorUndoRedoManager	clear_history	void	0	0	int?	bool?
-E	EditorUndoRedoManager	SpecialHistory	0	GLOBAL_HISTORY	0	REMOTE_HISTORY	-9	INVALID_HISTORY	-99
 P	EditorUndoRedoManager	history_changed	Signal
 P	EditorUndoRedoManager	version_changed	Signal
 C	EditorVCSInterface	Object	0
@@ -7322,8 +7305,6 @@ F	EditorVCSInterface	create_status_file	Dictionary	0	0	String	enum::EditorVCSInt
 F	EditorVCSInterface	add_diff_hunks_into_diff_file	Dictionary	0	0	Dictionary	typedarray::Dictionary
 F	EditorVCSInterface	add_line_diffs_into_diff_hunk	Dictionary	0	0	Dictionary	typedarray::Dictionary
 F	EditorVCSInterface	popup_error	void	0	0	String
-E	EditorVCSInterface	ChangeType	0	CHANGE_TYPE_NEW	0	CHANGE_TYPE_MODIFIED	1	CHANGE_TYPE_RENAMED	2	CHANGE_TYPE_DELETED	3	CHANGE_TYPE_TYPECHANGE	4	CHANGE_TYPE_UNMERGED	5
-E	EditorVCSInterface	TreeArea	0	TREE_AREA_COMMIT	0	TREE_AREA_STAGED	1	TREE_AREA_UNSTAGED	2
 C	EncodedObjectAsID	RefCounted	0
 P	EncodedObjectAsID	object_id	int
 F	EncodedObjectAsID	set_object_id	void	0	0	int
@@ -7406,7 +7387,7 @@ F	EngineProfiler	_toggle	void	0	0	bool	Array
 F	EngineProfiler	_add_frame	void	0	0	Array
 F	EngineProfiler	_tick	void	0	0	float	float	float	float
 C	Environment	Resource	0
-P	Environment	background_mode	int
+P	Environment	background_mode	enum::Environment.BGMode
 P	Environment	background_color	Color
 P	Environment	background_energy_multiplier	float
 P	Environment	background_intensity	float
@@ -7415,12 +7396,12 @@ P	Environment	background_camera_feed_id	int
 P	Environment	sky	Sky
 P	Environment	sky_custom_fov	float
 P	Environment	sky_rotation	Vector3
-P	Environment	ambient_light_source	int
+P	Environment	ambient_light_source	enum::Environment.AmbientSource
 P	Environment	ambient_light_color	Color
 P	Environment	ambient_light_sky_contribution	float
 P	Environment	ambient_light_energy	float
-P	Environment	reflected_light_source	int
-P	Environment	tonemap_mode	int
+P	Environment	reflected_light_source	enum::Environment.ReflectionSource
+P	Environment	tonemap_mode	enum::Environment.ToneMapper
 P	Environment	tonemap_exposure	float
 P	Environment	tonemap_white	float
 P	Environment	tonemap_agx_white	float
@@ -7452,7 +7433,7 @@ P	Environment	sdfgi_cascades	int
 P	Environment	sdfgi_min_cell_size	float
 P	Environment	sdfgi_cascade0_distance	float
 P	Environment	sdfgi_max_distance	float
-P	Environment	sdfgi_y_scale	int
+P	Environment	sdfgi_y_scale	enum::Environment.SDFGIYScale
 P	Environment	sdfgi_energy	float
 P	Environment	sdfgi_normal_bias	float
 P	Environment	sdfgi_probe_bias	float
@@ -7462,14 +7443,14 @@ P	Environment	glow_intensity	float
 P	Environment	glow_strength	float
 P	Environment	glow_mix	float
 P	Environment	glow_bloom	float
-P	Environment	glow_blend_mode	int
+P	Environment	glow_blend_mode	enum::Environment.GlowBlendMode
 P	Environment	glow_hdr_threshold	float
 P	Environment	glow_hdr_scale	float
 P	Environment	glow_hdr_luminance_cap	float
 P	Environment	glow_map_strength	float
 P	Environment	glow_map	Texture2D
 P	Environment	fog_enabled	bool
-P	Environment	fog_mode	int
+P	Environment	fog_mode	enum::Environment.FogMode
 P	Environment	fog_light_color	Color
 P	Environment	fog_light_energy	float
 P	Environment	fog_sun_scatter	float
@@ -7711,24 +7692,24 @@ P	FBXState	allow_geometry_helper_nodes	bool
 F	FBXState	get_allow_geometry_helper_nodes	bool	0	0
 F	FBXState	set_allow_geometry_helper_nodes	void	0	0	bool
 C	FastNoiseLite	Noise	0
-P	FastNoiseLite	noise_type	int
+P	FastNoiseLite	noise_type	enum::FastNoiseLite.NoiseType
 P	FastNoiseLite	seed	int
 P	FastNoiseLite	frequency	float
 P	FastNoiseLite	offset	Vector3
-P	FastNoiseLite	fractal_type	int
+P	FastNoiseLite	fractal_type	enum::FastNoiseLite.FractalType
 P	FastNoiseLite	fractal_octaves	int
 P	FastNoiseLite	fractal_lacunarity	float
 P	FastNoiseLite	fractal_gain	float
 P	FastNoiseLite	fractal_weighted_strength	float
 P	FastNoiseLite	fractal_ping_pong_strength	float
-P	FastNoiseLite	cellular_distance_function	int
+P	FastNoiseLite	cellular_distance_function	enum::FastNoiseLite.CellularDistanceFunction
 P	FastNoiseLite	cellular_jitter	float
-P	FastNoiseLite	cellular_return_type	int
+P	FastNoiseLite	cellular_return_type	enum::FastNoiseLite.CellularReturnType
 P	FastNoiseLite	domain_warp_enabled	bool
-P	FastNoiseLite	domain_warp_type	int
+P	FastNoiseLite	domain_warp_type	enum::FastNoiseLite.DomainWarpType
 P	FastNoiseLite	domain_warp_amplitude	float
 P	FastNoiseLite	domain_warp_frequency	float
-P	FastNoiseLite	domain_warp_fractal_type	int
+P	FastNoiseLite	domain_warp_fractal_type	enum::FastNoiseLite.DomainWarpFractalType
 P	FastNoiseLite	domain_warp_fractal_octaves	int
 P	FastNoiseLite	domain_warp_fractal_lacunarity	float
 P	FastNoiseLite	domain_warp_fractal_gain	float
@@ -7855,9 +7836,9 @@ E	FileAccess	CompressionMode	0	COMPRESSION_FASTLZ	0	COMPRESSION_DEFLATE	1	COMPRE
 E	FileAccess	UnixPermissionFlags	1	UNIX_READ_OWNER	256	UNIX_WRITE_OWNER	128	UNIX_EXECUTE_OWNER	64	UNIX_READ_GROUP	32	UNIX_WRITE_GROUP	16	UNIX_EXECUTE_GROUP	8	UNIX_READ_OTHER	4	UNIX_WRITE_OTHER	2	UNIX_EXECUTE_OTHER	1	UNIX_SET_USER_ID	2048	UNIX_SET_GROUP_ID	1024	UNIX_RESTRICTED_DELETE	512
 C	FileDialog	ConfirmationDialog	0
 P	FileDialog	mode_overrides_title	bool
-P	FileDialog	file_mode	int
-P	FileDialog	display_mode	int
-P	FileDialog	access	int
+P	FileDialog	file_mode	enum::FileDialog.FileMode
+P	FileDialog	display_mode	enum::FileDialog.DisplayMode
+P	FileDialog	access	enum::FileDialog.Access
 P	FileDialog	root_subfolder	String
 P	FileDialog	filters	PackedStringArray
 P	FileDialog	filename_filter	String
@@ -7949,8 +7930,8 @@ P	FileSystemDock	folder_color_changed	Signal
 P	FileSystemDock	selection_changed	Signal
 P	FileSystemDock	display_mode_changed	Signal
 C	FlowContainer	Container	0
-P	FlowContainer	alignment	int
-P	FlowContainer	last_wrap_alignment	int
+P	FlowContainer	alignment	enum::FlowContainer.AlignmentMode
+P	FlowContainer	last_wrap_alignment	enum::FlowContainer.LastWrapAlignmentMode
 P	FlowContainer	vertical	bool
 P	FlowContainer	reverse_fill	bool
 F	FlowContainer	get_line_count	int	0	0
@@ -7985,7 +7966,7 @@ F	FogMaterial	set_density_texture	void	0	0	Texture3D
 F	FogMaterial	get_density_texture	Texture3D	0	0
 C	FogVolume	VisualInstance3D	0
 P	FogVolume	size	Vector3
-P	FogVolume	shape	int
+P	FogVolume	shape	enum::RenderingServer.FogVolumeShape
 P	FogVolume	material	FogMaterial,ShaderMaterial
 F	FogVolume	set_size	void	0	0	Vector3
 F	FogVolume	get_size	Vector3	0	0
@@ -7996,11 +7977,11 @@ F	FogVolume	get_material	Material	0	0
 C	FoldableContainer	Container	0
 P	FoldableContainer	folded	bool
 P	FoldableContainer	title	String
-P	FoldableContainer	title_alignment	int
-P	FoldableContainer	title_position	int
-P	FoldableContainer	title_text_overrun_behavior	int
+P	FoldableContainer	title_alignment	enum::HorizontalAlignment
+P	FoldableContainer	title_position	enum::FoldableContainer.TitlePosition
+P	FoldableContainer	title_text_overrun_behavior	enum::TextServer.OverrunBehavior
 P	FoldableContainer	foldable_group	FoldableGroup
-P	FoldableContainer	title_text_direction	int
+P	FoldableContainer	title_text_direction	enum::Control.TextDirection
 P	FoldableContainer	language	String
 F	FoldableContainer	fold	void	0	0
 F	FoldableContainer	expand	void	0	0
@@ -8074,13 +8055,13 @@ C	FontFile	Font	0
 P	FontFile	data	PackedByteArray
 P	FontFile	generate_mipmaps	bool
 P	FontFile	disable_embedded_bitmaps	bool
-P	FontFile	antialiasing	int
+P	FontFile	antialiasing	enum::TextServer.FontAntialiasing
 P	FontFile	font_name	String
 P	FontFile	style_name	String
 P	FontFile	font_style	int
 P	FontFile	font_weight	int
 P	FontFile	font_stretch	int
-P	FontFile	subpixel_positioning	int
+P	FontFile	subpixel_positioning	enum::TextServer.SubpixelPositioning
 P	FontFile	keep_rounding_remainders	bool
 P	FontFile	multichannel_signed_distance_field	bool
 P	FontFile	msdf_pixel_range	int
@@ -8088,9 +8069,9 @@ P	FontFile	msdf_size	int
 P	FontFile	allow_system_fallback	bool
 P	FontFile	force_autohinter	bool
 P	FontFile	modulate_color_glyphs	bool
-P	FontFile	hinting	int
+P	FontFile	hinting	enum::TextServer.Hinting
 P	FontFile	fixed_size	int
-P	FontFile	fixed_size_scale_mode	int
+P	FontFile	fixed_size_scale_mode	enum::TextServer.FixedSizeScaleMode
 P	FontFile	opentype_feature_overrides	Dictionary
 P	FontFile	oversampling	float
 F	FontFile	load_bitmap_font	enum::Error	0	0	String
@@ -8297,17 +8278,17 @@ F	GDScriptWorkspace	publish_diagnostics	void	0	0	String
 C	GLTFAccessor	Resource	0
 P	GLTFAccessor	buffer_view	int
 P	GLTFAccessor	byte_offset	int
-P	GLTFAccessor	component_type	int
+P	GLTFAccessor	component_type	enum::GLTFAccessor.GLTFComponentType
 P	GLTFAccessor	normalized	bool
 P	GLTFAccessor	count	int
-P	GLTFAccessor	accessor_type	int
+P	GLTFAccessor	accessor_type	enum::GLTFAccessor.GLTFAccessorType
 P	GLTFAccessor	type	int
 P	GLTFAccessor	min	PackedFloat64Array
 P	GLTFAccessor	max	PackedFloat64Array
 P	GLTFAccessor	sparse_count	int
 P	GLTFAccessor	sparse_indices_buffer_view	int
 P	GLTFAccessor	sparse_indices_byte_offset	int
-P	GLTFAccessor	sparse_indices_component_type	int
+P	GLTFAccessor	sparse_indices_component_type	enum::GLTFAccessor.GLTFComponentType
 P	GLTFAccessor	sparse_values_buffer_view	int
 P	GLTFAccessor	sparse_values_byte_offset	int
 F	GLTFAccessor	from_dictionary	GLTFAccessor	1	0	Dictionary
@@ -8400,9 +8381,9 @@ P	GLTFDocument	image_format	String
 P	GLTFDocument	lossy_quality	float
 P	GLTFDocument	fallback_image_format	String
 P	GLTFDocument	fallback_image_quality	float
-P	GLTFDocument	root_node_mode	int
-P	GLTFDocument	texture_map_mode	int
-P	GLTFDocument	visibility_mode	int
+P	GLTFDocument	root_node_mode	enum::GLTFDocument.RootNodeMode
+P	GLTFDocument	texture_map_mode	enum::GLTFDocument.TextureMapMode
+P	GLTFDocument	visibility_mode	enum::GLTFDocument.VisibilityMode
 F	GLTFDocument	set_image_format	void	0	0	String
 F	GLTFDocument	get_image_format	String	0	0
 F	GLTFDocument	set_lossy_quality	void	0	0	float
@@ -8549,9 +8530,9 @@ C	GLTFObjectModelProperty	RefCounted	0
 P	GLTFObjectModelProperty	gltf_to_godot_expression	Expression
 P	GLTFObjectModelProperty	godot_to_gltf_expression	Expression
 P	GLTFObjectModelProperty	node_paths	Array
-P	GLTFObjectModelProperty	object_model_type	int
+P	GLTFObjectModelProperty	object_model_type	enum::GLTFObjectModelProperty.GLTFObjectModelType
 P	GLTFObjectModelProperty	json_pointers	PackedStringArray
-P	GLTFObjectModelProperty	variant_type	int
+P	GLTFObjectModelProperty	variant_type	enum::Variant.Type
 F	GLTFObjectModelProperty	append_node_path	void	0	0	NodePath
 F	GLTFObjectModelProperty	append_path_to_property	void	0	0	NodePath	StringName
 F	GLTFObjectModelProperty	get_accessor_type	enum::GLTFAccessor.GLTFAccessorType	0	0
@@ -8720,7 +8701,7 @@ P	GLTFState	skeletons	Array
 P	GLTFState	create_animations	bool
 P	GLTFState	import_as_skeleton_bones	bool
 P	GLTFState	animations	Array
-P	GLTFState	handle_binary_image_mode	int
+P	GLTFState	handle_binary_image_mode	enum::GLTFState.HandleBinaryImageMode
 P	GLTFState	bake_fps	float
 P	GLTFState	handle_binary_image	int
 F	GLTFState	add_used_extension	void	0	0	String	bool
@@ -8840,7 +8821,7 @@ P	GPUParticles2D	fract_delta	bool
 P	GPUParticles2D	collision_base_size	float
 P	GPUParticles2D	visibility_rect	Rect2
 P	GPUParticles2D	local_coords	bool
-P	GPUParticles2D	draw_order	int
+P	GPUParticles2D	draw_order	enum::GPUParticles2D.DrawOrder
 P	GPUParticles2D	trail_enabled	bool
 P	GPUParticles2D	trail_lifetime	float
 P	GPUParticles2D	trail_sections	int
@@ -8926,10 +8907,10 @@ P	GPUParticles3D	fract_delta	bool
 P	GPUParticles3D	collision_base_size	float
 P	GPUParticles3D	visibility_aabb	AABB
 P	GPUParticles3D	local_coords	bool
-P	GPUParticles3D	draw_order	int
-P	GPUParticles3D	transform_align	int
-P	GPUParticles3D	transform_align_axis	int
-P	GPUParticles3D	transform_align_channel_filter	int
+P	GPUParticles3D	draw_order	enum::GPUParticles3D.DrawOrder
+P	GPUParticles3D	transform_align	enum::GPUParticles3D.TransformAlign
+P	GPUParticles3D	transform_align_axis	enum::RenderingServer.ParticlesTransformAlignAxis
+P	GPUParticles3D	transform_align_channel_filter	enum::RenderingServer.ParticlesTransformAlignCustomSrc
 P	GPUParticles3D	trail_enabled	bool
 P	GPUParticles3D	trail_lifetime	float
 P	GPUParticles3D	process_material	ParticleProcessMaterial,ShaderMaterial
@@ -9045,8 +9026,8 @@ F	GPUParticlesCollisionBox3D	set_size	void	0	0	Vector3
 F	GPUParticlesCollisionBox3D	get_size	Vector3	0	0
 C	GPUParticlesCollisionHeightField3D	GPUParticlesCollision3D	0
 P	GPUParticlesCollisionHeightField3D	size	Vector3
-P	GPUParticlesCollisionHeightField3D	resolution	int
-P	GPUParticlesCollisionHeightField3D	update_mode	int
+P	GPUParticlesCollisionHeightField3D	resolution	enum::GPUParticlesCollisionHeightField3D.Resolution
+P	GPUParticlesCollisionHeightField3D	update_mode	enum::GPUParticlesCollisionHeightField3D.UpdateMode
 P	GPUParticlesCollisionHeightField3D	follow_camera_enabled	bool
 P	GPUParticlesCollisionHeightField3D	heightfield_mask	int
 F	GPUParticlesCollisionHeightField3D	set_size	void	0	0	Vector3
@@ -9065,7 +9046,7 @@ E	GPUParticlesCollisionHeightField3D	Resolution	0	RESOLUTION_256	0	RESOLUTION_51
 E	GPUParticlesCollisionHeightField3D	UpdateMode	0	UPDATE_MODE_WHEN_MOVED	0	UPDATE_MODE_ALWAYS	1
 C	GPUParticlesCollisionSDF3D	GPUParticlesCollision3D	0
 P	GPUParticlesCollisionSDF3D	size	Vector3
-P	GPUParticlesCollisionSDF3D	resolution	int
+P	GPUParticlesCollisionSDF3D	resolution	enum::GPUParticlesCollisionSDF3D.Resolution
 P	GPUParticlesCollisionSDF3D	thickness	float
 P	GPUParticlesCollisionSDF3D	bake_mask	int
 P	GPUParticlesCollisionSDF3D	texture	Texture3D
@@ -9149,19 +9130,19 @@ C	GeometryInstance3D	VisualInstance3D	0
 P	GeometryInstance3D	material_override	BaseMaterial3D,ShaderMaterial
 P	GeometryInstance3D	material_overlay	BaseMaterial3D,ShaderMaterial
 P	GeometryInstance3D	transparency	float
-P	GeometryInstance3D	cast_shadow	int
+P	GeometryInstance3D	cast_shadow	enum::GeometryInstance3D.ShadowCastingSetting
 P	GeometryInstance3D	extra_cull_margin	float
 P	GeometryInstance3D	custom_aabb	AABB
 P	GeometryInstance3D	lod_bias	float
 P	GeometryInstance3D	ignore_occlusion_culling	bool
-P	GeometryInstance3D	gi_mode	int
+P	GeometryInstance3D	gi_mode	enum::GeometryInstance3D.GIMode
 P	GeometryInstance3D	gi_lightmap_texel_scale	float
-P	GeometryInstance3D	gi_lightmap_scale	int
+P	GeometryInstance3D	gi_lightmap_scale	enum::GeometryInstance3D.LightmapScale
 P	GeometryInstance3D	visibility_range_begin	float
 P	GeometryInstance3D	visibility_range_begin_margin	float
 P	GeometryInstance3D	visibility_range_end	float
 P	GeometryInstance3D	visibility_range_end_margin	float
-P	GeometryInstance3D	visibility_range_fade_mode	int
+P	GeometryInstance3D	visibility_range_fade_mode	enum::GeometryInstance3D.VisibilityRangeFadeMode
 F	GeometryInstance3D	set_material_override	void	0	0	Material
 F	GeometryInstance3D	get_material_override	Material	0	0
 F	GeometryInstance3D	set_material_overlay	void	0	0	Material
@@ -9209,8 +9190,8 @@ F	GodotInstance	focus_out	void	0	0
 F	GodotInstance	pause	void	0	0
 F	GodotInstance	resume	void	0	0
 C	Gradient	Resource	0
-P	Gradient	interpolation_mode	int
-P	Gradient	interpolation_color_space	int
+P	Gradient	interpolation_mode	enum::Gradient.InterpolationMode
+P	Gradient	interpolation_color_space	enum::Gradient.ColorSpace
 P	Gradient	offsets	PackedFloat32Array
 P	Gradient	colors	PackedColorArray
 F	Gradient	add_point	void	0	0	float	Color
@@ -9246,10 +9227,10 @@ P	GradientTexture2D	gradient	Gradient
 P	GradientTexture2D	width	int
 P	GradientTexture2D	height	int
 P	GradientTexture2D	use_hdr	bool
-P	GradientTexture2D	fill	int
+P	GradientTexture2D	fill	enum::GradientTexture2D.Fill
 P	GradientTexture2D	fill_from	Vector2
 P	GradientTexture2D	fill_to	Vector2
-P	GradientTexture2D	repeat	int
+P	GradientTexture2D	repeat	enum::GradientTexture2D.Repeat
 F	GradientTexture2D	set_gradient	void	0	0	Gradient
 F	GradientTexture2D	get_gradient	Gradient	0	0
 F	GradientTexture2D	set_width	void	0	0	int
@@ -9269,10 +9250,10 @@ E	GradientTexture2D	Repeat	0	REPEAT_NONE	0	REPEAT	1	REPEAT_MIRROR	2
 C	GraphEdit	Control	0
 P	GraphEdit	scroll_offset	Vector2
 P	GraphEdit	show_grid	bool
-P	GraphEdit	grid_pattern	int
+P	GraphEdit	grid_pattern	enum::GraphEdit.GridPattern
 P	GraphEdit	snapping_enabled	bool
 P	GraphEdit	snapping_distance	int
-P	GraphEdit	panning_scheme	int
+P	GraphEdit	panning_scheme	enum::GraphEdit.PanningScheme
 P	GraphEdit	right_disconnects	bool
 P	GraphEdit	type_names	typeddictionary::int;String
 P	GraphEdit	connection_lines_curvature	float
@@ -9443,7 +9424,7 @@ P	GraphFrame	autoshrink_changed	Signal
 C	GraphNode	GraphElement	0
 P	GraphNode	title	String
 P	GraphNode	ignore_invalid_connection_type	bool
-P	GraphNode	slots_focus_mode	int
+P	GraphNode	slots_focus_mode	enum::Control.FocusMode
 F	GraphNode	_draw_port	void	0	0	int	Vector2i	bool	Color
 F	GraphNode	set_title	void	0	0	String
 F	GraphNode	get_title	String	0	0
@@ -9505,7 +9486,7 @@ P	GridMap	cell_scale	float
 P	GridMap	collision_layer	int
 P	GridMap	collision_mask	int
 P	GridMap	collision_priority	float
-P	GridMap	collision_visibility_mode	int
+P	GridMap	collision_visibility_mode	enum::GridMap.DebugVisibilityMode
 P	GridMap	bake_navigation	bool
 F	GridMap	set_collision_layer	void	0	0	int
 F	GridMap	get_collision_layer	int	0	0
@@ -9851,12 +9832,12 @@ P	ImporterMeshInstance3D	mesh	ImporterMesh
 P	ImporterMeshInstance3D	skin	Skin
 P	ImporterMeshInstance3D	skeleton_path	NodePath
 P	ImporterMeshInstance3D	layer_mask	int
-P	ImporterMeshInstance3D	cast_shadow	int
+P	ImporterMeshInstance3D	cast_shadow	enum::GeometryInstance3D.ShadowCastingSetting
 P	ImporterMeshInstance3D	visibility_range_begin	float
 P	ImporterMeshInstance3D	visibility_range_begin_margin	float
 P	ImporterMeshInstance3D	visibility_range_end	float
 P	ImporterMeshInstance3D	visibility_range_end_margin	float
-P	ImporterMeshInstance3D	visibility_range_fade_mode	int
+P	ImporterMeshInstance3D	visibility_range_fade_mode	enum::GeometryInstance3D.VisibilityRangeFadeMode
 F	ImporterMeshInstance3D	set_mesh	void	0	0	ImporterMesh
 F	ImporterMeshInstance3D	get_mesh	ImporterMesh	0	0
 F	ImporterMeshInstance3D	set_skin	void	0	0	Skin
@@ -9878,7 +9859,7 @@ F	ImporterMeshInstance3D	get_visibility_range_begin	float	0	0
 F	ImporterMeshInstance3D	set_visibility_range_fade_mode	void	0	0	enum::GeometryInstance3D.VisibilityRangeFadeMode
 F	ImporterMeshInstance3D	get_visibility_range_fade_mode	enum::GeometryInstance3D.VisibilityRangeFadeMode	0	0
 C	Input	Object	0
-P	Input	mouse_mode	int
+P	Input	mouse_mode	enum::Input.MouseMode
 P	Input	use_accumulated_input	bool
 P	Input	emulate_mouse_from_touch	bool
 P	Input	emulate_touch_from_mouse	bool
@@ -10004,7 +9985,7 @@ P	InputEventGesture	position	Vector2
 F	InputEventGesture	set_position	void	0	0	Vector2
 F	InputEventGesture	get_position	Vector2	0	0
 C	InputEventJoypadButton	InputEvent	0
-P	InputEventJoypadButton	button_index	int
+P	InputEventJoypadButton	button_index	enum::JoyButton
 P	InputEventJoypadButton	pressure	float
 P	InputEventJoypadButton	pressed	bool
 F	InputEventJoypadButton	set_button_index	void	0	0	enum::JoyButton
@@ -10013,7 +9994,7 @@ F	InputEventJoypadButton	set_pressure	void	0	0	float
 F	InputEventJoypadButton	get_pressure	float	0	0
 F	InputEventJoypadButton	set_pressed	void	0	0	bool
 C	InputEventJoypadMotion	InputEvent	0
-P	InputEventJoypadMotion	axis	int
+P	InputEventJoypadMotion	axis	enum::JoyAxis
 P	InputEventJoypadMotion	axis_value	float
 F	InputEventJoypadMotion	set_axis	void	0	0	enum::JoyAxis
 F	InputEventJoypadMotion	get_axis	enum::JoyAxis	0	0
@@ -10021,11 +10002,11 @@ F	InputEventJoypadMotion	set_axis_value	void	0	0	float
 F	InputEventJoypadMotion	get_axis_value	float	0	0
 C	InputEventKey	InputEventWithModifiers	0
 P	InputEventKey	pressed	bool
-P	InputEventKey	keycode	int
-P	InputEventKey	physical_keycode	int
-P	InputEventKey	key_label	int
+P	InputEventKey	keycode	enum::Key
+P	InputEventKey	physical_keycode	enum::Key
+P	InputEventKey	key_label	enum::Key
 P	InputEventKey	unicode	int
-P	InputEventKey	location	int
+P	InputEventKey	location	enum::KeyLocation
 P	InputEventKey	echo	bool
 F	InputEventKey	set_pressed	void	0	0	bool
 F	InputEventKey	set_keycode	void	0	0	enum::Key
@@ -10048,7 +10029,7 @@ F	InputEventKey	as_text_key_label	String	0	0
 F	InputEventKey	as_text_location	String	0	0
 C	InputEventMIDI	InputEvent	0
 P	InputEventMIDI	channel	int
-P	InputEventMIDI	message	int
+P	InputEventMIDI	message	enum::MIDIMessage
 P	InputEventMIDI	pitch	int
 P	InputEventMIDI	velocity	int
 P	InputEventMIDI	instrument	int
@@ -10087,7 +10068,7 @@ F	InputEventMouse	set_global_position	void	0	0	Vector2
 F	InputEventMouse	get_global_position	Vector2	0	0
 C	InputEventMouseButton	InputEventMouse	0
 P	InputEventMouseButton	factor	float
-P	InputEventMouseButton	button_index	int
+P	InputEventMouseButton	button_index	enum::MouseButton
 P	InputEventMouseButton	canceled	bool
 P	InputEventMouseButton	pressed	bool
 P	InputEventMouseButton	double_click	bool
@@ -10211,22 +10192,22 @@ F	InstancePlaceholder	create_instance	Node	0	0	bool?	PackedScene?
 F	InstancePlaceholder	get_instance_path	String	0	0
 C	IntervalTweener	Tweener	0
 C	ItemList	Control	0
-P	ItemList	select_mode	int
+P	ItemList	select_mode	enum::ItemList.SelectMode
 P	ItemList	allow_reselect	bool
 P	ItemList	allow_rmb_select	bool
 P	ItemList	allow_search	bool
 P	ItemList	max_text_lines	int
 P	ItemList	auto_width	bool
 P	ItemList	auto_height	bool
-P	ItemList	text_overrun_behavior	int
+P	ItemList	text_overrun_behavior	enum::TextServer.OverrunBehavior
 P	ItemList	wraparound_items	bool
-P	ItemList	scroll_hint_mode	int
+P	ItemList	scroll_hint_mode	enum::ItemList.ScrollHintMode
 P	ItemList	tile_scroll_hint	bool
 P	ItemList	item_count	int
 P	ItemList	max_columns	int
 P	ItemList	same_column_width	bool
 P	ItemList	fixed_column_width	int
-P	ItemList	icon_mode	int
+P	ItemList	icon_mode	enum::ItemList.IconMode
 P	ItemList	icon_scale	float
 P	ItemList	fixed_icon_size	Vector2i
 F	ItemList	add_item	int	0	0	String	Texture2D?	bool?
@@ -10465,25 +10446,25 @@ F	KinematicCollision3D	get_collider_velocity	Vector3	0	0	int?
 C	Label	Control	0
 P	Label	text	String
 P	Label	label_settings	LabelSettings
-P	Label	horizontal_alignment	int
-P	Label	vertical_alignment	int
-P	Label	autowrap_mode	int
+P	Label	horizontal_alignment	enum::HorizontalAlignment
+P	Label	vertical_alignment	enum::VerticalAlignment
+P	Label	autowrap_mode	enum::TextServer.AutowrapMode
 P	Label	autowrap_trim_flags	int
 P	Label	justification_flags	int
 P	Label	paragraph_separator	String
 P	Label	clip_text	bool
-P	Label	text_overrun_behavior	int
+P	Label	text_overrun_behavior	enum::TextServer.OverrunBehavior
 P	Label	ellipsis_char	String
 P	Label	uppercase	bool
 P	Label	tab_stops	PackedFloat32Array
 P	Label	lines_skipped	int
 P	Label	max_lines_visible	int
 P	Label	visible_characters	int
-P	Label	visible_characters_behavior	int
+P	Label	visible_characters_behavior	enum::TextServer.VisibleCharactersBehavior
 P	Label	visible_ratio	float
-P	Label	text_direction	int
+P	Label	text_direction	enum::Control.TextDirection
 P	Label	language	String
-P	Label	structured_text_bidi_override	int
+P	Label	structured_text_bidi_override	enum::TextServer.StructuredTextParser
 P	Label	structured_text_bidi_override_options	Array
 F	Label	set_horizontal_alignment	void	0	0	enum::HorizontalAlignment
 F	Label	get_horizontal_alignment	enum::HorizontalAlignment	0	0
@@ -10537,17 +10518,17 @@ F	Label	get_character_bounds	Rect2	0	0	int
 C	Label3D	GeometryInstance3D	0
 P	Label3D	pixel_size	float
 P	Label3D	offset	Vector2
-P	Label3D	billboard	int
+P	Label3D	billboard	enum::BaseMaterial3D.BillboardMode
 P	Label3D	shaded	bool
 P	Label3D	double_sided	bool
 P	Label3D	no_depth_test	bool
 P	Label3D	fixed_size	bool
-P	Label3D	alpha_cut	int
+P	Label3D	alpha_cut	enum::Label3D.AlphaCutMode
 P	Label3D	alpha_scissor_threshold	float
 P	Label3D	alpha_hash_scale	float
-P	Label3D	alpha_antialiasing_mode	int
+P	Label3D	alpha_antialiasing_mode	enum::BaseMaterial3D.AlphaAntiAliasing
 P	Label3D	alpha_antialiasing_edge	float
-P	Label3D	texture_filter	int
+P	Label3D	texture_filter	enum::BaseMaterial3D.TextureFilter
 P	Label3D	render_priority	int
 P	Label3D	outline_render_priority	int
 P	Label3D	modulate	Color
@@ -10556,17 +10537,17 @@ P	Label3D	text	String
 P	Label3D	font	Font
 P	Label3D	font_size	int
 P	Label3D	outline_size	int
-P	Label3D	horizontal_alignment	int
-P	Label3D	vertical_alignment	int
+P	Label3D	horizontal_alignment	enum::HorizontalAlignment
+P	Label3D	vertical_alignment	enum::VerticalAlignment
 P	Label3D	uppercase	bool
 P	Label3D	line_spacing	float
-P	Label3D	autowrap_mode	int
+P	Label3D	autowrap_mode	enum::TextServer.AutowrapMode
 P	Label3D	autowrap_trim_flags	int
 P	Label3D	justification_flags	int
 P	Label3D	width	float
-P	Label3D	text_direction	int
+P	Label3D	text_direction	enum::TextServer.Direction
 P	Label3D	language	String
-P	Label3D	structured_text_bidi_override	int
+P	Label3D	structured_text_bidi_override	enum::TextServer.StructuredTextParser
 P	Label3D	structured_text_bidi_override_options	Array
 F	Label3D	set_horizontal_alignment	void	0	0	enum::HorizontalAlignment
 F	Label3D	get_horizontal_alignment	enum::HorizontalAlignment	0	0
@@ -10689,7 +10670,7 @@ P	Light2D	enabled	bool
 P	Light2D	editor_only	bool
 P	Light2D	color	Color
 P	Light2D	energy	float
-P	Light2D	blend_mode	int
+P	Light2D	blend_mode	enum::Light2D.BlendMode
 P	Light2D	range_z_min	int
 P	Light2D	range_z_max	int
 P	Light2D	range_layer_min	int
@@ -10697,7 +10678,7 @@ P	Light2D	range_layer_max	int
 P	Light2D	range_item_cull_mask	int
 P	Light2D	shadow_enabled	bool
 P	Light2D	shadow_color	Color
-P	Light2D	shadow_filter	int
+P	Light2D	shadow_filter	enum::Light2D.ShadowFilter
 P	Light2D	shadow_filter_smooth	float
 P	Light2D	shadow_item_cull_mask	int
 F	Light2D	set_enabled	void	0	0	bool
@@ -10747,7 +10728,7 @@ P	Light3D	light_size	float
 P	Light3D	light_angular_distance	float
 P	Light3D	light_negative	bool
 P	Light3D	light_specular	float
-P	Light3D	light_bake_mode	int
+P	Light3D	light_bake_mode	enum::Light3D.BakeMode
 P	Light3D	light_cull_mask	int
 P	Light3D	shadow_enabled	bool
 P	Light3D	shadow_bias	float
@@ -10806,13 +10787,13 @@ F	LightOccluder2D	get_occluder_light_mask	int	0	0
 F	LightOccluder2D	set_as_sdf_collision	void	0	0	bool
 F	LightOccluder2D	is_set_as_sdf_collision	bool	0	0
 C	LightmapGI	VisualInstance3D	0
-P	LightmapGI	quality	int
+P	LightmapGI	quality	enum::LightmapGI.BakeQuality
 P	LightmapGI	supersampling	bool
 P	LightmapGI	supersampling_factor	float
 P	LightmapGI	bounces	int
 P	LightmapGI	bounce_indirect_energy	float
 P	LightmapGI	directional	bool
-P	LightmapGI	shadowmask_mode	int
+P	LightmapGI	shadowmask_mode	enum::LightmapGIData.ShadowmaskMode
 P	LightmapGI	use_texture_for_bounces	bool
 P	LightmapGI	interior	bool
 P	LightmapGI	use_denoiser	bool
@@ -10821,12 +10802,12 @@ P	LightmapGI	denoiser_range	int
 P	LightmapGI	bias	float
 P	LightmapGI	texel_scale	float
 P	LightmapGI	max_texture_size	int
-P	LightmapGI	environment_mode	int
+P	LightmapGI	environment_mode	enum::LightmapGI.EnvironmentMode
 P	LightmapGI	environment_custom_sky	Sky
 P	LightmapGI	environment_custom_color	Color
 P	LightmapGI	environment_custom_energy	float
 P	LightmapGI	camera_attributes	CameraAttributesPractical,CameraAttributesPhysical
-P	LightmapGI	generate_probes_subdiv	int
+P	LightmapGI	generate_probes_subdiv	enum::LightmapGI.GenerateProbes
 P	LightmapGI	light_data	LightmapGIData
 F	LightmapGI	set_light_data	void	0	0	LightmapGIData
 F	LightmapGI	get_light_data	LightmapGIData	0	0
@@ -10929,10 +10910,10 @@ P	Line2D	width_curve	Curve
 P	Line2D	default_color	Color
 P	Line2D	gradient	Gradient
 P	Line2D	texture	Texture2D
-P	Line2D	texture_mode	int
-P	Line2D	joint_mode	int
-P	Line2D	begin_cap_mode	int
-P	Line2D	end_cap_mode	int
+P	Line2D	texture_mode	enum::Line2D.LineTextureMode
+P	Line2D	joint_mode	enum::Line2D.LineJointMode
+P	Line2D	begin_cap_mode	enum::Line2D.LineCapMode
+P	Line2D	end_cap_mode	enum::Line2D.LineCapMode
 P	Line2D	sharp_limit	float
 P	Line2D	round_precision	int
 P	Line2D	antialiased	bool
@@ -10976,7 +10957,7 @@ E	Line2D	LineTextureMode	0	LINE_TEXTURE_NONE	0	LINE_TEXTURE_TILE	1	LINE_TEXTURE_
 C	LineEdit	Control	0
 P	LineEdit	text	String
 P	LineEdit	placeholder_text	String
-P	LineEdit	alignment	int
+P	LineEdit	alignment	enum::HorizontalAlignment
 P	LineEdit	max_length	int
 P	LineEdit	editable	bool
 P	LineEdit	keep_editing_on_text_submit	bool
@@ -10995,7 +10976,7 @@ P	LineEdit	draw_control_chars	bool
 P	LineEdit	select_all_on_focus	bool
 P	LineEdit	virtual_keyboard_enabled	bool
 P	LineEdit	virtual_keyboard_show_on_focus	bool
-P	LineEdit	virtual_keyboard_type	int
+P	LineEdit	virtual_keyboard_type	enum::LineEdit.VirtualKeyboardType
 P	LineEdit	caret_blink	bool
 P	LineEdit	caret_blink_interval	float
 P	LineEdit	caret_column	int
@@ -11003,12 +10984,12 @@ P	LineEdit	caret_force_displayed	bool
 P	LineEdit	caret_mid_grapheme	bool
 P	LineEdit	secret	bool
 P	LineEdit	secret_character	String
-P	LineEdit	text_direction	int
+P	LineEdit	text_direction	enum::Control.TextDirection
 P	LineEdit	language	String
-P	LineEdit	structured_text_bidi_override	int
+P	LineEdit	structured_text_bidi_override	enum::TextServer.StructuredTextParser
 P	LineEdit	structured_text_bidi_override_options	Array
 P	LineEdit	right_icon	Texture2D
-P	LineEdit	icon_expand_mode	int
+P	LineEdit	icon_expand_mode	enum::LineEdit.ExpandMode
 P	LineEdit	right_icon_scale	float
 F	LineEdit	has_ime_text	bool	0	0
 F	LineEdit	cancel_ime	void	0	0
@@ -11116,13 +11097,13 @@ P	LineEdit	text_submitted	Signal
 P	LineEdit	editing_toggled	Signal
 C	LinkButton	BaseButton	0
 P	LinkButton	text	String
-P	LinkButton	underline	int
+P	LinkButton	underline	enum::LinkButton.UnderlineMode
 P	LinkButton	uri	String
-P	LinkButton	text_overrun_behavior	int
+P	LinkButton	text_overrun_behavior	enum::TextServer.OverrunBehavior
 P	LinkButton	ellipsis_char	String
-P	LinkButton	text_direction	int
+P	LinkButton	text_direction	enum::Control.TextDirection
 P	LinkButton	language	String
-P	LinkButton	structured_text_bidi_override	int
+P	LinkButton	structured_text_bidi_override	enum::TextServer.StructuredTextParser
 P	LinkButton	structured_text_bidi_override_options	Array
 F	LinkButton	set_text	void	0	0	String
 F	LinkButton	get_text	String	0	0
@@ -11151,19 +11132,19 @@ C	LookAtModifier3D	SkeletonModifier3D	0
 P	LookAtModifier3D	target_node	NodePath
 P	LookAtModifier3D	bone_name	String
 P	LookAtModifier3D	bone	int
-P	LookAtModifier3D	forward_axis	int
-P	LookAtModifier3D	primary_rotation_axis	int
+P	LookAtModifier3D	forward_axis	enum::SkeletonModifier3D.BoneAxis
+P	LookAtModifier3D	primary_rotation_axis	enum::Vector3.Axis
 P	LookAtModifier3D	use_secondary_rotation	bool
 P	LookAtModifier3D	relative	bool
-P	LookAtModifier3D	origin_from	int
+P	LookAtModifier3D	origin_from	enum::LookAtModifier3D.OriginFrom
 P	LookAtModifier3D	origin_bone_name	String
 P	LookAtModifier3D	origin_bone	int
 P	LookAtModifier3D	origin_external_node	NodePath
 P	LookAtModifier3D	origin_offset	Vector3
 P	LookAtModifier3D	origin_safe_margin	float
 P	LookAtModifier3D	duration	float
-P	LookAtModifier3D	transition_type	int
-P	LookAtModifier3D	ease_type	int
+P	LookAtModifier3D	transition_type	enum::Tween.TransitionType
+P	LookAtModifier3D	ease_type	enum::Tween.EaseType
 P	LookAtModifier3D	use_angle_limitation	bool
 P	LookAtModifier3D	symmetry_limitation	bool
 P	LookAtModifier3D	primary_limit_angle	float
@@ -11310,7 +11291,7 @@ P	MenuBar	flat	bool
 P	MenuBar	start_index	int
 P	MenuBar	switch_on_hover	bool
 P	MenuBar	prefer_global_menu	bool
-P	MenuBar	text_direction	int
+P	MenuBar	text_direction	enum::Control.TextDirection
 P	MenuBar	language	String
 F	MenuBar	set_switch_on_hover	void	0	0	bool
 F	MenuBar	is_switch_on_hover	bool	0	0
@@ -11392,7 +11373,7 @@ P	MeshConvexDecompositionSettings	max_num_vertices_per_convex_hull	int
 P	MeshConvexDecompositionSettings	plane_downsampling	int
 P	MeshConvexDecompositionSettings	convex_hull_downsampling	int
 P	MeshConvexDecompositionSettings	normalize_mesh	bool
-P	MeshConvexDecompositionSettings	mode	int
+P	MeshConvexDecompositionSettings	mode	enum::MeshConvexDecompositionSettings.Mode
 P	MeshConvexDecompositionSettings	convex_hull_approximation	bool
 P	MeshConvexDecompositionSettings	max_convex_hulls	int
 P	MeshConvexDecompositionSettings	project_hull_vertices	bool
@@ -11603,7 +11584,7 @@ F	MovieWriter	_write_frame	enum::Error	0	0	Image	const void*
 F	MovieWriter	_write_end	void	0	0
 F	MovieWriter	add_writer	void	1	0	MovieWriter
 C	MultiMesh	Resource	0
-P	MultiMesh	transform_format	int
+P	MultiMesh	transform_format	enum::MultiMesh.TransformFormat
 P	MultiMesh	use_colors	bool
 P	MultiMesh	use_custom_data	bool
 P	MultiMesh	custom_aabb	AABB
@@ -11615,7 +11596,7 @@ P	MultiMesh	transform_array	PackedVector3Array
 P	MultiMesh	transform_2d_array	PackedVector2Array
 P	MultiMesh	color_array	PackedColorArray
 P	MultiMesh	custom_data_array	PackedColorArray
-P	MultiMesh	physics_interpolation_quality	int
+P	MultiMesh	physics_interpolation_quality	enum::MultiMesh.PhysicsInterpolationQuality
 F	MultiMesh	set_mesh	void	0	0	Mesh
 F	MultiMesh	get_mesh	Mesh	0	0
 F	MultiMesh	set_use_colors	void	0	0	bool
@@ -11694,7 +11675,7 @@ F	MultiplayerAPIExtension	_object_configuration_add	enum::Error	0	0	Object	Varia
 F	MultiplayerAPIExtension	_object_configuration_remove	enum::Error	0	0	Object	Variant
 C	MultiplayerPeer	PacketPeer	0
 P	MultiplayerPeer	refuse_new_connections	bool
-P	MultiplayerPeer	transfer_mode	int
+P	MultiplayerPeer	transfer_mode	enum::MultiplayerPeer.TransferMode
 P	MultiplayerPeer	transfer_channel	int
 F	MultiplayerPeer	set_transfer_channel	void	0	0	int
 F	MultiplayerPeer	get_transfer_channel	int	0	0
@@ -11765,7 +11746,7 @@ P	MultiplayerSynchronizer	root_path	NodePath
 P	MultiplayerSynchronizer	replication_interval	float
 P	MultiplayerSynchronizer	delta_interval	float
 P	MultiplayerSynchronizer	replication_config	SceneReplicationConfig
-P	MultiplayerSynchronizer	visibility_update_mode	int
+P	MultiplayerSynchronizer	visibility_update_mode	enum::MultiplayerSynchronizer.VisibilityUpdateMode
 P	MultiplayerSynchronizer	public_visibility	bool
 F	MultiplayerSynchronizer	set_root_path	void	0	0	NodePath
 F	MultiplayerSynchronizer	get_root_path	NodePath	0	0
@@ -11870,8 +11851,8 @@ P	NavigationAgent2D	path_desired_distance	float
 P	NavigationAgent2D	target_desired_distance	float
 P	NavigationAgent2D	path_max_distance	float
 P	NavigationAgent2D	navigation_layers	int
-P	NavigationAgent2D	pathfinding_algorithm	int
-P	NavigationAgent2D	path_postprocessing	int
+P	NavigationAgent2D	pathfinding_algorithm	enum::NavigationPathQueryParameters2D.PathfindingAlgorithm
+P	NavigationAgent2D	path_postprocessing	enum::NavigationPathQueryParameters2D.PathPostProcessing
 P	NavigationAgent2D	path_metadata_flags	int
 P	NavigationAgent2D	simplify_path	bool
 P	NavigationAgent2D	simplify_epsilon	float
@@ -11988,8 +11969,8 @@ P	NavigationAgent3D	target_desired_distance	float
 P	NavigationAgent3D	path_height_offset	float
 P	NavigationAgent3D	path_max_distance	float
 P	NavigationAgent3D	navigation_layers	int
-P	NavigationAgent3D	pathfinding_algorithm	int
-P	NavigationAgent3D	path_postprocessing	int
+P	NavigationAgent3D	pathfinding_algorithm	enum::NavigationPathQueryParameters3D.PathfindingAlgorithm
+P	NavigationAgent3D	path_postprocessing	enum::NavigationPathQueryParameters3D.PathPostProcessing
 P	NavigationAgent3D	path_metadata_flags	int
 P	NavigationAgent3D	simplify_path	bool
 P	NavigationAgent3D	simplify_epsilon	float
@@ -12172,10 +12153,10 @@ F	NavigationLink3D	get_travel_cost	float	0	0
 C	NavigationMesh	Resource	0
 P	NavigationMesh	vertices	PackedVector3Array
 P	NavigationMesh	polygons	Array
-P	NavigationMesh	sample_partition_type	int
-P	NavigationMesh	geometry_parsed_geometry_type	int
+P	NavigationMesh	sample_partition_type	enum::NavigationMesh.SamplePartitionType
+P	NavigationMesh	geometry_parsed_geometry_type	enum::NavigationMesh.ParsedGeometryType
 P	NavigationMesh	geometry_collision_mask	int
-P	NavigationMesh	geometry_source_geometry_mode	int
+P	NavigationMesh	geometry_source_geometry_mode	enum::NavigationMesh.SourceGeometryMode
 P	NavigationMesh	geometry_source_group_name	String
 P	NavigationMesh	cell_size	float
 P	NavigationMesh	cell_height	float
@@ -12367,8 +12348,8 @@ P	NavigationPathQueryParameters2D	map	RID
 P	NavigationPathQueryParameters2D	start_position	Vector2
 P	NavigationPathQueryParameters2D	target_position	Vector2
 P	NavigationPathQueryParameters2D	navigation_layers	int
-P	NavigationPathQueryParameters2D	pathfinding_algorithm	int
-P	NavigationPathQueryParameters2D	path_postprocessing	int
+P	NavigationPathQueryParameters2D	pathfinding_algorithm	enum::NavigationPathQueryParameters2D.PathfindingAlgorithm
+P	NavigationPathQueryParameters2D	path_postprocessing	enum::NavigationPathQueryParameters2D.PathPostProcessing
 P	NavigationPathQueryParameters2D	metadata_flags	int
 P	NavigationPathQueryParameters2D	simplify_path	bool
 P	NavigationPathQueryParameters2D	simplify_epsilon	float
@@ -12416,8 +12397,8 @@ P	NavigationPathQueryParameters3D	map	RID
 P	NavigationPathQueryParameters3D	start_position	Vector3
 P	NavigationPathQueryParameters3D	target_position	Vector3
 P	NavigationPathQueryParameters3D	navigation_layers	int
-P	NavigationPathQueryParameters3D	pathfinding_algorithm	int
-P	NavigationPathQueryParameters3D	path_postprocessing	int
+P	NavigationPathQueryParameters3D	pathfinding_algorithm	enum::NavigationPathQueryParameters3D.PathfindingAlgorithm
+P	NavigationPathQueryParameters3D	path_postprocessing	enum::NavigationPathQueryParameters3D.PathPostProcessing
 P	NavigationPathQueryParameters3D	metadata_flags	int
 P	NavigationPathQueryParameters3D	simplify_path	bool
 P	NavigationPathQueryParameters3D	simplify_epsilon	float
@@ -12500,10 +12481,10 @@ C	NavigationPolygon	Resource	0
 P	NavigationPolygon	vertices	PackedVector2Array
 P	NavigationPolygon	polygons	Array
 P	NavigationPolygon	outlines	Array
-P	NavigationPolygon	sample_partition_type	int
-P	NavigationPolygon	parsed_geometry_type	int
+P	NavigationPolygon	sample_partition_type	enum::NavigationPolygon.SamplePartitionType
+P	NavigationPolygon	parsed_geometry_type	enum::NavigationPolygon.ParsedGeometryType
 P	NavigationPolygon	parsed_collision_mask	int
-P	NavigationPolygon	source_geometry_mode	int
+P	NavigationPolygon	source_geometry_mode	enum::NavigationPolygon.SourceGeometryMode
 P	NavigationPolygon	source_geometry_group_name	String
 P	NavigationPolygon	cell_size	float
 P	NavigationPolygon	border_size	float
@@ -12926,8 +12907,8 @@ P	NinePatchRect	patch_margin_left	int
 P	NinePatchRect	patch_margin_top	int
 P	NinePatchRect	patch_margin_right	int
 P	NinePatchRect	patch_margin_bottom	int
-P	NinePatchRect	axis_stretch_horizontal	int
-P	NinePatchRect	axis_stretch_vertical	int
+P	NinePatchRect	axis_stretch_horizontal	enum::NinePatchRect.AxisStretchMode
+P	NinePatchRect	axis_stretch_vertical	enum::NinePatchRect.AxisStretchMode
 F	NinePatchRect	set_texture	void	0	0	Texture2D
 F	NinePatchRect	get_texture	Texture2D	0	0
 F	NinePatchRect	set_patch_margin	void	0	0	enum::Side	int
@@ -12948,14 +12929,14 @@ P	Node	unique_name_in_owner	bool
 P	Node	scene_file_path	String
 P	Node	owner	Node
 P	Node	multiplayer	MultiplayerAPI
-P	Node	process_mode	int
+P	Node	process_mode	enum::Node.ProcessMode
 P	Node	process_priority	int
 P	Node	process_physics_priority	int
-P	Node	process_thread_group	int
+P	Node	process_thread_group	enum::Node.ProcessThreadGroup
 P	Node	process_thread_group_order	int
 P	Node	process_thread_messages	int
-P	Node	physics_interpolation_mode	int
-P	Node	auto_translate_mode	int
+P	Node	physics_interpolation_mode	enum::Node.PhysicsInterpolationMode
+P	Node	auto_translate_mode	enum::Node.AutoTranslateMode
 P	Node	editor_description	String
 F	Node	_process	void	0	0	float
 F	Node	_physics_process	void	0	0	float
@@ -13212,8 +13193,8 @@ P	Node3D	rotation_degrees	Vector3
 P	Node3D	quaternion	Quaternion
 P	Node3D	basis	Basis
 P	Node3D	scale	Vector3
-P	Node3D	rotation_edit_mode	int
-P	Node3D	rotation_order	int
+P	Node3D	rotation_edit_mode	enum::Node3D.RotationEditMode
+P	Node3D	rotation_order	enum::EulerOrder
 P	Node3D	top_level	bool
 P	Node3D	global_position	Vector3
 P	Node3D	global_basis	Basis
@@ -13534,7 +13515,7 @@ F	OccluderInstance3D	set_occluder	void	0	0	Occluder3D
 F	OccluderInstance3D	get_occluder	Occluder3D	0	0
 C	OccluderPolygon2D	Resource	0
 P	OccluderPolygon2D	closed	bool
-P	OccluderPolygon2D	cull_mode	int
+P	OccluderPolygon2D	cull_mode	enum::OccluderPolygon2D.CullMode
 P	OccluderPolygon2D	polygon	PackedVector2Array
 F	OccluderPolygon2D	set_closed	void	0	0	bool
 F	OccluderPolygon2D	is_closed	bool	0	0
@@ -13559,7 +13540,7 @@ C	OggPacketSequencePlayback	RefCounted	0
 C	OmniLight3D	Light3D	0
 P	OmniLight3D	omni_range	float
 P	OmniLight3D	omni_attenuation	float
-P	OmniLight3D	omni_shadow_mode	int
+P	OmniLight3D	omni_shadow_mode	enum::OmniLight3D.ShadowMode
 F	OmniLight3D	set_shadow_mode	void	0	0	enum::OmniLight3D.ShadowMode
 F	OmniLight3D	get_shadow_mode	enum::OmniLight3D.ShadowMode	0	0
 E	OmniLight3D	ShadowMode	0	SHADOW_DUAL_PARABOLOID	0	SHADOW_CUBE	1
@@ -13618,7 +13599,7 @@ F	OpenXRAPIExtension	update_main_swapchain_size	void	0	0
 E	OpenXRAPIExtension	OpenXRAlphaBlendModeSupport	0	OPENXR_ALPHA_BLEND_MODE_SUPPORT_NONE	0	OPENXR_ALPHA_BLEND_MODE_SUPPORT_REAL	1	OPENXR_ALPHA_BLEND_MODE_SUPPORT_EMULATING	2
 C	OpenXRAction	Resource	0
 P	OpenXRAction	localized_name	String
-P	OpenXRAction	action_type	int
+P	OpenXRAction	action_type	enum::OpenXRAction.ActionType
 P	OpenXRAction	toplevel_paths	PackedStringArray
 F	OpenXRAction	set_localized_name	void	0	0	String
 F	OpenXRAction	get_localized_name	String	0	0
@@ -13696,16 +13677,16 @@ P	OpenXRCompositionLayer	android_surface_size	Vector2i
 P	OpenXRCompositionLayer	sort_order	int
 P	OpenXRCompositionLayer	alpha_blend	bool
 P	OpenXRCompositionLayer	enable_hole_punch	bool
-P	OpenXRCompositionLayer	eye_visibility	int
-P	OpenXRCompositionLayer	swapchain_state_min_filter	int
-P	OpenXRCompositionLayer	swapchain_state_mag_filter	int
-P	OpenXRCompositionLayer	swapchain_state_mipmap_mode	int
-P	OpenXRCompositionLayer	swapchain_state_horizontal_wrap	int
-P	OpenXRCompositionLayer	swapchain_state_vertical_wrap	int
-P	OpenXRCompositionLayer	swapchain_state_red_swizzle	int
-P	OpenXRCompositionLayer	swapchain_state_green_swizzle	int
-P	OpenXRCompositionLayer	swapchain_state_blue_swizzle	int
-P	OpenXRCompositionLayer	swapchain_state_alpha_swizzle	int
+P	OpenXRCompositionLayer	eye_visibility	enum::OpenXRCompositionLayer.EyeVisibility
+P	OpenXRCompositionLayer	swapchain_state_min_filter	enum::OpenXRCompositionLayer.Filter
+P	OpenXRCompositionLayer	swapchain_state_mag_filter	enum::OpenXRCompositionLayer.Filter
+P	OpenXRCompositionLayer	swapchain_state_mipmap_mode	enum::OpenXRCompositionLayer.MipmapMode
+P	OpenXRCompositionLayer	swapchain_state_horizontal_wrap	enum::OpenXRCompositionLayer.Wrap
+P	OpenXRCompositionLayer	swapchain_state_vertical_wrap	enum::OpenXRCompositionLayer.Wrap
+P	OpenXRCompositionLayer	swapchain_state_red_swizzle	enum::OpenXRCompositionLayer.Swizzle
+P	OpenXRCompositionLayer	swapchain_state_green_swizzle	enum::OpenXRCompositionLayer.Swizzle
+P	OpenXRCompositionLayer	swapchain_state_blue_swizzle	enum::OpenXRCompositionLayer.Swizzle
+P	OpenXRCompositionLayer	swapchain_state_alpha_swizzle	enum::OpenXRCompositionLayer.Swizzle
 P	OpenXRCompositionLayer	swapchain_state_max_anisotropy	float
 P	OpenXRCompositionLayer	swapchain_state_border_color	Color
 F	OpenXRCompositionLayer	set_layer_viewport	void	0	0	SubViewport
@@ -13886,11 +13867,11 @@ F	OpenXRFutureResult	get_result_value	Variant	0	0
 E	OpenXRFutureResult	ResultStatus	0	RESULT_RUNNING	0	RESULT_FINISHED	1	RESULT_CANCELLED	2
 P	OpenXRFutureResult	completed	Signal
 C	OpenXRHand	Node3D	0
-P	OpenXRHand	hand	int
-P	OpenXRHand	motion_range	int
+P	OpenXRHand	hand	enum::OpenXRHand.Hands
+P	OpenXRHand	motion_range	enum::OpenXRHand.MotionRange
 P	OpenXRHand	hand_skeleton	NodePath
-P	OpenXRHand	skeleton_rig	int
-P	OpenXRHand	bone_update	int
+P	OpenXRHand	skeleton_rig	enum::OpenXRHand.SkeletonRig
+P	OpenXRHand	bone_update	enum::OpenXRHand.BoneUpdate
 F	OpenXRHand	set_hand	void	0	0	enum::OpenXRHand.Hands
 F	OpenXRHand	get_hand	enum::OpenXRHand.Hands	0	0
 F	OpenXRHand	set_hand_skeleton	void	0	0	NodePath
@@ -14026,7 +14007,7 @@ P	OpenXRInterface	gpu_level_changed	Signal
 P	OpenXRInterface	user_presence_changed	Signal
 C	OpenXRMarkerTracker	OpenXRSpatialEntityTracker	0
 P	OpenXRMarkerTracker	bounds_size	int
-P	OpenXRMarkerTracker	marker_type	int
+P	OpenXRMarkerTracker	marker_type	enum::OpenXRSpatialComponentMarkerList.MarkerType
 P	OpenXRMarkerTracker	marker_id	int
 F	OpenXRMarkerTracker	set_bounds_size	void	0	0	Vector2
 F	OpenXRMarkerTracker	get_bounds_size	Vector2	0	0
@@ -14038,7 +14019,7 @@ F	OpenXRMarkerTracker	set_marker_data	void	0	0	Variant
 F	OpenXRMarkerTracker	get_marker_data	Variant	0	0
 C	OpenXRPlaneTracker	OpenXRSpatialEntityTracker	0
 P	OpenXRPlaneTracker	bounds_size	int
-P	OpenXRPlaneTracker	plane_alignment	int
+P	OpenXRPlaneTracker	plane_alignment	enum::OpenXRSpatialComponentPlaneAlignmentList.PlaneAlignment
 P	OpenXRPlaneTracker	plane_label	String
 F	OpenXRPlaneTracker	set_bounds_size	void	0	0	Vector2
 F	OpenXRPlaneTracker	get_bounds_size	Vector2	0	0
@@ -14076,7 +14057,7 @@ P	OpenXRRenderModelExtension	render_model_added	Signal
 P	OpenXRRenderModelExtension	render_model_removed	Signal
 P	OpenXRRenderModelExtension	render_model_top_level_path_changed	Signal
 C	OpenXRRenderModelManager	Node3D	0
-P	OpenXRRenderModelManager	tracker	int
+P	OpenXRRenderModelManager	tracker	enum::OpenXRRenderModelManager.RenderModelTracker
 P	OpenXRRenderModelManager	make_local_to_pose	String
 F	OpenXRRenderModelManager	get_tracker	enum::OpenXRRenderModelManager.RenderModelTracker	0	0
 F	OpenXRRenderModelManager	set_tracker	void	0	0	enum::OpenXRRenderModelManager.RenderModelTracker
@@ -14103,13 +14084,13 @@ E	OpenXRSpatialAnchorCapability	PersistenceScope	0	PERSISTENCE_SCOPE_SYSTEM_MANA
 C	OpenXRSpatialCapabilityConfigurationAnchor	OpenXRSpatialCapabilityConfigurationBaseHeader	0
 F	OpenXRSpatialCapabilityConfigurationAnchor	get_enabled_components	PackedInt64Array	0	0
 C	OpenXRSpatialCapabilityConfigurationAprilTag	OpenXRSpatialCapabilityConfigurationBaseHeader	0
-P	OpenXRSpatialCapabilityConfigurationAprilTag	april_dict	int
+P	OpenXRSpatialCapabilityConfigurationAprilTag	april_dict	enum::OpenXRSpatialCapabilityConfigurationAprilTag.AprilTagDict
 F	OpenXRSpatialCapabilityConfigurationAprilTag	get_enabled_components	PackedInt64Array	0	0
 F	OpenXRSpatialCapabilityConfigurationAprilTag	set_april_dict	void	0	0	enum::OpenXRSpatialCapabilityConfigurationAprilTag.AprilTagDict
 F	OpenXRSpatialCapabilityConfigurationAprilTag	get_april_dict	enum::OpenXRSpatialCapabilityConfigurationAprilTag.AprilTagDict	0	0
 E	OpenXRSpatialCapabilityConfigurationAprilTag	AprilTagDict	0	APRIL_TAG_DICT_16H5	1	APRIL_TAG_DICT_25H9	2	APRIL_TAG_DICT_36H10	3	APRIL_TAG_DICT_36H11	4
 C	OpenXRSpatialCapabilityConfigurationAruco	OpenXRSpatialCapabilityConfigurationBaseHeader	0
-P	OpenXRSpatialCapabilityConfigurationAruco	aruco_dict	int
+P	OpenXRSpatialCapabilityConfigurationAruco	aruco_dict	enum::OpenXRSpatialCapabilityConfigurationAruco.ArucoDict
 F	OpenXRSpatialCapabilityConfigurationAruco	get_enabled_components	PackedInt64Array	0	0
 F	OpenXRSpatialCapabilityConfigurationAruco	set_aruco_dict	void	0	0	enum::OpenXRSpatialCapabilityConfigurationAruco.ArucoDict
 F	OpenXRSpatialCapabilityConfigurationAruco	get_aruco_dict	enum::OpenXRSpatialCapabilityConfigurationAruco.ArucoDict	0	0
@@ -14204,7 +14185,7 @@ E	OpenXRSpatialEntityExtension	ComponentType	0	COMPONENT_TYPE_BOUNDED_2D	1	COMPO
 P	OpenXRSpatialEntityExtension	spatial_discovery_recommended	Signal
 C	OpenXRSpatialEntityTracker	XRPositionalTracker	0
 P	OpenXRSpatialEntityTracker	entity	RID
-P	OpenXRSpatialEntityTracker	spatial_tracking_state	int
+P	OpenXRSpatialEntityTracker	spatial_tracking_state	enum::OpenXRSpatialEntityTracker.EntityTrackingState
 F	OpenXRSpatialEntityTracker	set_spatial_context	void	0	0	RID
 F	OpenXRSpatialEntityTracker	get_spatial_context	RID	0	0
 F	OpenXRSpatialEntityTracker	set_entity	void	0	0	RID
@@ -14438,7 +14419,7 @@ P	ParticleProcessMaterial	particle_flag_damping_as_friction	bool
 P	ParticleProcessMaterial	particle_flag_inherit_emitter_scale	bool
 P	ParticleProcessMaterial	emission_shape_offset	Vector3
 P	ParticleProcessMaterial	emission_shape_scale	Vector3
-P	ParticleProcessMaterial	emission_shape	int
+P	ParticleProcessMaterial	emission_shape	enum::ParticleProcessMaterial.EmissionShape
 P	ParticleProcessMaterial	emission_sphere_radius	float
 P	ParticleProcessMaterial	emission_box_extents	Vector3
 P	ParticleProcessMaterial	emission_point_texture	Texture2D
@@ -14544,11 +14525,11 @@ P	ParticleProcessMaterial	turbulence_initial_displacement	Vector2
 P	ParticleProcessMaterial	turbulence_initial_displacement_min	float
 P	ParticleProcessMaterial	turbulence_initial_displacement_max	float
 P	ParticleProcessMaterial	turbulence_influence_over_life	CurveTexture
-P	ParticleProcessMaterial	collision_mode	int
+P	ParticleProcessMaterial	collision_mode	enum::ParticleProcessMaterial.CollisionMode
 P	ParticleProcessMaterial	collision_friction	float
 P	ParticleProcessMaterial	collision_bounce	float
 P	ParticleProcessMaterial	collision_use_scale	bool
-P	ParticleProcessMaterial	sub_emitter_mode	int
+P	ParticleProcessMaterial	sub_emitter_mode	enum::ParticleProcessMaterial.SubEmitterMode
 P	ParticleProcessMaterial	sub_emitter_frequency	float
 P	ParticleProcessMaterial	sub_emitter_amount_at_end	int
 P	ParticleProcessMaterial	sub_emitter_amount_at_collision	int
@@ -14716,7 +14697,7 @@ P	PathFollow3D	progress	float
 P	PathFollow3D	progress_ratio	float
 P	PathFollow3D	h_offset	float
 P	PathFollow3D	v_offset	float
-P	PathFollow3D	rotation_mode	int
+P	PathFollow3D	rotation_mode	enum::PathFollow3D.RotationMode
 P	PathFollow3D	use_model_front	bool
 P	PathFollow3D	cubic_interp	bool
 P	PathFollow3D	loop	bool
@@ -14771,7 +14752,7 @@ F	PhysicalBone2D	get_bone2d_index	int	0	0
 F	PhysicalBone2D	set_follow_bone_when_simulating	void	0	0	bool
 F	PhysicalBone2D	get_follow_bone_when_simulating	bool	0	0
 C	PhysicalBone3D	PhysicsBody3D	0
-P	PhysicalBone3D	joint_type	int
+P	PhysicalBone3D	joint_type	enum::PhysicalBone3D.JointType
 P	PhysicalBone3D	joint_offset	Transform3D
 P	PhysicalBone3D	joint_rotation	Vector3
 P	PhysicalBone3D	body_offset	Transform3D
@@ -14780,9 +14761,9 @@ P	PhysicalBone3D	friction	float
 P	PhysicalBone3D	bounce	float
 P	PhysicalBone3D	gravity_scale	float
 P	PhysicalBone3D	custom_integrator	bool
-P	PhysicalBone3D	linear_damp_mode	int
+P	PhysicalBone3D	linear_damp_mode	enum::PhysicalBone3D.DampMode
 P	PhysicalBone3D	linear_damp	float
-P	PhysicalBone3D	angular_damp_mode	int
+P	PhysicalBone3D	angular_damp_mode	enum::PhysicalBone3D.DampMode
 P	PhysicalBone3D	angular_damp	float
 P	PhysicalBone3D	linear_velocity	Vector3
 P	PhysicalBone3D	angular_velocity	Vector3
@@ -16109,7 +16090,7 @@ P	PlaneMesh	size	Vector2
 P	PlaneMesh	subdivide_width	int
 P	PlaneMesh	subdivide_depth	int
 P	PlaneMesh	center_offset	Vector3
-P	PlaneMesh	orientation	int
+P	PlaneMesh	orientation	enum::PlaneMesh.Orientation
 F	PlaneMesh	set_size	void	0	0	Vector2
 F	PlaneMesh	get_size	Vector2	0	0
 F	PlaneMesh	set_subdivide_width	void	0	0	int
@@ -16210,7 +16191,7 @@ P	PopupMenu	hide_on_checkable_item_selection	bool
 P	PopupMenu	hide_on_state_item_selection	bool
 P	PopupMenu	submenu_popup_delay	float
 P	PopupMenu	allow_search	bool
-P	PopupMenu	system_menu_id	int
+P	PopupMenu	system_menu_id	enum::NativeMenu.SystemMenus
 P	PopupMenu	prefer_native_menu	bool
 P	PopupMenu	shrink_height	bool
 P	PopupMenu	shrink_width	bool
@@ -16473,7 +16454,7 @@ P	RDAccelerationStructureGeometry	vertex_buffer	RID
 P	RDAccelerationStructureGeometry	vertex_offset	int
 P	RDAccelerationStructureGeometry	vertex_stride	int
 P	RDAccelerationStructureGeometry	vertex_count	int
-P	RDAccelerationStructureGeometry	vertex_format	int
+P	RDAccelerationStructureGeometry	vertex_format	enum::RenderingDevice.DataFormat
 P	RDAccelerationStructureGeometry	index_buffer	RID
 P	RDAccelerationStructureGeometry	index_offset	int
 P	RDAccelerationStructureGeometry	index_count	int
@@ -16515,8 +16496,8 @@ F	RDAccelerationStructureInstance	get_flags	bitfield::RenderingDevice.Accelerati
 F	RDAccelerationStructureInstance	set_blas	void	0	0	RID
 F	RDAccelerationStructureInstance	get_blas	RID	0	0
 C	RDAttachmentFormat	RefCounted	0
-P	RDAttachmentFormat	format	int
-P	RDAttachmentFormat	samples	int
+P	RDAttachmentFormat	format	enum::RenderingDevice.DataFormat
+P	RDAttachmentFormat	samples	enum::RenderingDevice.TextureSamples
 P	RDAttachmentFormat	usage_flags	int
 F	RDAttachmentFormat	set_format	void	0	0	enum::RenderingDevice.DataFormat
 F	RDAttachmentFormat	get_format	enum::RenderingDevice.DataFormat	0	0
@@ -16553,7 +16534,7 @@ F	RDHitGroup	set_intersection_shader	void	0	0	RDPipelineShader
 F	RDHitGroup	get_intersection_shader	RDPipelineShader	0	0
 C	RDPipelineColorBlendState	RefCounted	0
 P	RDPipelineColorBlendState	enable_logic_op	bool
-P	RDPipelineColorBlendState	logic_op	int
+P	RDPipelineColorBlendState	logic_op	enum::RenderingDevice.LogicOperation
 P	RDPipelineColorBlendState	blend_constant	Color
 P	RDPipelineColorBlendState	attachments	typedarray::RDPipelineColorBlendStateAttachment
 F	RDPipelineColorBlendState	set_enable_logic_op	void	0	0	bool
@@ -16566,12 +16547,12 @@ F	RDPipelineColorBlendState	set_attachments	void	0	0	typedarray::RDPipelineColor
 F	RDPipelineColorBlendState	get_attachments	typedarray::RDPipelineColorBlendStateAttachment	0	0
 C	RDPipelineColorBlendStateAttachment	RefCounted	0
 P	RDPipelineColorBlendStateAttachment	enable_blend	bool
-P	RDPipelineColorBlendStateAttachment	src_color_blend_factor	int
-P	RDPipelineColorBlendStateAttachment	dst_color_blend_factor	int
-P	RDPipelineColorBlendStateAttachment	color_blend_op	int
-P	RDPipelineColorBlendStateAttachment	src_alpha_blend_factor	int
-P	RDPipelineColorBlendStateAttachment	dst_alpha_blend_factor	int
-P	RDPipelineColorBlendStateAttachment	alpha_blend_op	int
+P	RDPipelineColorBlendStateAttachment	src_color_blend_factor	enum::RenderingDevice.BlendFactor
+P	RDPipelineColorBlendStateAttachment	dst_color_blend_factor	enum::RenderingDevice.BlendFactor
+P	RDPipelineColorBlendStateAttachment	color_blend_op	enum::RenderingDevice.BlendOperation
+P	RDPipelineColorBlendStateAttachment	src_alpha_blend_factor	enum::RenderingDevice.BlendFactor
+P	RDPipelineColorBlendStateAttachment	dst_alpha_blend_factor	enum::RenderingDevice.BlendFactor
+P	RDPipelineColorBlendStateAttachment	alpha_blend_op	enum::RenderingDevice.BlendOperation
 P	RDPipelineColorBlendStateAttachment	write_r	bool
 P	RDPipelineColorBlendStateAttachment	write_g	bool
 P	RDPipelineColorBlendStateAttachment	write_b	bool
@@ -16602,22 +16583,22 @@ F	RDPipelineColorBlendStateAttachment	get_write_a	bool	0	0
 C	RDPipelineDepthStencilState	RefCounted	0
 P	RDPipelineDepthStencilState	enable_depth_test	bool
 P	RDPipelineDepthStencilState	enable_depth_write	bool
-P	RDPipelineDepthStencilState	depth_compare_operator	int
+P	RDPipelineDepthStencilState	depth_compare_operator	enum::RenderingDevice.CompareOperator
 P	RDPipelineDepthStencilState	enable_depth_range	bool
 P	RDPipelineDepthStencilState	depth_range_min	float
 P	RDPipelineDepthStencilState	depth_range_max	float
 P	RDPipelineDepthStencilState	enable_stencil	bool
-P	RDPipelineDepthStencilState	front_op_fail	int
-P	RDPipelineDepthStencilState	front_op_pass	int
-P	RDPipelineDepthStencilState	front_op_depth_fail	int
-P	RDPipelineDepthStencilState	front_op_compare	int
+P	RDPipelineDepthStencilState	front_op_fail	enum::RenderingDevice.StencilOperation
+P	RDPipelineDepthStencilState	front_op_pass	enum::RenderingDevice.StencilOperation
+P	RDPipelineDepthStencilState	front_op_depth_fail	enum::RenderingDevice.StencilOperation
+P	RDPipelineDepthStencilState	front_op_compare	enum::RenderingDevice.CompareOperator
 P	RDPipelineDepthStencilState	front_op_compare_mask	int
 P	RDPipelineDepthStencilState	front_op_write_mask	int
 P	RDPipelineDepthStencilState	front_op_reference	int
-P	RDPipelineDepthStencilState	back_op_fail	int
-P	RDPipelineDepthStencilState	back_op_pass	int
-P	RDPipelineDepthStencilState	back_op_depth_fail	int
-P	RDPipelineDepthStencilState	back_op_compare	int
+P	RDPipelineDepthStencilState	back_op_fail	enum::RenderingDevice.StencilOperation
+P	RDPipelineDepthStencilState	back_op_pass	enum::RenderingDevice.StencilOperation
+P	RDPipelineDepthStencilState	back_op_depth_fail	enum::RenderingDevice.StencilOperation
+P	RDPipelineDepthStencilState	back_op_compare	enum::RenderingDevice.CompareOperator
 P	RDPipelineDepthStencilState	back_op_compare_mask	int
 P	RDPipelineDepthStencilState	back_op_write_mask	int
 P	RDPipelineDepthStencilState	back_op_reference	int
@@ -16664,7 +16645,7 @@ F	RDPipelineDepthStencilState	get_back_op_write_mask	int	0	0
 F	RDPipelineDepthStencilState	set_back_op_reference	void	0	0	int
 F	RDPipelineDepthStencilState	get_back_op_reference	int	0	0
 C	RDPipelineMultisampleState	RefCounted	0
-P	RDPipelineMultisampleState	sample_count	int
+P	RDPipelineMultisampleState	sample_count	enum::RenderingDevice.TextureSamples
 P	RDPipelineMultisampleState	enable_sample_shading	bool
 P	RDPipelineMultisampleState	min_sample_shading	float
 P	RDPipelineMultisampleState	enable_alpha_to_coverage	bool
@@ -16686,8 +16667,8 @@ C	RDPipelineRasterizationState	RefCounted	0
 P	RDPipelineRasterizationState	enable_depth_clamp	bool
 P	RDPipelineRasterizationState	discard_primitives	bool
 P	RDPipelineRasterizationState	wireframe	bool
-P	RDPipelineRasterizationState	cull_mode	int
-P	RDPipelineRasterizationState	front_face	int
+P	RDPipelineRasterizationState	cull_mode	enum::RenderingDevice.PolygonCullMode
+P	RDPipelineRasterizationState	front_face	enum::RenderingDevice.PolygonFrontFace
 P	RDPipelineRasterizationState	depth_bias_enabled	bool
 P	RDPipelineRasterizationState	depth_bias_constant_factor	float
 P	RDPipelineRasterizationState	depth_bias_clamp	float
@@ -16731,20 +16712,20 @@ F	RDPipelineSpecializationConstant	get_value	Variant	0	0
 F	RDPipelineSpecializationConstant	set_constant_id	void	0	0	int
 F	RDPipelineSpecializationConstant	get_constant_id	int	0	0
 C	RDSamplerState	RefCounted	0
-P	RDSamplerState	mag_filter	int
-P	RDSamplerState	min_filter	int
-P	RDSamplerState	mip_filter	int
-P	RDSamplerState	repeat_u	int
-P	RDSamplerState	repeat_v	int
-P	RDSamplerState	repeat_w	int
+P	RDSamplerState	mag_filter	enum::RenderingDevice.SamplerFilter
+P	RDSamplerState	min_filter	enum::RenderingDevice.SamplerFilter
+P	RDSamplerState	mip_filter	enum::RenderingDevice.SamplerFilter
+P	RDSamplerState	repeat_u	enum::RenderingDevice.SamplerRepeatMode
+P	RDSamplerState	repeat_v	enum::RenderingDevice.SamplerRepeatMode
+P	RDSamplerState	repeat_w	enum::RenderingDevice.SamplerRepeatMode
 P	RDSamplerState	lod_bias	float
 P	RDSamplerState	use_anisotropy	bool
 P	RDSamplerState	anisotropy_max	float
 P	RDSamplerState	enable_compare	bool
-P	RDSamplerState	compare_op	int
+P	RDSamplerState	compare_op	enum::RenderingDevice.CompareOperator
 P	RDSamplerState	min_lod	float
 P	RDSamplerState	max_lod	float
-P	RDSamplerState	border_color	int
+P	RDSamplerState	border_color	enum::RenderingDevice.SamplerBorderColor
 P	RDSamplerState	unnormalized_uvw	bool
 F	RDSamplerState	set_mag_filter	void	0	0	enum::RenderingDevice.SamplerFilter
 F	RDSamplerState	get_mag_filter	enum::RenderingDevice.SamplerFilter	0	0
@@ -16819,20 +16800,20 @@ P	RDShaderSource	source_any_hit	String
 P	RDShaderSource	source_closest_hit	String
 P	RDShaderSource	source_miss	String
 P	RDShaderSource	source_intersection	String
-P	RDShaderSource	language	int
+P	RDShaderSource	language	enum::RenderingDevice.ShaderLanguage
 F	RDShaderSource	set_stage_source	void	0	0	enum::RenderingDevice.ShaderStage	String
 F	RDShaderSource	get_stage_source	String	0	0	enum::RenderingDevice.ShaderStage
 F	RDShaderSource	set_language	void	0	0	enum::RenderingDevice.ShaderLanguage
 F	RDShaderSource	get_language	enum::RenderingDevice.ShaderLanguage	0	0
 C	RDTextureFormat	RefCounted	0
-P	RDTextureFormat	format	int
+P	RDTextureFormat	format	enum::RenderingDevice.DataFormat
 P	RDTextureFormat	width	int
 P	RDTextureFormat	height	int
 P	RDTextureFormat	depth	int
 P	RDTextureFormat	array_layers	int
 P	RDTextureFormat	mipmaps	int
-P	RDTextureFormat	texture_type	int
-P	RDTextureFormat	samples	int
+P	RDTextureFormat	texture_type	enum::RenderingDevice.TextureType
+P	RDTextureFormat	samples	enum::RenderingDevice.TextureSamples
 P	RDTextureFormat	usage_bits	int
 P	RDTextureFormat	is_resolve_buffer	bool
 P	RDTextureFormat	is_discardable	bool
@@ -16861,11 +16842,11 @@ F	RDTextureFormat	get_is_discardable	bool	0	0
 F	RDTextureFormat	add_shareable_format	void	0	0	enum::RenderingDevice.DataFormat
 F	RDTextureFormat	remove_shareable_format	void	0	0	enum::RenderingDevice.DataFormat
 C	RDTextureView	RefCounted	0
-P	RDTextureView	format_override	int
-P	RDTextureView	swizzle_r	int
-P	RDTextureView	swizzle_g	int
-P	RDTextureView	swizzle_b	int
-P	RDTextureView	swizzle_a	int
+P	RDTextureView	format_override	enum::RenderingDevice.DataFormat
+P	RDTextureView	swizzle_r	enum::RenderingDevice.TextureSwizzle
+P	RDTextureView	swizzle_g	enum::RenderingDevice.TextureSwizzle
+P	RDTextureView	swizzle_b	enum::RenderingDevice.TextureSwizzle
+P	RDTextureView	swizzle_a	enum::RenderingDevice.TextureSwizzle
 F	RDTextureView	set_format_override	void	0	0	enum::RenderingDevice.DataFormat
 F	RDTextureView	get_format_override	enum::RenderingDevice.DataFormat	0	0
 F	RDTextureView	set_swizzle_r	void	0	0	enum::RenderingDevice.TextureSwizzle
@@ -16877,7 +16858,7 @@ F	RDTextureView	get_swizzle_b	enum::RenderingDevice.TextureSwizzle	0	0
 F	RDTextureView	set_swizzle_a	void	0	0	enum::RenderingDevice.TextureSwizzle
 F	RDTextureView	get_swizzle_a	enum::RenderingDevice.TextureSwizzle	0	0
 C	RDUniform	RefCounted	0
-P	RDUniform	uniform_type	int
+P	RDUniform	uniform_type	enum::RenderingDevice.UniformType
 P	RDUniform	binding	int
 F	RDUniform	set_uniform_type	void	0	0	enum::RenderingDevice.UniformType
 F	RDUniform	get_uniform_type	enum::RenderingDevice.UniformType	0	0
@@ -16890,9 +16871,9 @@ C	RDVertexAttribute	RefCounted	0
 P	RDVertexAttribute	binding	int
 P	RDVertexAttribute	location	int
 P	RDVertexAttribute	offset	int
-P	RDVertexAttribute	format	int
+P	RDVertexAttribute	format	enum::RenderingDevice.DataFormat
 P	RDVertexAttribute	stride	int
-P	RDVertexAttribute	frequency	int
+P	RDVertexAttribute	frequency	enum::RenderingDevice.VertexFrequency
 F	RDVertexAttribute	set_binding	void	0	0	int
 F	RDVertexAttribute	get_binding	int	0	0
 F	RDVertexAttribute	set_location	void	0	0	int
@@ -17058,7 +17039,7 @@ F	ReferenceRect	set_border_width	void	0	0	float
 F	ReferenceRect	get_editor_only	bool	0	0
 F	ReferenceRect	set_editor_only	void	0	0	bool
 C	ReflectionProbe	VisualInstance3D	0
-P	ReflectionProbe	update_mode	int
+P	ReflectionProbe	update_mode	enum::ReflectionProbe.UpdateMode
 P	ReflectionProbe	intensity	float
 P	ReflectionProbe	blend_distance	float
 P	ReflectionProbe	max_distance	float
@@ -17070,7 +17051,7 @@ P	ReflectionProbe	enable_shadows	bool
 P	ReflectionProbe	cull_mask	int
 P	ReflectionProbe	reflection_mask	int
 P	ReflectionProbe	mesh_lod_threshold	float
-P	ReflectionProbe	ambient_mode	int
+P	ReflectionProbe	ambient_mode	enum::ReflectionProbe.AmbientMode
 P	ReflectionProbe	ambient_color	Color
 P	ReflectionProbe	ambient_color_energy	float
 F	ReflectionProbe	set_intensity	void	0	0	float
@@ -17179,12 +17160,12 @@ P	RenderSceneBuffersConfiguration	render_target	RID
 P	RenderSceneBuffersConfiguration	internal_size	Vector2i
 P	RenderSceneBuffersConfiguration	target_size	Vector2i
 P	RenderSceneBuffersConfiguration	view_count	int
-P	RenderSceneBuffersConfiguration	scaling_3d_mode	int
-P	RenderSceneBuffersConfiguration	msaa_3d	int
-P	RenderSceneBuffersConfiguration	screen_space_aa	int
+P	RenderSceneBuffersConfiguration	scaling_3d_mode	enum::RenderingServer.ViewportScaling3DMode
+P	RenderSceneBuffersConfiguration	msaa_3d	enum::RenderingServer.ViewportMSAA
+P	RenderSceneBuffersConfiguration	screen_space_aa	enum::RenderingServer.ViewportScreenSpaceAA
 P	RenderSceneBuffersConfiguration	fsr_sharpness	bool
 P	RenderSceneBuffersConfiguration	texture_mipmap_bias	bool
-P	RenderSceneBuffersConfiguration	anisotropic_filtering_level	int
+P	RenderSceneBuffersConfiguration	anisotropic_filtering_level	enum::RenderingServer.ViewportAnisotropicFiltering
 F	RenderSceneBuffersConfiguration	get_render_target	RID	0	0
 F	RenderSceneBuffersConfiguration	set_render_target	void	0	0	RID
 F	RenderSceneBuffersConfiguration	get_internal_size	Vector2i	0	0
@@ -18213,7 +18194,7 @@ F	RetargetModifier3D	set_scale_enabled	void	0	0	bool
 F	RetargetModifier3D	is_scale_enabled	bool	0	0
 E	RetargetModifier3D	TransformFlag	1	TRANSFORM_FLAG_POSITION	1	TRANSFORM_FLAG_ROTATION	2	TRANSFORM_FLAG_SCALE	4	TRANSFORM_FLAG_ALL	7
 C	RibbonTrailMesh	PrimitiveMesh	0
-P	RibbonTrailMesh	shape	int
+P	RibbonTrailMesh	shape	enum::RibbonTrailMesh.Shape
 P	RibbonTrailMesh	size	float
 P	RibbonTrailMesh	sections	int
 P	RibbonTrailMesh	section_length	float
@@ -18241,13 +18222,13 @@ P	RichTextLabel	fit_content	bool
 P	RichTextLabel	scroll_active	bool
 P	RichTextLabel	scroll_following	bool
 P	RichTextLabel	scroll_following_visible_characters	bool
-P	RichTextLabel	autowrap_mode	int
+P	RichTextLabel	autowrap_mode	enum::TextServer.AutowrapMode
 P	RichTextLabel	autowrap_trim_flags	int
 P	RichTextLabel	tab_size	int
 P	RichTextLabel	context_menu_enabled	bool
 P	RichTextLabel	shortcut_keys_enabled	bool
-P	RichTextLabel	horizontal_alignment	int
-P	RichTextLabel	vertical_alignment	int
+P	RichTextLabel	horizontal_alignment	enum::HorizontalAlignment
+P	RichTextLabel	vertical_alignment	enum::VerticalAlignment
 P	RichTextLabel	justification_flags	int
 P	RichTextLabel	tab_stops	PackedFloat32Array
 P	RichTextLabel	custom_effects	typedarray::24/17:RichTextEffect
@@ -18259,11 +18240,11 @@ P	RichTextLabel	selection_enabled	bool
 P	RichTextLabel	deselect_on_focus_loss_enabled	bool
 P	RichTextLabel	drag_and_drop_selection_enabled	bool
 P	RichTextLabel	visible_characters	int
-P	RichTextLabel	visible_characters_behavior	int
+P	RichTextLabel	visible_characters_behavior	enum::TextServer.VisibleCharactersBehavior
 P	RichTextLabel	visible_ratio	float
-P	RichTextLabel	text_direction	int
+P	RichTextLabel	text_direction	enum::Control.TextDirection
 P	RichTextLabel	language	String
-P	RichTextLabel	structured_text_bidi_override	int
+P	RichTextLabel	structured_text_bidi_override	enum::TextServer.StructuredTextParser
 P	RichTextLabel	structured_text_bidi_override_options	Array
 F	RichTextLabel	get_parsed_text	String	0	0
 F	RichTextLabel	add_text	void	0	0	String
@@ -18416,23 +18397,23 @@ C	RigidBody2D	PhysicsBody2D	0
 P	RigidBody2D	mass	float
 P	RigidBody2D	physics_material_override	PhysicsMaterial
 P	RigidBody2D	gravity_scale	float
-P	RigidBody2D	center_of_mass_mode	int
+P	RigidBody2D	center_of_mass_mode	enum::RigidBody2D.CenterOfMassMode
 P	RigidBody2D	center_of_mass	Vector2
 P	RigidBody2D	inertia	float
 P	RigidBody2D	sleeping	bool
 P	RigidBody2D	can_sleep	bool
 P	RigidBody2D	lock_rotation	bool
 P	RigidBody2D	freeze	bool
-P	RigidBody2D	freeze_mode	int
+P	RigidBody2D	freeze_mode	enum::RigidBody2D.FreezeMode
 P	RigidBody2D	custom_integrator	bool
-P	RigidBody2D	continuous_cd	int
+P	RigidBody2D	continuous_cd	enum::RigidBody2D.CCDMode
 P	RigidBody2D	contact_monitor	bool
 P	RigidBody2D	max_contacts_reported	int
 P	RigidBody2D	linear_velocity	Vector2
-P	RigidBody2D	linear_damp_mode	int
+P	RigidBody2D	linear_damp_mode	enum::RigidBody2D.DampMode
 P	RigidBody2D	linear_damp	float
 P	RigidBody2D	angular_velocity	float
-P	RigidBody2D	angular_damp_mode	int
+P	RigidBody2D	angular_damp_mode	enum::RigidBody2D.DampMode
 P	RigidBody2D	angular_damp	float
 P	RigidBody2D	constant_force	Vector2
 P	RigidBody2D	constant_torque	float
@@ -18508,23 +18489,23 @@ C	RigidBody3D	PhysicsBody3D	0
 P	RigidBody3D	mass	float
 P	RigidBody3D	physics_material_override	PhysicsMaterial
 P	RigidBody3D	gravity_scale	float
-P	RigidBody3D	center_of_mass_mode	int
+P	RigidBody3D	center_of_mass_mode	enum::RigidBody3D.CenterOfMassMode
 P	RigidBody3D	center_of_mass	Vector3
 P	RigidBody3D	inertia	Vector3
 P	RigidBody3D	sleeping	bool
 P	RigidBody3D	can_sleep	bool
 P	RigidBody3D	lock_rotation	bool
 P	RigidBody3D	freeze	bool
-P	RigidBody3D	freeze_mode	int
+P	RigidBody3D	freeze_mode	enum::RigidBody3D.FreezeMode
 P	RigidBody3D	custom_integrator	bool
 P	RigidBody3D	continuous_cd	bool
 P	RigidBody3D	contact_monitor	bool
 P	RigidBody3D	max_contacts_reported	int
 P	RigidBody3D	linear_velocity	Vector3
-P	RigidBody3D	linear_damp_mode	int
+P	RigidBody3D	linear_damp_mode	enum::RigidBody3D.DampMode
 P	RigidBody3D	linear_damp	float
 P	RigidBody3D	angular_velocity	Vector3
-P	RigidBody3D	angular_damp_mode	int
+P	RigidBody3D	angular_damp_mode	enum::RigidBody3D.DampMode
 P	RigidBody3D	angular_damp	float
 P	RigidBody3D	constant_force	Vector3
 P	RigidBody3D	constant_torque	Vector3
@@ -18949,11 +18930,11 @@ P	ScrollContainer	scroll_horizontal	int
 P	ScrollContainer	scroll_vertical	int
 P	ScrollContainer	scroll_horizontal_custom_step	float
 P	ScrollContainer	scroll_vertical_custom_step	float
-P	ScrollContainer	horizontal_scroll_mode	int
-P	ScrollContainer	vertical_scroll_mode	int
+P	ScrollContainer	horizontal_scroll_mode	enum::ScrollContainer.ScrollMode
+P	ScrollContainer	vertical_scroll_mode	enum::ScrollContainer.ScrollMode
 P	ScrollContainer	scroll_horizontal_by_default	bool
 P	ScrollContainer	scroll_deadzone	int
-P	ScrollContainer	scroll_hint_mode	int
+P	ScrollContainer	scroll_hint_mode	enum::ScrollContainer.ScrollHintMode
 P	ScrollContainer	tile_scroll_hint	bool
 F	ScrollContainer	set_h_scroll	void	0	0	int
 F	ScrollContainer	get_h_scroll	int	0	0
@@ -19173,7 +19154,7 @@ P	Skeleton2D	bone_setup_changed	Signal
 C	Skeleton3D	Node3D	0
 P	Skeleton3D	motion_scale	float
 P	Skeleton3D	show_rest_only	bool
-P	Skeleton3D	modifier_callback_mode_process	int
+P	Skeleton3D	modifier_callback_mode_process	enum::Skeleton3D.ModifierCallbackModeProcess
 P	Skeleton3D	animate_physical_bones	bool
 F	Skeleton3D	add_bone	int	0	0	String
 F	Skeleton3D	find_bone	int	0	0	String
@@ -19515,8 +19496,8 @@ F	SkinReference	get_skeleton	RID	0	0
 F	SkinReference	get_skin	Skin	0	0
 C	Sky	Resource	0
 P	Sky	sky_material	PanoramaSkyMaterial,ProceduralSkyMaterial,PhysicalSkyMaterial,ShaderMaterial
-P	Sky	process_mode	int
-P	Sky	radiance_size	int
+P	Sky	process_mode	enum::Sky.ProcessMode
+P	Sky	radiance_size	enum::Sky.RadianceSize
 F	Sky	set_radiance_size	void	0	0	enum::Sky.RadianceSize
 F	Sky	get_radiance_size	enum::Sky.RadianceSize	0	0
 F	Sky	set_process_mode	void	0	0	enum::Sky.ProcessMode
@@ -19530,7 +19511,7 @@ P	Slider	editable	bool
 P	Slider	scrollable	bool
 P	Slider	tick_count	int
 P	Slider	ticks_on_borders	bool
-P	Slider	ticks_position	int
+P	Slider	ticks_position	enum::Slider.TickPosition
 F	Slider	set_ticks	void	0	0	int
 F	Slider	get_ticks	int	0	0
 F	Slider	get_ticks_on_borders	bool	0	0
@@ -19565,7 +19546,7 @@ P	SoftBody3D	pressure_coefficient	float
 P	SoftBody3D	damping_coefficient	float
 P	SoftBody3D	drag_coefficient	float
 P	SoftBody3D	ray_pickable	bool
-P	SoftBody3D	disable_mode	int
+P	SoftBody3D	disable_mode	enum::SoftBody3D.DisableMode
 F	SoftBody3D	get_physics_rid	RID	0	0
 F	SoftBody3D	set_collision_mask	void	0	0	int
 F	SoftBody3D	get_collision_mask	int	0	0
@@ -19631,7 +19612,7 @@ P	SphereShape3D	radius	float
 F	SphereShape3D	set_radius	void	0	0	float
 F	SphereShape3D	get_radius	float	0	0
 C	SpinBox	Range	0
-P	SpinBox	alignment	int
+P	SpinBox	alignment	enum::HorizontalAlignment
 P	SpinBox	editable	bool
 P	SpinBox	update_on_text_changed	bool
 P	SpinBox	prefix	String
@@ -19671,7 +19652,7 @@ C	SplitContainer	Container	0
 P	SplitContainer	split_offsets	PackedInt32Array
 P	SplitContainer	collapsed	bool
 P	SplitContainer	dragging_enabled	bool
-P	SplitContainer	dragger_visibility	int
+P	SplitContainer	dragger_visibility	enum::SplitContainer.DraggerVisibility
 P	SplitContainer	vertical	bool
 P	SplitContainer	touch_dragger_enabled	bool
 P	SplitContainer	drag_nested_intersections	bool
@@ -19928,19 +19909,19 @@ P	SpriteBase3D	flip_h	bool
 P	SpriteBase3D	flip_v	bool
 P	SpriteBase3D	modulate	Color
 P	SpriteBase3D	pixel_size	float
-P	SpriteBase3D	axis	int
-P	SpriteBase3D	billboard	int
+P	SpriteBase3D	axis	enum::Vector3.Axis
+P	SpriteBase3D	billboard	enum::BaseMaterial3D.BillboardMode
 P	SpriteBase3D	transparent	bool
 P	SpriteBase3D	shaded	bool
 P	SpriteBase3D	double_sided	bool
 P	SpriteBase3D	no_depth_test	bool
 P	SpriteBase3D	fixed_size	bool
-P	SpriteBase3D	alpha_cut	int
+P	SpriteBase3D	alpha_cut	enum::SpriteBase3D.AlphaCutMode
 P	SpriteBase3D	alpha_scissor_threshold	float
 P	SpriteBase3D	alpha_hash_scale	float
-P	SpriteBase3D	alpha_antialiasing_mode	int
+P	SpriteBase3D	alpha_antialiasing_mode	enum::BaseMaterial3D.AlphaAntiAliasing
 P	SpriteBase3D	alpha_antialiasing_edge	float
-P	SpriteBase3D	texture_filter	int
+P	SpriteBase3D	texture_filter	enum::BaseMaterial3D.TextureFilter
 P	SpriteBase3D	render_priority	int
 F	SpriteBase3D	set_centered	void	0	0	bool
 F	SpriteBase3D	is_centered	bool	0	0
@@ -20220,8 +20201,8 @@ P	StyleBoxTexture	expand_margin_left	float
 P	StyleBoxTexture	expand_margin_top	float
 P	StyleBoxTexture	expand_margin_right	float
 P	StyleBoxTexture	expand_margin_bottom	float
-P	StyleBoxTexture	axis_stretch_horizontal	int
-P	StyleBoxTexture	axis_stretch_vertical	int
+P	StyleBoxTexture	axis_stretch_horizontal	enum::StyleBoxTexture.AxisStretchMode
+P	StyleBoxTexture	axis_stretch_vertical	enum::StyleBoxTexture.AxisStretchMode
 P	StyleBoxTexture	region_rect	Rect2
 P	StyleBoxTexture	modulate_color	Color
 P	StyleBoxTexture	draw_center	bool
@@ -20249,8 +20230,8 @@ P	SubViewport	size	Vector2i
 P	SubViewport	size_2d_override	Vector2i
 P	SubViewport	size_2d_override_stretch	bool
 P	SubViewport	view_count	int
-P	SubViewport	render_target_clear_mode	int
-P	SubViewport	render_target_update_mode	int
+P	SubViewport	render_target_clear_mode	enum::SubViewport.ClearMode
+P	SubViewport	render_target_update_mode	enum::SubViewport.UpdateMode
 F	SubViewport	set_size	void	0	0	Vector2i
 F	SubViewport	get_size	Vector2i	0	0
 F	SubViewport	set_size_2d_override	void	0	0	Vector2i
@@ -20327,14 +20308,14 @@ P	SystemFont	font_names	PackedStringArray
 P	SystemFont	font_italic	bool
 P	SystemFont	font_weight	int
 P	SystemFont	font_stretch	int
-P	SystemFont	antialiasing	int
+P	SystemFont	antialiasing	enum::TextServer.FontAntialiasing
 P	SystemFont	generate_mipmaps	bool
 P	SystemFont	disable_embedded_bitmaps	bool
 P	SystemFont	allow_system_fallback	bool
 P	SystemFont	force_autohinter	bool
 P	SystemFont	modulate_color_glyphs	bool
-P	SystemFont	hinting	int
-P	SystemFont	subpixel_positioning	int
+P	SystemFont	hinting	enum::TextServer.Hinting
+P	SystemFont	subpixel_positioning	enum::TextServer.SubpixelPositioning
 P	SystemFont	keep_rounding_remainders	bool
 P	SystemFont	multichannel_signed_distance_field	bool
 P	SystemFont	msdf_pixel_range	int
@@ -20388,10 +20369,10 @@ F	TLSOptions	get_private_key	CryptoKey	0	0
 F	TLSOptions	get_own_certificate	X509Certificate	0	0
 C	TabBar	Control	0
 P	TabBar	current_tab	int
-P	TabBar	tab_alignment	int
+P	TabBar	tab_alignment	enum::TabBar.AlignmentMode
 P	TabBar	clip_tabs	bool
 P	TabBar	close_with_middle_mouse	bool
-P	TabBar	tab_close_display_policy	int
+P	TabBar	tab_close_display_policy	enum::TabBar.CloseButtonDisplayPolicy
 P	TabBar	max_tab_width	int
 P	TabBar	scrolling_enabled	bool
 P	TabBar	drag_to_rearrange_enabled	bool
@@ -20472,9 +20453,9 @@ P	TabBar	tab_button_pressed	Signal
 P	TabBar	tab_hovered	Signal
 P	TabBar	active_tab_rearranged	Signal
 C	TabContainer	Container	0
-P	TabContainer	tab_alignment	int
+P	TabContainer	tab_alignment	enum::TabBar.AlignmentMode
 P	TabContainer	current_tab	int
-P	TabContainer	tabs_position	int
+P	TabContainer	tabs_position	enum::TabContainer.TabPosition
 P	TabContainer	clip_tabs	bool
 P	TabContainer	tabs_visible	bool
 P	TabContainer	all_tabs_in_front	bool
@@ -20482,7 +20463,7 @@ P	TabContainer	switch_on_drag_hover	bool
 P	TabContainer	drag_to_rearrange_enabled	bool
 P	TabContainer	tabs_rearrange_group	int
 P	TabContainer	use_hidden_tabs_for_min_size	bool
-P	TabContainer	tab_focus_mode	int
+P	TabContainer	tab_focus_mode	enum::Control.FocusMode
 P	TabContainer	deselect_enabled	bool
 F	TabContainer	get_tab_count	int	0	0
 F	TabContainer	set_current_tab	void	0	0	int
@@ -20556,8 +20537,8 @@ P	TextEdit	deselect_on_focus_loss_enabled	bool
 P	TextEdit	drag_and_drop_selection_enabled	bool
 P	TextEdit	middle_mouse_paste_enabled	bool
 P	TextEdit	empty_selection_clipboard_enabled	bool
-P	TextEdit	wrap_mode	int
-P	TextEdit	autowrap_mode	int
+P	TextEdit	wrap_mode	enum::TextEdit.LineWrappingMode
+P	TextEdit	autowrap_mode	enum::TextServer.AutowrapMode
 P	TextEdit	indent_wrapped_lines	bool
 P	TextEdit	tab_input_mode	bool
 P	TextEdit	virtual_keyboard_enabled	bool
@@ -20571,7 +20552,7 @@ P	TextEdit	scroll_fit_content_height	bool
 P	TextEdit	scroll_fit_content_width	bool
 P	TextEdit	minimap_draw	bool
 P	TextEdit	minimap_width	int
-P	TextEdit	caret_type	int
+P	TextEdit	caret_type	enum::TextEdit.CaretType
 P	TextEdit	caret_blink	bool
 P	TextEdit	caret_blink_interval	float
 P	TextEdit	caret_draw_when_editable_disabled	bool
@@ -20587,9 +20568,9 @@ P	TextEdit	highlight_current_line	bool
 P	TextEdit	draw_control_chars	bool
 P	TextEdit	draw_tabs	bool
 P	TextEdit	draw_spaces	bool
-P	TextEdit	text_direction	int
+P	TextEdit	text_direction	enum::Control.TextDirection
 P	TextEdit	language	String
-P	TextEdit	structured_text_bidi_override	int
+P	TextEdit	structured_text_bidi_override	enum::TextServer.StructuredTextParser
 P	TextEdit	structured_text_bidi_override_options	Array
 F	TextEdit	_handle_unicode_input	void	0	0	int	int
 F	TextEdit	_backspace	void	0	0	int
@@ -20861,14 +20842,14 @@ P	TextEdit	gutter_clicked	Signal
 P	TextEdit	gutter_added	Signal
 P	TextEdit	gutter_removed	Signal
 C	TextLine	RefCounted	0
-P	TextLine	direction	int
-P	TextLine	orientation	int
+P	TextLine	direction	enum::TextServer.Direction
+P	TextLine	orientation	enum::TextServer.Orientation
 P	TextLine	preserve_invalid	bool
 P	TextLine	preserve_control	bool
 P	TextLine	width	float
-P	TextLine	alignment	int
+P	TextLine	alignment	enum::HorizontalAlignment
 P	TextLine	flags	int
-P	TextLine	text_overrun_behavior	int
+P	TextLine	text_overrun_behavior	enum::TextServer.OverrunBehavior
 P	TextLine	ellipsis_char	String
 F	TextLine	clear	void	0	0
 F	TextLine	duplicate	TextLine	0	0
@@ -20913,20 +20894,20 @@ C	TextMesh	PrimitiveMesh	0
 P	TextMesh	text	String
 P	TextMesh	font	Font
 P	TextMesh	font_size	int
-P	TextMesh	horizontal_alignment	int
-P	TextMesh	vertical_alignment	int
+P	TextMesh	horizontal_alignment	enum::HorizontalAlignment
+P	TextMesh	vertical_alignment	enum::VerticalAlignment
 P	TextMesh	uppercase	bool
 P	TextMesh	line_spacing	float
-P	TextMesh	autowrap_mode	int
+P	TextMesh	autowrap_mode	enum::TextServer.AutowrapMode
 P	TextMesh	justification_flags	int
 P	TextMesh	pixel_size	float
 P	TextMesh	curve_step	float
 P	TextMesh	depth	float
 P	TextMesh	width	float
 P	TextMesh	offset	Vector2
-P	TextMesh	text_direction	int
+P	TextMesh	text_direction	enum::TextServer.Direction
 P	TextMesh	language	String
-P	TextMesh	structured_text_bidi_override	int
+P	TextMesh	structured_text_bidi_override	enum::TextServer.StructuredTextParser
 P	TextMesh	structured_text_bidi_override_options	Array
 F	TextMesh	set_horizontal_alignment	void	0	0	enum::HorizontalAlignment
 F	TextMesh	get_horizontal_alignment	enum::HorizontalAlignment	0	0
@@ -20965,15 +20946,15 @@ F	TextMesh	get_structured_text_bidi_override_options	Array	0	0
 F	TextMesh	set_uppercase	void	0	0	bool
 F	TextMesh	is_uppercase	bool	0	0
 C	TextParagraph	RefCounted	0
-P	TextParagraph	direction	int
+P	TextParagraph	direction	enum::TextServer.Direction
 P	TextParagraph	custom_punctuation	String
-P	TextParagraph	orientation	int
+P	TextParagraph	orientation	enum::TextServer.Orientation
 P	TextParagraph	preserve_invalid	bool
 P	TextParagraph	preserve_control	bool
-P	TextParagraph	alignment	int
+P	TextParagraph	alignment	enum::HorizontalAlignment
 P	TextParagraph	break_flags	int
 P	TextParagraph	justification_flags	int
-P	TextParagraph	text_overrun_behavior	int
+P	TextParagraph	text_overrun_behavior	enum::TextServer.OverrunBehavior
 P	TextParagraph	ellipsis_char	String
 P	TextParagraph	width	float
 P	TextParagraph	max_lines_visible	int
@@ -21625,7 +21606,7 @@ P	TextureButton	texture_disabled	Texture2D
 P	TextureButton	texture_focused	Texture2D
 P	TextureButton	texture_click_mask	BitMap
 P	TextureButton	ignore_texture_size	bool
-P	TextureButton	stretch_mode	int
+P	TextureButton	stretch_mode	enum::TextureButton.StretchMode
 P	TextureButton	flip_h	bool
 P	TextureButton	flip_v	bool
 F	TextureButton	set_texture_normal	void	0	0	Texture2D
@@ -21717,8 +21698,8 @@ F	TextureProgressBar	get_nine_patch_stretch	bool	0	0
 E	TextureProgressBar	FillMode	0	FILL_LEFT_TO_RIGHT	0	FILL_RIGHT_TO_LEFT	1	FILL_TOP_TO_BOTTOM	2	FILL_BOTTOM_TO_TOP	3	FILL_CLOCKWISE	4	FILL_COUNTER_CLOCKWISE	5	FILL_BILINEAR_LEFT_AND_RIGHT	6	FILL_BILINEAR_TOP_AND_BOTTOM	7	FILL_CLOCKWISE_AND_COUNTER_CLOCKWISE	8
 C	TextureRect	Control	0
 P	TextureRect	texture	Texture2D
-P	TextureRect	expand_mode	int
-P	TextureRect	stretch_mode	int
+P	TextureRect	expand_mode	enum::TextureRect.ExpandMode
+P	TextureRect	stretch_mode	enum::TextureRect.StretchMode
 P	TextureRect	flip_h	bool
 P	TextureRect	flip_v	bool
 F	TextureRect	set_texture	void	0	0	Texture2D
@@ -21906,8 +21887,8 @@ C	TileMap	Node2D	0
 P	TileMap	tile_set	TileSet
 P	TileMap	rendering_quadrant_size	int
 P	TileMap	collision_animatable	bool
-P	TileMap	collision_visibility_mode	int
-P	TileMap	navigation_visibility_mode	int
+P	TileMap	collision_visibility_mode	enum::TileMap.VisibilityMode
+P	TileMap	navigation_visibility_mode	enum::TileMap.VisibilityMode
 F	TileMap	_use_tile_data_runtime_update	bool	0	0	int	Vector2i
 F	TileMap	_tile_data_runtime_update	void	0	0	int	Vector2i	TileData
 F	TileMap	set_navigation_map	void	0	0	int	RID
@@ -21983,10 +21964,10 @@ P	TileMapLayer	x_draw_order_reversed	bool
 P	TileMapLayer	rendering_quadrant_size	int
 P	TileMapLayer	collision_enabled	bool
 P	TileMapLayer	use_kinematic_bodies	bool
-P	TileMapLayer	collision_visibility_mode	int
+P	TileMapLayer	collision_visibility_mode	enum::TileMapLayer.DebugVisibilityMode
 P	TileMapLayer	physics_quadrant_size	int
 P	TileMapLayer	navigation_enabled	bool
-P	TileMapLayer	navigation_visibility_mode	int
+P	TileMapLayer	navigation_visibility_mode	enum::TileMapLayer.DebugVisibilityMode
 F	TileMapLayer	_use_tile_data_runtime_update	bool	0	0	Vector2i
 F	TileMapLayer	_tile_data_runtime_update	void	0	0	Vector2i	TileData
 F	TileMapLayer	_update_cells	void	0	0	typedarray::Vector2i	bool
@@ -22059,9 +22040,9 @@ F	TileMapPattern	get_size	Vector2i	0	0
 F	TileMapPattern	set_size	void	0	0	Vector2i
 F	TileMapPattern	is_empty	bool	0	0
 C	TileSet	Resource	0
-P	TileSet	tile_shape	int
-P	TileSet	tile_layout	int
-P	TileSet	tile_offset_axis	int
+P	TileSet	tile_shape	enum::TileSet.TileShape
+P	TileSet	tile_layout	enum::TileSet.TileLayout
+P	TileSet	tile_offset_axis	enum::TileSet.TileOffsetAxis
 P	TileSet	tile_size	Vector2i
 P	TileSet	uv_clipping	bool
 F	TileSet	get_next_source_id	int	0	0
@@ -22254,7 +22235,7 @@ F	Time	get_ticks_usec	int	0	0
 E	Time	Month	0	MONTH_JANUARY	1	MONTH_FEBRUARY	2	MONTH_MARCH	3	MONTH_APRIL	4	MONTH_MAY	5	MONTH_JUNE	6	MONTH_JULY	7	MONTH_AUGUST	8	MONTH_SEPTEMBER	9	MONTH_OCTOBER	10	MONTH_NOVEMBER	11	MONTH_DECEMBER	12
 E	Time	Weekday	0	WEEKDAY_SUNDAY	0	WEEKDAY_MONDAY	1	WEEKDAY_TUESDAY	2	WEEKDAY_WEDNESDAY	3	WEEKDAY_THURSDAY	4	WEEKDAY_FRIDAY	5	WEEKDAY_SATURDAY	6
 C	Timer	Node	0
-P	Timer	process_callback	int
+P	Timer	process_callback	enum::Timer.TimerProcessCallback
 P	Timer	wait_time	float
 P	Timer	one_shot	bool
 P	Timer	autostart	bool
@@ -22301,7 +22282,7 @@ P	TouchScreenButton	shape_centered	bool
 P	TouchScreenButton	shape_visible	bool
 P	TouchScreenButton	passby_press	bool
 P	TouchScreenButton	action	StringName
-P	TouchScreenButton	visibility_mode	int
+P	TouchScreenButton	visibility_mode	enum::TouchScreenButton.VisibilityMode
 F	TouchScreenButton	set_texture_normal	void	0	0	Texture2D
 F	TouchScreenButton	get_texture_normal	Texture2D	0	0
 F	TouchScreenButton	set_texture_pressed	void	0	0	Texture2D
@@ -22433,11 +22414,11 @@ P	Tree	enable_recursive_folding	bool
 P	Tree	enable_drag_unfolding	bool
 P	Tree	hide_root	bool
 P	Tree	drop_mode_flags	int
-P	Tree	select_mode	int
+P	Tree	select_mode	enum::Tree.SelectMode
 P	Tree	auto_tooltip	bool
 P	Tree	scroll_horizontal_enabled	bool
 P	Tree	scroll_vertical_enabled	bool
-P	Tree	scroll_hint_mode	int
+P	Tree	scroll_hint_mode	enum::Tree.ScrollHintMode
 P	Tree	tile_scroll_hint	bool
 F	Tree	clear	void	0	0
 F	Tree	create_item	TreeItem	0	0	TreeItem?	int?
@@ -22800,7 +22781,7 @@ P	UPNPDevice	service_type	String
 P	UPNPDevice	igd_control_url	String
 P	UPNPDevice	igd_service_type	String
 P	UPNPDevice	igd_our_addr	String
-P	UPNPDevice	igd_status	int
+P	UPNPDevice	igd_status	enum::UPNPDevice.IGDStatus
 F	UPNPDevice	is_valid_gateway	bool	0	0
 F	UPNPDevice	query_external_address	String	0	0
 F	UPNPDevice	add_port_mapping	int	0	0	int	int?	String?	String?	int?
@@ -22987,25 +22968,25 @@ P	Viewport	transparent_bg	bool
 P	Viewport	handle_input_locally	bool
 P	Viewport	snap_2d_transforms_to_pixel	bool
 P	Viewport	snap_2d_vertices_to_pixel	bool
-P	Viewport	msaa_2d	int
-P	Viewport	msaa_3d	int
-P	Viewport	screen_space_aa	int
+P	Viewport	msaa_2d	enum::Viewport.MSAA
+P	Viewport	msaa_3d	enum::Viewport.MSAA
+P	Viewport	screen_space_aa	enum::Viewport.ScreenSpaceAA
 P	Viewport	use_taa	bool
 P	Viewport	use_debanding	bool
 P	Viewport	use_occlusion_culling	bool
 P	Viewport	mesh_lod_threshold	float
-P	Viewport	debug_draw	int
+P	Viewport	debug_draw	enum::Viewport.DebugDraw
 P	Viewport	use_hdr_2d	bool
-P	Viewport	scaling_3d_mode	int
+P	Viewport	scaling_3d_mode	enum::Viewport.Scaling3DMode
 P	Viewport	scaling_3d_scale	float
 P	Viewport	texture_mipmap_bias	float
-P	Viewport	anisotropic_filtering_level	int
+P	Viewport	anisotropic_filtering_level	enum::Viewport.AnisotropicFiltering
 P	Viewport	fsr_sharpness	float
-P	Viewport	vrs_mode	int
-P	Viewport	vrs_update_mode	int
+P	Viewport	vrs_mode	enum::Viewport.VRSMode
+P	Viewport	vrs_update_mode	enum::Viewport.VRSUpdateMode
 P	Viewport	vrs_texture	Texture2D
-P	Viewport	canvas_item_default_texture_filter	int
-P	Viewport	canvas_item_default_texture_repeat	int
+P	Viewport	canvas_item_default_texture_filter	enum::Viewport.DefaultCanvasItemTextureFilter
+P	Viewport	canvas_item_default_texture_repeat	enum::Viewport.DefaultCanvasItemTextureRepeat
 P	Viewport	audio_listener_enable_2d	bool
 P	Viewport	audio_listener_enable_3d	bool
 P	Viewport	physics_object_picking	bool
@@ -23015,8 +22996,8 @@ P	Viewport	gui_disable_input	bool
 P	Viewport	gui_snap_controls_to_pixels	bool
 P	Viewport	gui_embed_subwindows	bool
 P	Viewport	gui_drag_threshold	int
-P	Viewport	sdf_oversize	int
-P	Viewport	sdf_scale	int
+P	Viewport	sdf_oversize	enum::Viewport.SDFOversize
+P	Viewport	sdf_scale	enum::Viewport.SDFScale
 P	Viewport	positional_shadow_atlas_size	int
 P	Viewport	positional_shadow_atlas_16_bits	bool
 P	Viewport	positional_shadow_atlas_quad_0	int
@@ -23179,7 +23160,7 @@ P	ViewportTexture	viewport_path	NodePath
 F	ViewportTexture	set_viewport_path_in_scene	void	0	0	NodePath
 F	ViewportTexture	get_viewport_path_in_scene	NodePath	0	0
 C	VirtualJoystick	Control	0
-P	VirtualJoystick	joystick_mode	int
+P	VirtualJoystick	joystick_mode	enum::VirtualJoystick.JoystickMode
 P	VirtualJoystick	joystick_size	float
 P	VirtualJoystick	tip_size	float
 P	VirtualJoystick	deadzone_ratio	float
@@ -23189,7 +23170,7 @@ P	VirtualJoystick	action_left	StringName
 P	VirtualJoystick	action_right	StringName
 P	VirtualJoystick	action_up	StringName
 P	VirtualJoystick	action_down	StringName
-P	VirtualJoystick	visibility_mode	int
+P	VirtualJoystick	visibility_mode	enum::VirtualJoystick.VisibilityMode
 F	VirtualJoystick	set_joystick_mode	void	0	0	enum::VirtualJoystick.JoystickMode
 F	VirtualJoystick	get_joystick_mode	enum::VirtualJoystick.JoystickMode	0	0
 F	VirtualJoystick	set_joystick_size	void	0	0	float
@@ -23220,7 +23201,7 @@ P	VirtualJoystick	released	Signal
 P	VirtualJoystick	flicked	Signal
 P	VirtualJoystick	flick_canceled	Signal
 C	VisibleOnScreenEnabler2D	VisibleOnScreenNotifier2D	0
-P	VisibleOnScreenEnabler2D	enable_mode	int
+P	VisibleOnScreenEnabler2D	enable_mode	enum::VisibleOnScreenEnabler2D.EnableMode
 P	VisibleOnScreenEnabler2D	enable_node_path	NodePath
 F	VisibleOnScreenEnabler2D	set_enable_mode	void	0	0	enum::VisibleOnScreenEnabler2D.EnableMode
 F	VisibleOnScreenEnabler2D	get_enable_mode	enum::VisibleOnScreenEnabler2D.EnableMode	0	0
@@ -23228,7 +23209,7 @@ F	VisibleOnScreenEnabler2D	set_enable_node_path	void	0	0	NodePath
 F	VisibleOnScreenEnabler2D	get_enable_node_path	NodePath	0	0
 E	VisibleOnScreenEnabler2D	EnableMode	0	ENABLE_MODE_INHERIT	0	ENABLE_MODE_ALWAYS	1	ENABLE_MODE_WHEN_PAUSED	2
 C	VisibleOnScreenEnabler3D	VisibleOnScreenNotifier3D	0
-P	VisibleOnScreenEnabler3D	enable_mode	int
+P	VisibleOnScreenEnabler3D	enable_mode	enum::VisibleOnScreenEnabler3D.EnableMode
 P	VisibleOnScreenEnabler3D	enable_node_path	NodePath
 F	VisibleOnScreenEnabler3D	set_enable_mode	void	0	0	enum::VisibleOnScreenEnabler3D.EnableMode
 F	VisibleOnScreenEnabler3D	get_enable_mode	enum::VisibleOnScreenEnabler3D.EnableMode	0	0
@@ -23315,7 +23296,7 @@ F	VisualShaderNode	set_frame	void	0	0	int
 F	VisualShaderNode	get_frame	int	0	0
 E	VisualShaderNode	PortType	0	PORT_TYPE_SCALAR	0	PORT_TYPE_SCALAR_INT	1	PORT_TYPE_SCALAR_UINT	2	PORT_TYPE_VECTOR_2D	3	PORT_TYPE_VECTOR_3D	4	PORT_TYPE_VECTOR_4D	5	PORT_TYPE_BOOLEAN	6	PORT_TYPE_TRANSFORM	7	PORT_TYPE_SAMPLER	8	PORT_TYPE_MAX	9
 C	VisualShaderNodeBillboard	VisualShaderNode	0
-P	VisualShaderNodeBillboard	billboard_type	int
+P	VisualShaderNodeBillboard	billboard_type	enum::VisualShaderNodeBillboard.BillboardType
 P	VisualShaderNodeBillboard	keep_scale	bool
 F	VisualShaderNodeBillboard	set_billboard_type	void	0	0	enum::VisualShaderNodeBillboard.BillboardType
 F	VisualShaderNodeBillboard	get_billboard_type	enum::VisualShaderNodeBillboard.BillboardType	0	0
@@ -23334,7 +23315,7 @@ F	VisualShaderNodeBooleanParameter	is_default_value_enabled	bool	0	0
 F	VisualShaderNodeBooleanParameter	set_default_value	void	0	0	bool
 F	VisualShaderNodeBooleanParameter	get_default_value	bool	0	0
 C	VisualShaderNodeClamp	VisualShaderNode	0
-P	VisualShaderNodeClamp	op_type	int
+P	VisualShaderNodeClamp	op_type	enum::VisualShaderNodeClamp.OpType
 F	VisualShaderNodeClamp	set_op_type	void	0	0	enum::VisualShaderNodeClamp.OpType
 F	VisualShaderNodeClamp	get_op_type	enum::VisualShaderNodeClamp.OpType	0	0
 E	VisualShaderNodeClamp	OpType	0	OP_TYPE_FLOAT	0	OP_TYPE_INT	1	OP_TYPE_UINT	2	OP_TYPE_VECTOR_2D	3	OP_TYPE_VECTOR_3D	4	OP_TYPE_VECTOR_4D	5	OP_TYPE_MAX	6
@@ -23343,12 +23324,12 @@ P	VisualShaderNodeColorConstant	constant	Color
 F	VisualShaderNodeColorConstant	set_constant	void	0	0	Color
 F	VisualShaderNodeColorConstant	get_constant	Color	0	0
 C	VisualShaderNodeColorFunc	VisualShaderNode	0
-P	VisualShaderNodeColorFunc	function	int
+P	VisualShaderNodeColorFunc	function	enum::VisualShaderNodeColorFunc.Function
 F	VisualShaderNodeColorFunc	set_function	void	0	0	enum::VisualShaderNodeColorFunc.Function
 F	VisualShaderNodeColorFunc	get_function	enum::VisualShaderNodeColorFunc.Function	0	0
 E	VisualShaderNodeColorFunc	Function	0	FUNC_GRAYSCALE	0	FUNC_HSV2RGB	1	FUNC_RGB2HSV	2	FUNC_SEPIA	3	FUNC_LINEAR_TO_SRGB	4	FUNC_SRGB_TO_LINEAR	5	FUNC_MAX	6
 C	VisualShaderNodeColorOp	VisualShaderNode	0
-P	VisualShaderNodeColorOp	operator	int
+P	VisualShaderNodeColorOp	operator	enum::VisualShaderNodeColorOp.Operator
 F	VisualShaderNodeColorOp	set_operator	void	0	0	enum::VisualShaderNodeColorOp.Operator
 F	VisualShaderNodeColorOp	get_operator	enum::VisualShaderNodeColorOp.Operator	0	0
 E	VisualShaderNodeColorOp	Operator	0	OP_SCREEN	0	OP_DIFFERENCE	1	OP_DARKEN	2	OP_LIGHTEN	3	OP_OVERLAY	4	OP_DODGE	5	OP_BURN	6	OP_SOFT_LIGHT	7	OP_HARD_LIGHT	8	OP_MAX	9
@@ -23364,9 +23345,9 @@ P	VisualShaderNodeComment	description	String
 F	VisualShaderNodeComment	set_description	void	0	0	String
 F	VisualShaderNodeComment	get_description	String	0	0
 C	VisualShaderNodeCompare	VisualShaderNode	0
-P	VisualShaderNodeCompare	type	int
-P	VisualShaderNodeCompare	function	int
-P	VisualShaderNodeCompare	condition	int
+P	VisualShaderNodeCompare	type	enum::VisualShaderNodeCompare.ComparisonType
+P	VisualShaderNodeCompare	function	enum::VisualShaderNodeCompare.Function
+P	VisualShaderNodeCompare	condition	enum::VisualShaderNodeCompare.Condition
 F	VisualShaderNodeCompare	set_comparison_type	void	0	0	enum::VisualShaderNodeCompare.ComparisonType
 F	VisualShaderNodeCompare	get_comparison_type	enum::VisualShaderNodeCompare.ComparisonType	0	0
 F	VisualShaderNodeCompare	set_function	void	0	0	enum::VisualShaderNodeCompare.Function
@@ -23378,9 +23359,9 @@ E	VisualShaderNodeCompare	Function	0	FUNC_EQUAL	0	FUNC_NOT_EQUAL	1	FUNC_GREATER_
 E	VisualShaderNodeCompare	Condition	0	COND_ALL	0	COND_ANY	1	COND_MAX	2
 C	VisualShaderNodeConstant	VisualShaderNode	0
 C	VisualShaderNodeCubemap	VisualShaderNode	0
-P	VisualShaderNodeCubemap	source	int
+P	VisualShaderNodeCubemap	source	enum::VisualShaderNodeCubemap.Source
 P	VisualShaderNodeCubemap	cube_map	Cubemap,CompressedCubemap,PlaceholderCubemap,TextureCubemapRD
-P	VisualShaderNodeCubemap	texture_type	int
+P	VisualShaderNodeCubemap	texture_type	enum::VisualShaderNodeCubemap.TextureType
 F	VisualShaderNodeCubemap	set_source	void	0	0	enum::VisualShaderNodeCubemap.Source
 F	VisualShaderNodeCubemap	get_source	enum::VisualShaderNodeCubemap.Source	0	0
 F	VisualShaderNodeCubemap	set_cube_map	void	0	0	TextureLayered
@@ -23424,9 +23405,9 @@ F	VisualShaderNodeCustom	_is_highend	bool	0	0
 F	VisualShaderNodeCustom	_is_available	bool	0	0	enum::Shader.Mode	enum::VisualShader.Type
 F	VisualShaderNodeCustom	get_option_index	int	0	0	int
 C	VisualShaderNodeDerivativeFunc	VisualShaderNode	0
-P	VisualShaderNodeDerivativeFunc	op_type	int
-P	VisualShaderNodeDerivativeFunc	function	int
-P	VisualShaderNodeDerivativeFunc	precision	int
+P	VisualShaderNodeDerivativeFunc	op_type	enum::VisualShaderNodeDerivativeFunc.OpType
+P	VisualShaderNodeDerivativeFunc	function	enum::VisualShaderNodeDerivativeFunc.Function
+P	VisualShaderNodeDerivativeFunc	precision	enum::VisualShaderNodeDerivativeFunc.Precision
 F	VisualShaderNodeDerivativeFunc	set_op_type	void	0	0	enum::VisualShaderNodeDerivativeFunc.OpType
 F	VisualShaderNodeDerivativeFunc	get_op_type	enum::VisualShaderNodeDerivativeFunc.OpType	0	0
 F	VisualShaderNodeDerivativeFunc	set_function	void	0	0	enum::VisualShaderNodeDerivativeFunc.Function
@@ -23449,17 +23430,17 @@ P	VisualShaderNodeFloatConstant	constant	float
 F	VisualShaderNodeFloatConstant	set_constant	void	0	0	float
 F	VisualShaderNodeFloatConstant	get_constant	float	0	0
 C	VisualShaderNodeFloatFunc	VisualShaderNode	0
-P	VisualShaderNodeFloatFunc	function	int
+P	VisualShaderNodeFloatFunc	function	enum::VisualShaderNodeFloatFunc.Function
 F	VisualShaderNodeFloatFunc	set_function	void	0	0	enum::VisualShaderNodeFloatFunc.Function
 F	VisualShaderNodeFloatFunc	get_function	enum::VisualShaderNodeFloatFunc.Function	0	0
 E	VisualShaderNodeFloatFunc	Function	0	FUNC_SIN	0	FUNC_COS	1	FUNC_TAN	2	FUNC_ASIN	3	FUNC_ACOS	4	FUNC_ATAN	5	FUNC_SINH	6	FUNC_COSH	7	FUNC_TANH	8	FUNC_LOG	9	FUNC_EXP	10	FUNC_SQRT	11	FUNC_ABS	12	FUNC_SIGN	13	FUNC_FLOOR	14	FUNC_ROUND	15	FUNC_CEIL	16	FUNC_FRACT	17	FUNC_SATURATE	18	FUNC_NEGATE	19	FUNC_ACOSH	20	FUNC_ASINH	21	FUNC_ATANH	22	FUNC_DEGREES	23	FUNC_EXP2	24	FUNC_INVERSE_SQRT	25	FUNC_LOG2	26	FUNC_RADIANS	27	FUNC_RECIPROCAL	28	FUNC_ROUNDEVEN	29	FUNC_TRUNC	30	FUNC_ONEMINUS	31	FUNC_MAX	32
 C	VisualShaderNodeFloatOp	VisualShaderNode	0
-P	VisualShaderNodeFloatOp	operator	int
+P	VisualShaderNodeFloatOp	operator	enum::VisualShaderNodeFloatOp.Operator
 F	VisualShaderNodeFloatOp	set_operator	void	0	0	enum::VisualShaderNodeFloatOp.Operator
 F	VisualShaderNodeFloatOp	get_operator	enum::VisualShaderNodeFloatOp.Operator	0	0
 E	VisualShaderNodeFloatOp	Operator	0	OP_ADD	0	OP_SUB	1	OP_MUL	2	OP_DIV	3	OP_MOD	4	OP_POW	5	OP_MAX	6	OP_MIN	7	OP_ATAN2	8	OP_STEP	9	OP_ENUM_SIZE	10
 C	VisualShaderNodeFloatParameter	VisualShaderNodeParameter	0
-P	VisualShaderNodeFloatParameter	hint	int
+P	VisualShaderNodeFloatParameter	hint	enum::VisualShaderNodeFloatParameter.Hint
 P	VisualShaderNodeFloatParameter	min	float
 P	VisualShaderNodeFloatParameter	max	float
 P	VisualShaderNodeFloatParameter	step	float
@@ -23532,17 +23513,17 @@ P	VisualShaderNodeIntConstant	constant	int
 F	VisualShaderNodeIntConstant	set_constant	void	0	0	int
 F	VisualShaderNodeIntConstant	get_constant	int	0	0
 C	VisualShaderNodeIntFunc	VisualShaderNode	0
-P	VisualShaderNodeIntFunc	function	int
+P	VisualShaderNodeIntFunc	function	enum::VisualShaderNodeIntFunc.Function
 F	VisualShaderNodeIntFunc	set_function	void	0	0	enum::VisualShaderNodeIntFunc.Function
 F	VisualShaderNodeIntFunc	get_function	enum::VisualShaderNodeIntFunc.Function	0	0
 E	VisualShaderNodeIntFunc	Function	0	FUNC_ABS	0	FUNC_NEGATE	1	FUNC_SIGN	2	FUNC_BITWISE_NOT	3	FUNC_MAX	4
 C	VisualShaderNodeIntOp	VisualShaderNode	0
-P	VisualShaderNodeIntOp	operator	int
+P	VisualShaderNodeIntOp	operator	enum::VisualShaderNodeIntOp.Operator
 F	VisualShaderNodeIntOp	set_operator	void	0	0	enum::VisualShaderNodeIntOp.Operator
 F	VisualShaderNodeIntOp	get_operator	enum::VisualShaderNodeIntOp.Operator	0	0
 E	VisualShaderNodeIntOp	Operator	0	OP_ADD	0	OP_SUB	1	OP_MUL	2	OP_DIV	3	OP_MOD	4	OP_MAX	5	OP_MIN	6	OP_BITWISE_AND	7	OP_BITWISE_OR	8	OP_BITWISE_XOR	9	OP_BITWISE_LEFT_SHIFT	10	OP_BITWISE_RIGHT_SHIFT	11	OP_ENUM_SIZE	12
 C	VisualShaderNodeIntParameter	VisualShaderNodeParameter	0
-P	VisualShaderNodeIntParameter	hint	int
+P	VisualShaderNodeIntParameter	hint	enum::VisualShaderNodeIntParameter.Hint
 P	VisualShaderNodeIntParameter	min	int
 P	VisualShaderNodeIntParameter	max	int
 P	VisualShaderNodeIntParameter	step	int
@@ -23565,18 +23546,18 @@ F	VisualShaderNodeIntParameter	set_default_value	void	0	0	int
 F	VisualShaderNodeIntParameter	get_default_value	int	0	0
 E	VisualShaderNodeIntParameter	Hint	0	HINT_NONE	0	HINT_RANGE	1	HINT_RANGE_STEP	2	HINT_ENUM	3	HINT_MAX	4
 C	VisualShaderNodeIs	VisualShaderNode	0
-P	VisualShaderNodeIs	function	int
+P	VisualShaderNodeIs	function	enum::VisualShaderNodeIs.Function
 F	VisualShaderNodeIs	set_function	void	0	0	enum::VisualShaderNodeIs.Function
 F	VisualShaderNodeIs	get_function	enum::VisualShaderNodeIs.Function	0	0
 E	VisualShaderNodeIs	Function	0	FUNC_IS_INF	0	FUNC_IS_NAN	1	FUNC_MAX	2
 C	VisualShaderNodeLinearSceneDepth	VisualShaderNode	0
 C	VisualShaderNodeMix	VisualShaderNode	0
-P	VisualShaderNodeMix	op_type	int
+P	VisualShaderNodeMix	op_type	enum::VisualShaderNodeMix.OpType
 F	VisualShaderNodeMix	set_op_type	void	0	0	enum::VisualShaderNodeMix.OpType
 F	VisualShaderNodeMix	get_op_type	enum::VisualShaderNodeMix.OpType	0	0
 E	VisualShaderNodeMix	OpType	0	OP_TYPE_SCALAR	0	OP_TYPE_VECTOR_2D	1	OP_TYPE_VECTOR_2D_SCALAR	2	OP_TYPE_VECTOR_3D	3	OP_TYPE_VECTOR_3D_SCALAR	4	OP_TYPE_VECTOR_4D	5	OP_TYPE_VECTOR_4D_SCALAR	6	OP_TYPE_MAX	7
 C	VisualShaderNodeMultiplyAdd	VisualShaderNode	0
-P	VisualShaderNodeMultiplyAdd	op_type	int
+P	VisualShaderNodeMultiplyAdd	op_type	enum::VisualShaderNodeMultiplyAdd.OpType
 F	VisualShaderNodeMultiplyAdd	set_op_type	void	0	0	enum::VisualShaderNodeMultiplyAdd.OpType
 F	VisualShaderNodeMultiplyAdd	get_op_type	enum::VisualShaderNodeMultiplyAdd.OpType	0	0
 E	VisualShaderNodeMultiplyAdd	OpType	0	OP_TYPE_SCALAR	0	OP_TYPE_VECTOR_2D	1	OP_TYPE_VECTOR_3D	2	OP_TYPE_VECTOR_4D	3	OP_TYPE_MAX	4
@@ -23584,7 +23565,7 @@ C	VisualShaderNodeOuterProduct	VisualShaderNode	0
 C	VisualShaderNodeOutput	VisualShaderNode	0
 C	VisualShaderNodeParameter	VisualShaderNode	0
 P	VisualShaderNodeParameter	parameter_name	StringName
-P	VisualShaderNodeParameter	qualifier	int
+P	VisualShaderNodeParameter	qualifier	enum::VisualShaderNodeParameter.Qualifier
 P	VisualShaderNodeParameter	instance_index	int
 F	VisualShaderNodeParameter	set_parameter_name	void	0	0	String
 F	VisualShaderNodeParameter	get_parameter_name	String	0	0
@@ -23599,14 +23580,14 @@ P	VisualShaderNodeParameterRef	param_type	int
 F	VisualShaderNodeParameterRef	set_parameter_name	void	0	0	String
 F	VisualShaderNodeParameterRef	get_parameter_name	String	0	0
 C	VisualShaderNodeParticleAccelerator	VisualShaderNode	0
-P	VisualShaderNodeParticleAccelerator	mode	int
+P	VisualShaderNodeParticleAccelerator	mode	enum::VisualShaderNodeParticleAccelerator.Mode
 F	VisualShaderNodeParticleAccelerator	set_mode	void	0	0	enum::VisualShaderNodeParticleAccelerator.Mode
 F	VisualShaderNodeParticleAccelerator	get_mode	enum::VisualShaderNodeParticleAccelerator.Mode	0	0
 E	VisualShaderNodeParticleAccelerator	Mode	0	MODE_LINEAR	0	MODE_RADIAL	1	MODE_TANGENTIAL	2	MODE_MAX	3
 C	VisualShaderNodeParticleBoxEmitter	VisualShaderNodeParticleEmitter	0
 C	VisualShaderNodeParticleConeVelocity	VisualShaderNode	0
 C	VisualShaderNodeParticleEmit	VisualShaderNode	0
-P	VisualShaderNodeParticleEmit	flags	int
+P	VisualShaderNodeParticleEmit	flags	enum::VisualShaderNodeParticleEmit.EmitFlags
 F	VisualShaderNodeParticleEmit	set_flags	void	0	0	enum::VisualShaderNodeParticleEmit.EmitFlags
 F	VisualShaderNodeParticleEmit	get_flags	enum::VisualShaderNodeParticleEmit.EmitFlags	0	0
 E	VisualShaderNodeParticleEmit	EmitFlags	0	EMIT_FLAG_POSITION	1	EMIT_FLAG_ROT_SCALE	2	EMIT_FLAG_VELOCITY	4	EMIT_FLAG_COLOR	8	EMIT_FLAG_CUSTOM	16
@@ -23630,7 +23611,7 @@ F	VisualShaderNodeParticleMultiplyByAxisAngle	set_degrees_mode	void	0	0	bool
 F	VisualShaderNodeParticleMultiplyByAxisAngle	is_degrees_mode	bool	0	0
 C	VisualShaderNodeParticleOutput	VisualShaderNodeOutput	0
 C	VisualShaderNodeParticleRandomness	VisualShaderNode	0
-P	VisualShaderNodeParticleRandomness	op_type	int
+P	VisualShaderNodeParticleRandomness	op_type	enum::VisualShaderNodeParticleRandomness.OpType
 F	VisualShaderNodeParticleRandomness	set_op_type	void	0	0	enum::VisualShaderNodeParticleRandomness.OpType
 F	VisualShaderNodeParticleRandomness	get_op_type	enum::VisualShaderNodeParticleRandomness.OpType	0	0
 E	VisualShaderNodeParticleRandomness	OpType	0	OP_TYPE_SCALAR	0	OP_TYPE_VECTOR_2D	1	OP_TYPE_VECTOR_3D	2	OP_TYPE_VECTOR_4D	3	OP_TYPE_MAX	4
@@ -23639,12 +23620,12 @@ C	VisualShaderNodeParticleSphereEmitter	VisualShaderNodeParticleEmitter	0
 C	VisualShaderNodeProximityFade	VisualShaderNode	0
 C	VisualShaderNodeRandomRange	VisualShaderNode	0
 C	VisualShaderNodeRemap	VisualShaderNode	0
-P	VisualShaderNodeRemap	op_type	int
+P	VisualShaderNodeRemap	op_type	enum::VisualShaderNodeRemap.OpType
 F	VisualShaderNodeRemap	set_op_type	void	0	0	enum::VisualShaderNodeRemap.OpType
 F	VisualShaderNodeRemap	get_op_type	enum::VisualShaderNodeRemap.OpType	0	0
 E	VisualShaderNodeRemap	OpType	0	OP_TYPE_SCALAR	0	OP_TYPE_VECTOR_2D	1	OP_TYPE_VECTOR_2D_SCALAR	2	OP_TYPE_VECTOR_3D	3	OP_TYPE_VECTOR_3D_SCALAR	4	OP_TYPE_VECTOR_4D	5	OP_TYPE_VECTOR_4D_SCALAR	6	OP_TYPE_MAX	7
 C	VisualShaderNodeReroute	VisualShaderNode	0
-P	VisualShaderNodeReroute	port_type	int
+P	VisualShaderNodeReroute	port_type	enum::VisualShaderNode.PortType
 F	VisualShaderNodeReroute	get_port_type	enum::VisualShaderNode.PortType	0	0
 C	VisualShaderNodeResizableBase	VisualShaderNode	0
 P	VisualShaderNodeResizableBase	size	Vector2
@@ -23654,31 +23635,31 @@ C	VisualShaderNodeRotationByAxis	VisualShaderNode	0
 C	VisualShaderNodeSDFRaymarch	VisualShaderNode	0
 C	VisualShaderNodeSDFToScreenUV	VisualShaderNode	0
 C	VisualShaderNodeSample3D	VisualShaderNode	0
-P	VisualShaderNodeSample3D	source	int
+P	VisualShaderNodeSample3D	source	enum::VisualShaderNodeSample3D.Source
 F	VisualShaderNodeSample3D	set_source	void	0	0	enum::VisualShaderNodeSample3D.Source
 F	VisualShaderNodeSample3D	get_source	enum::VisualShaderNodeSample3D.Source	0	0
 E	VisualShaderNodeSample3D	Source	0	SOURCE_TEXTURE	0	SOURCE_PORT	1	SOURCE_MAX	2
 C	VisualShaderNodeScreenNormalWorldSpace	VisualShaderNode	0
 C	VisualShaderNodeScreenUVToSDF	VisualShaderNode	0
 C	VisualShaderNodeSmoothStep	VisualShaderNode	0
-P	VisualShaderNodeSmoothStep	op_type	int
+P	VisualShaderNodeSmoothStep	op_type	enum::VisualShaderNodeSmoothStep.OpType
 F	VisualShaderNodeSmoothStep	set_op_type	void	0	0	enum::VisualShaderNodeSmoothStep.OpType
 F	VisualShaderNodeSmoothStep	get_op_type	enum::VisualShaderNodeSmoothStep.OpType	0	0
 E	VisualShaderNodeSmoothStep	OpType	0	OP_TYPE_SCALAR	0	OP_TYPE_VECTOR_2D	1	OP_TYPE_VECTOR_2D_SCALAR	2	OP_TYPE_VECTOR_3D	3	OP_TYPE_VECTOR_3D_SCALAR	4	OP_TYPE_VECTOR_4D	5	OP_TYPE_VECTOR_4D_SCALAR	6	OP_TYPE_MAX	7
 C	VisualShaderNodeStep	VisualShaderNode	0
-P	VisualShaderNodeStep	op_type	int
+P	VisualShaderNodeStep	op_type	enum::VisualShaderNodeStep.OpType
 F	VisualShaderNodeStep	set_op_type	void	0	0	enum::VisualShaderNodeStep.OpType
 F	VisualShaderNodeStep	get_op_type	enum::VisualShaderNodeStep.OpType	0	0
 E	VisualShaderNodeStep	OpType	0	OP_TYPE_SCALAR	0	OP_TYPE_VECTOR_2D	1	OP_TYPE_VECTOR_2D_SCALAR	2	OP_TYPE_VECTOR_3D	3	OP_TYPE_VECTOR_3D_SCALAR	4	OP_TYPE_VECTOR_4D	5	OP_TYPE_VECTOR_4D_SCALAR	6	OP_TYPE_MAX	7
 C	VisualShaderNodeSwitch	VisualShaderNode	0
-P	VisualShaderNodeSwitch	op_type	int
+P	VisualShaderNodeSwitch	op_type	enum::VisualShaderNodeSwitch.OpType
 F	VisualShaderNodeSwitch	set_op_type	void	0	0	enum::VisualShaderNodeSwitch.OpType
 F	VisualShaderNodeSwitch	get_op_type	enum::VisualShaderNodeSwitch.OpType	0	0
 E	VisualShaderNodeSwitch	OpType	0	OP_TYPE_FLOAT	0	OP_TYPE_INT	1	OP_TYPE_UINT	2	OP_TYPE_VECTOR_2D	3	OP_TYPE_VECTOR_3D	4	OP_TYPE_VECTOR_4D	5	OP_TYPE_BOOLEAN	6	OP_TYPE_TRANSFORM	7	OP_TYPE_MAX	8
 C	VisualShaderNodeTexture	VisualShaderNode	0
-P	VisualShaderNodeTexture	source	int
+P	VisualShaderNodeTexture	source	enum::VisualShaderNodeTexture.Source
 P	VisualShaderNodeTexture	texture	Texture2D
-P	VisualShaderNodeTexture	texture_type	int
+P	VisualShaderNodeTexture	texture_type	enum::VisualShaderNodeTexture.TextureType
 F	VisualShaderNodeTexture	set_source	void	0	0	enum::VisualShaderNodeTexture.Source
 F	VisualShaderNodeTexture	get_source	enum::VisualShaderNodeTexture.Source	0	0
 F	VisualShaderNodeTexture	set_texture	void	0	0	Texture2D
@@ -23699,11 +23680,11 @@ F	VisualShaderNodeTexture3D	set_texture	void	0	0	Texture3D
 F	VisualShaderNodeTexture3D	get_texture	Texture3D	0	0
 C	VisualShaderNodeTexture3DParameter	VisualShaderNodeTextureParameter	0
 C	VisualShaderNodeTextureParameter	VisualShaderNodeParameter	0
-P	VisualShaderNodeTextureParameter	texture_type	int
-P	VisualShaderNodeTextureParameter	color_default	int
-P	VisualShaderNodeTextureParameter	texture_filter	int
-P	VisualShaderNodeTextureParameter	texture_repeat	int
-P	VisualShaderNodeTextureParameter	texture_source	int
+P	VisualShaderNodeTextureParameter	texture_type	enum::VisualShaderNodeTextureParameter.TextureType
+P	VisualShaderNodeTextureParameter	color_default	enum::VisualShaderNodeTextureParameter.ColorDefault
+P	VisualShaderNodeTextureParameter	texture_filter	enum::VisualShaderNodeTextureParameter.TextureFilter
+P	VisualShaderNodeTextureParameter	texture_repeat	enum::VisualShaderNodeTextureParameter.TextureRepeat
+P	VisualShaderNodeTextureParameter	texture_source	enum::VisualShaderNodeTextureParameter.TextureSource
 F	VisualShaderNodeTextureParameter	set_texture_type	void	0	0	enum::VisualShaderNodeTextureParameter.TextureType
 F	VisualShaderNodeTextureParameter	get_texture_type	enum::VisualShaderNodeTextureParameter.TextureType	0	0
 F	VisualShaderNodeTextureParameter	set_color_default	void	0	0	enum::VisualShaderNodeTextureParameter.ColorDefault
@@ -23729,12 +23710,12 @@ F	VisualShaderNodeTransformConstant	set_constant	void	0	0	Transform3D
 F	VisualShaderNodeTransformConstant	get_constant	Transform3D	0	0
 C	VisualShaderNodeTransformDecompose	VisualShaderNode	0
 C	VisualShaderNodeTransformFunc	VisualShaderNode	0
-P	VisualShaderNodeTransformFunc	function	int
+P	VisualShaderNodeTransformFunc	function	enum::VisualShaderNodeTransformFunc.Function
 F	VisualShaderNodeTransformFunc	set_function	void	0	0	enum::VisualShaderNodeTransformFunc.Function
 F	VisualShaderNodeTransformFunc	get_function	enum::VisualShaderNodeTransformFunc.Function	0	0
 E	VisualShaderNodeTransformFunc	Function	0	FUNC_INVERSE	0	FUNC_TRANSPOSE	1	FUNC_MAX	2
 C	VisualShaderNodeTransformOp	VisualShaderNode	0
-P	VisualShaderNodeTransformOp	operator	int
+P	VisualShaderNodeTransformOp	operator	enum::VisualShaderNodeTransformOp.Operator
 F	VisualShaderNodeTransformOp	set_operator	void	0	0	enum::VisualShaderNodeTransformOp.Operator
 F	VisualShaderNodeTransformOp	get_operator	enum::VisualShaderNodeTransformOp.Operator	0	0
 E	VisualShaderNodeTransformOp	Operator	0	OP_AxB	0	OP_BxA	1	OP_AxB_COMP	2	OP_BxA_COMP	3	OP_ADD	4	OP_A_MINUS_B	5	OP_B_MINUS_A	6	OP_A_DIV_B	7	OP_B_DIV_A	8	OP_MAX	9
@@ -23746,7 +23727,7 @@ F	VisualShaderNodeTransformParameter	is_default_value_enabled	bool	0	0
 F	VisualShaderNodeTransformParameter	set_default_value	void	0	0	Transform3D
 F	VisualShaderNodeTransformParameter	get_default_value	Transform3D	0	0
 C	VisualShaderNodeTransformVecMult	VisualShaderNode	0
-P	VisualShaderNodeTransformVecMult	operator	int
+P	VisualShaderNodeTransformVecMult	operator	enum::VisualShaderNodeTransformVecMult.Operator
 F	VisualShaderNodeTransformVecMult	set_operator	void	0	0	enum::VisualShaderNodeTransformVecMult.Operator
 F	VisualShaderNodeTransformVecMult	get_operator	enum::VisualShaderNodeTransformVecMult.Operator	0	0
 E	VisualShaderNodeTransformVecMult	Operator	0	OP_AxB	0	OP_BxA	1	OP_3x3_AxB	2	OP_3x3_BxA	3	OP_MAX	4
@@ -23755,12 +23736,12 @@ P	VisualShaderNodeUIntConstant	constant	int
 F	VisualShaderNodeUIntConstant	set_constant	void	0	0	int
 F	VisualShaderNodeUIntConstant	get_constant	int	0	0
 C	VisualShaderNodeUIntFunc	VisualShaderNode	0
-P	VisualShaderNodeUIntFunc	function	int
+P	VisualShaderNodeUIntFunc	function	enum::VisualShaderNodeUIntFunc.Function
 F	VisualShaderNodeUIntFunc	set_function	void	0	0	enum::VisualShaderNodeUIntFunc.Function
 F	VisualShaderNodeUIntFunc	get_function	enum::VisualShaderNodeUIntFunc.Function	0	0
 E	VisualShaderNodeUIntFunc	Function	0	FUNC_NEGATE	0	FUNC_BITWISE_NOT	1	FUNC_MAX	2
 C	VisualShaderNodeUIntOp	VisualShaderNode	0
-P	VisualShaderNodeUIntOp	operator	int
+P	VisualShaderNodeUIntOp	operator	enum::VisualShaderNodeUIntOp.Operator
 F	VisualShaderNodeUIntOp	set_operator	void	0	0	enum::VisualShaderNodeUIntOp.Operator
 F	VisualShaderNodeUIntOp	get_operator	enum::VisualShaderNodeUIntOp.Operator	0	0
 E	VisualShaderNodeUIntOp	Operator	0	OP_ADD	0	OP_SUB	1	OP_MUL	2	OP_DIV	3	OP_MOD	4	OP_MAX	5	OP_MIN	6	OP_BITWISE_AND	7	OP_BITWISE_OR	8	OP_BITWISE_XOR	9	OP_BITWISE_LEFT_SHIFT	10	OP_BITWISE_RIGHT_SHIFT	11	OP_ENUM_SIZE	12
@@ -23772,14 +23753,14 @@ F	VisualShaderNodeUIntParameter	is_default_value_enabled	bool	0	0
 F	VisualShaderNodeUIntParameter	set_default_value	void	0	0	int
 F	VisualShaderNodeUIntParameter	get_default_value	int	0	0
 C	VisualShaderNodeUVFunc	VisualShaderNode	0
-P	VisualShaderNodeUVFunc	function	int
+P	VisualShaderNodeUVFunc	function	enum::VisualShaderNodeUVFunc.Function
 F	VisualShaderNodeUVFunc	set_function	void	0	0	enum::VisualShaderNodeUVFunc.Function
 F	VisualShaderNodeUVFunc	get_function	enum::VisualShaderNodeUVFunc.Function	0	0
 E	VisualShaderNodeUVFunc	Function	0	FUNC_PANNING	0	FUNC_SCALING	1	FUNC_MAX	2
 C	VisualShaderNodeUVPolarCoord	VisualShaderNode	0
 C	VisualShaderNodeVarying	VisualShaderNode	0
 P	VisualShaderNodeVarying	varying_name	StringName
-P	VisualShaderNodeVarying	varying_type	int
+P	VisualShaderNodeVarying	varying_type	enum::VisualShader.VaryingType
 F	VisualShaderNodeVarying	set_varying_name	void	0	0	String
 F	VisualShaderNodeVarying	get_varying_name	String	0	0
 F	VisualShaderNodeVarying	set_varying_type	void	0	0	enum::VisualShader.VaryingType
@@ -23821,7 +23802,7 @@ F	VisualShaderNodeVec4Parameter	is_default_value_enabled	bool	0	0
 F	VisualShaderNodeVec4Parameter	set_default_value	void	0	0	Vector4
 F	VisualShaderNodeVec4Parameter	get_default_value	Vector4	0	0
 C	VisualShaderNodeVectorBase	VisualShaderNode	0
-P	VisualShaderNodeVectorBase	op_type	int
+P	VisualShaderNodeVectorBase	op_type	enum::VisualShaderNodeVectorBase.OpType
 F	VisualShaderNodeVectorBase	set_op_type	void	0	0	enum::VisualShaderNodeVectorBase.OpType
 F	VisualShaderNodeVectorBase	get_op_type	enum::VisualShaderNodeVectorBase.OpType	0	0
 E	VisualShaderNodeVectorBase	OpType	0	OP_TYPE_VECTOR_2D	0	OP_TYPE_VECTOR_3D	1	OP_TYPE_VECTOR_4D	2	OP_TYPE_MAX	3
@@ -23829,20 +23810,20 @@ C	VisualShaderNodeVectorCompose	VisualShaderNodeVectorBase	0
 C	VisualShaderNodeVectorDecompose	VisualShaderNodeVectorBase	0
 C	VisualShaderNodeVectorDistance	VisualShaderNodeVectorBase	0
 C	VisualShaderNodeVectorFunc	VisualShaderNodeVectorBase	0
-P	VisualShaderNodeVectorFunc	function	int
+P	VisualShaderNodeVectorFunc	function	enum::VisualShaderNodeVectorFunc.Function
 F	VisualShaderNodeVectorFunc	set_function	void	0	0	enum::VisualShaderNodeVectorFunc.Function
 F	VisualShaderNodeVectorFunc	get_function	enum::VisualShaderNodeVectorFunc.Function	0	0
 E	VisualShaderNodeVectorFunc	Function	0	FUNC_NORMALIZE	0	FUNC_SATURATE	1	FUNC_NEGATE	2	FUNC_RECIPROCAL	3	FUNC_ABS	4	FUNC_ACOS	5	FUNC_ACOSH	6	FUNC_ASIN	7	FUNC_ASINH	8	FUNC_ATAN	9	FUNC_ATANH	10	FUNC_CEIL	11	FUNC_COS	12	FUNC_COSH	13	FUNC_DEGREES	14	FUNC_EXP	15	FUNC_EXP2	16	FUNC_FLOOR	17	FUNC_FRACT	18	FUNC_INVERSE_SQRT	19	FUNC_LOG	20	FUNC_LOG2	21	FUNC_RADIANS	22	FUNC_ROUND	23	FUNC_ROUNDEVEN	24	FUNC_SIGN	25	FUNC_SIN	26	FUNC_SINH	27	FUNC_SQRT	28	FUNC_TAN	29	FUNC_TANH	30	FUNC_TRUNC	31	FUNC_ONEMINUS	32	FUNC_MAX	33
 C	VisualShaderNodeVectorLen	VisualShaderNodeVectorBase	0
 C	VisualShaderNodeVectorOp	VisualShaderNodeVectorBase	0
-P	VisualShaderNodeVectorOp	operator	int
+P	VisualShaderNodeVectorOp	operator	enum::VisualShaderNodeVectorOp.Operator
 F	VisualShaderNodeVectorOp	set_operator	void	0	0	enum::VisualShaderNodeVectorOp.Operator
 F	VisualShaderNodeVectorOp	get_operator	enum::VisualShaderNodeVectorOp.Operator	0	0
 E	VisualShaderNodeVectorOp	Operator	0	OP_ADD	0	OP_SUB	1	OP_MUL	2	OP_DIV	3	OP_MOD	4	OP_POW	5	OP_MAX	6	OP_MIN	7	OP_CROSS	8	OP_ATAN2	9	OP_REFLECT	10	OP_STEP	11	OP_ENUM_SIZE	12
 C	VisualShaderNodeVectorRefract	VisualShaderNodeVectorBase	0
 C	VisualShaderNodeWorldPositionFromDepth	VisualShaderNode	0
 C	VoxelGI	VisualInstance3D	0
-P	VoxelGI	subdiv	int
+P	VoxelGI	subdiv	enum::VoxelGI.Subdiv
 P	VoxelGI	size	Vector3
 P	VoxelGI	camera_attributes	CameraAttributesPractical,CameraAttributesPhysical
 P	VoxelGI	data	VoxelGIData
@@ -23889,7 +23870,7 @@ F	VoxelGIData	is_using_two_bounces	bool	0	0
 C	WeakRef	RefCounted	0
 F	WeakRef	get_ref	Variant	0	0
 C	WebRTCDataChannel	PacketPeer	0
-P	WebRTCDataChannel	write_mode	int
+P	WebRTCDataChannel	write_mode	enum::WebRTCDataChannel.WriteMode
 F	WebRTCDataChannel	poll	enum::Error	0	0
 F	WebRTCDataChannel	close	void	0	0
 F	WebRTCDataChannel	was_string_packet	bool	0	0
@@ -24067,9 +24048,9 @@ P	WebXRInterface	visibility_state_changed	Signal
 P	WebXRInterface	reference_space_reset	Signal
 P	WebXRInterface	display_refresh_rate_changed	Signal
 C	Window	Viewport	0
-P	Window	mode	int
+P	Window	mode	enum::Window.Mode
 P	Window	title	String
-P	Window	initial_position	int
+P	Window	initial_position	enum::Window.WindowInitialPosition
 P	Window	position	Vector2i
 P	Window	size	Vector2i
 P	Window	current_screen	int
@@ -24098,9 +24079,9 @@ P	Window	min_size	Vector2i
 P	Window	max_size	Vector2i
 P	Window	keep_title_visible	bool
 P	Window	content_scale_size	Vector2i
-P	Window	content_scale_mode	int
-P	Window	content_scale_aspect	int
-P	Window	content_scale_stretch	int
+P	Window	content_scale_mode	enum::Window.ContentScaleMode
+P	Window	content_scale_aspect	enum::Window.ContentScaleAspect
+P	Window	content_scale_stretch	enum::Window.ContentScaleStretch
 P	Window	content_scale_factor	float
 P	Window	hdr_output_requested	bool
 P	Window	auto_translate	bool
@@ -24355,7 +24336,7 @@ F	XRAnchor3D	get_plane	Plane	0	0
 C	XRBodyModifier3D	SkeletonModifier3D	0
 P	XRBodyModifier3D	body_tracker	String
 P	XRBodyModifier3D	body_update	int
-P	XRBodyModifier3D	bone_update	int
+P	XRBodyModifier3D	bone_update	enum::XRBodyModifier3D.BoneUpdate
 F	XRBodyModifier3D	set_body_tracker	void	0	0	StringName
 F	XRBodyModifier3D	get_body_tracker	StringName	0	0
 F	XRBodyModifier3D	set_body_update	void	0	0	bitfield::XRBodyModifier3D.BodyUpdate
@@ -24407,7 +24388,7 @@ F	XRFaceTracker	set_blend_shapes	void	0	0	PackedFloat32Array
 E	XRFaceTracker	BlendShapeEntry	0	FT_EYE_LOOK_OUT_RIGHT	0	FT_EYE_LOOK_IN_RIGHT	1	FT_EYE_LOOK_UP_RIGHT	2	FT_EYE_LOOK_DOWN_RIGHT	3	FT_EYE_LOOK_OUT_LEFT	4	FT_EYE_LOOK_IN_LEFT	5	FT_EYE_LOOK_UP_LEFT	6	FT_EYE_LOOK_DOWN_LEFT	7	FT_EYE_CLOSED_RIGHT	8	FT_EYE_CLOSED_LEFT	9	FT_EYE_SQUINT_RIGHT	10	FT_EYE_SQUINT_LEFT	11	FT_EYE_WIDE_RIGHT	12	FT_EYE_WIDE_LEFT	13	FT_EYE_DILATION_RIGHT	14	FT_EYE_DILATION_LEFT	15	FT_EYE_CONSTRICT_RIGHT	16	FT_EYE_CONSTRICT_LEFT	17	FT_BROW_PINCH_RIGHT	18	FT_BROW_PINCH_LEFT	19	FT_BROW_LOWERER_RIGHT	20	FT_BROW_LOWERER_LEFT	21	FT_BROW_INNER_UP_RIGHT	22	FT_BROW_INNER_UP_LEFT	23	FT_BROW_OUTER_UP_RIGHT	24	FT_BROW_OUTER_UP_LEFT	25	FT_NOSE_SNEER_RIGHT	26	FT_NOSE_SNEER_LEFT	27	FT_NASAL_DILATION_RIGHT	28	FT_NASAL_DILATION_LEFT	29	FT_NASAL_CONSTRICT_RIGHT	30	FT_NASAL_CONSTRICT_LEFT	31	FT_CHEEK_SQUINT_RIGHT	32	FT_CHEEK_SQUINT_LEFT	33	FT_CHEEK_PUFF_RIGHT	34	FT_CHEEK_PUFF_LEFT	35	FT_CHEEK_SUCK_RIGHT	36	FT_CHEEK_SUCK_LEFT	37	FT_JAW_OPEN	38	FT_MOUTH_CLOSED	39	FT_JAW_RIGHT	40	FT_JAW_LEFT	41	FT_JAW_FORWARD	42	FT_JAW_BACKWARD	43	FT_JAW_CLENCH	44	FT_JAW_MANDIBLE_RAISE	45	FT_LIP_SUCK_UPPER_RIGHT	46	FT_LIP_SUCK_UPPER_LEFT	47	FT_LIP_SUCK_LOWER_RIGHT	48	FT_LIP_SUCK_LOWER_LEFT	49	FT_LIP_SUCK_CORNER_RIGHT	50	FT_LIP_SUCK_CORNER_LEFT	51	FT_LIP_FUNNEL_UPPER_RIGHT	52	FT_LIP_FUNNEL_UPPER_LEFT	53	FT_LIP_FUNNEL_LOWER_RIGHT	54	FT_LIP_FUNNEL_LOWER_LEFT	55	FT_LIP_PUCKER_UPPER_RIGHT	56	FT_LIP_PUCKER_UPPER_LEFT	57	FT_LIP_PUCKER_LOWER_RIGHT	58	FT_LIP_PUCKER_LOWER_LEFT	59	FT_MOUTH_UPPER_UP_RIGHT	60	FT_MOUTH_UPPER_UP_LEFT	61	FT_MOUTH_LOWER_DOWN_RIGHT	62	FT_MOUTH_LOWER_DOWN_LEFT	63	FT_MOUTH_UPPER_DEEPEN_RIGHT	64	FT_MOUTH_UPPER_DEEPEN_LEFT	65	FT_MOUTH_UPPER_RIGHT	66	FT_MOUTH_UPPER_LEFT	67	FT_MOUTH_LOWER_RIGHT	68	FT_MOUTH_LOWER_LEFT	69	FT_MOUTH_CORNER_PULL_RIGHT	70	FT_MOUTH_CORNER_PULL_LEFT	71	FT_MOUTH_CORNER_SLANT_RIGHT	72	FT_MOUTH_CORNER_SLANT_LEFT	73	FT_MOUTH_FROWN_RIGHT	74	FT_MOUTH_FROWN_LEFT	75	FT_MOUTH_STRETCH_RIGHT	76	FT_MOUTH_STRETCH_LEFT	77	FT_MOUTH_DIMPLE_RIGHT	78	FT_MOUTH_DIMPLE_LEFT	79	FT_MOUTH_RAISER_UPPER	80	FT_MOUTH_RAISER_LOWER	81	FT_MOUTH_PRESS_RIGHT	82	FT_MOUTH_PRESS_LEFT	83	FT_MOUTH_TIGHTENER_RIGHT	84	FT_MOUTH_TIGHTENER_LEFT	85	FT_TONGUE_OUT	86	FT_TONGUE_UP	87	FT_TONGUE_DOWN	88	FT_TONGUE_RIGHT	89	FT_TONGUE_LEFT	90	FT_TONGUE_ROLL	91	FT_TONGUE_BLEND_DOWN	92	FT_TONGUE_CURL_UP	93	FT_TONGUE_SQUISH	94	FT_TONGUE_FLAT	95	FT_TONGUE_TWIST_RIGHT	96	FT_TONGUE_TWIST_LEFT	97	FT_SOFT_PALATE_CLOSE	98	FT_THROAT_SWALLOW	99	FT_NECK_FLEX_RIGHT	100	FT_NECK_FLEX_LEFT	101	FT_EYE_CLOSED	102	FT_EYE_WIDE	103	FT_EYE_SQUINT	104	FT_EYE_DILATION	105	FT_EYE_CONSTRICT	106	FT_BROW_DOWN_RIGHT	107	FT_BROW_DOWN_LEFT	108	FT_BROW_DOWN	109	FT_BROW_UP_RIGHT	110	FT_BROW_UP_LEFT	111	FT_BROW_UP	112	FT_NOSE_SNEER	113	FT_NASAL_DILATION	114	FT_NASAL_CONSTRICT	115	FT_CHEEK_PUFF	116	FT_CHEEK_SUCK	117	FT_CHEEK_SQUINT	118	FT_LIP_SUCK_UPPER	119	FT_LIP_SUCK_LOWER	120	FT_LIP_SUCK	121	FT_LIP_FUNNEL_UPPER	122	FT_LIP_FUNNEL_LOWER	123	FT_LIP_FUNNEL	124	FT_LIP_PUCKER_UPPER	125	FT_LIP_PUCKER_LOWER	126	FT_LIP_PUCKER	127	FT_MOUTH_UPPER_UP	128	FT_MOUTH_LOWER_DOWN	129	FT_MOUTH_OPEN	130	FT_MOUTH_RIGHT	131	FT_MOUTH_LEFT	132	FT_MOUTH_SMILE_RIGHT	133	FT_MOUTH_SMILE_LEFT	134	FT_MOUTH_SMILE	135	FT_MOUTH_SAD_RIGHT	136	FT_MOUTH_SAD_LEFT	137	FT_MOUTH_SAD	138	FT_MOUTH_STRETCH	139	FT_MOUTH_DIMPLE	140	FT_MOUTH_TIGHTENER	141	FT_MOUTH_PRESS	142	FT_MAX	143
 C	XRHandModifier3D	SkeletonModifier3D	0
 P	XRHandModifier3D	hand_tracker	String
-P	XRHandModifier3D	bone_update	int
+P	XRHandModifier3D	bone_update	enum::XRHandModifier3D.BoneUpdate
 F	XRHandModifier3D	set_hand_tracker	void	0	0	StringName
 F	XRHandModifier3D	get_hand_tracker	StringName	0	0
 F	XRHandModifier3D	set_bone_update	void	0	0	enum::XRHandModifier3D.BoneUpdate
@@ -24415,7 +24396,7 @@ F	XRHandModifier3D	get_bone_update	enum::XRHandModifier3D.BoneUpdate	0	0
 E	XRHandModifier3D	BoneUpdate	0	BONE_UPDATE_FULL	0	BONE_UPDATE_ROTATION_ONLY	1	BONE_UPDATE_MAX	2
 C	XRHandTracker	XRPositionalTracker	0
 P	XRHandTracker	has_tracking_data	bool
-P	XRHandTracker	hand_tracking_source	int
+P	XRHandTracker	hand_tracking_source	enum::XRHandTracker.HandTrackingSource
 F	XRHandTracker	set_has_tracking_data	void	0	0	bool
 F	XRHandTracker	get_has_tracking_data	bool	0	0
 F	XRHandTracker	set_hand_tracking_source	void	0	0	enum::XRHandTracker.HandTrackingSource
@@ -24435,8 +24416,8 @@ E	XRHandTracker	HandJoint	0	HAND_JOINT_PALM	0	HAND_JOINT_WRIST	1	HAND_JOINT_THUM
 E	XRHandTracker	HandJointFlags	1	HAND_JOINT_FLAG_ORIENTATION_VALID	1	HAND_JOINT_FLAG_ORIENTATION_TRACKED	2	HAND_JOINT_FLAG_POSITION_VALID	4	HAND_JOINT_FLAG_POSITION_TRACKED	8	HAND_JOINT_FLAG_LINEAR_VELOCITY_VALID	16	HAND_JOINT_FLAG_ANGULAR_VELOCITY_VALID	32
 C	XRInterface	RefCounted	0
 P	XRInterface	interface_is_primary	bool
-P	XRInterface	xr_play_area_mode	int
-P	XRInterface	environment_blend_mode	int
+P	XRInterface	xr_play_area_mode	enum::XRInterface.PlayAreaMode
+P	XRInterface	environment_blend_mode	enum::XRInterface.EnvironmentBlendMode
 P	XRInterface	ar_is_anchor_detection_enabled	bool
 F	XRInterface	get_name	StringName	0	0
 F	XRInterface	get_capabilities	int	0	0
@@ -24538,7 +24519,7 @@ P	XRPose	name	String
 P	XRPose	transform	String
 P	XRPose	linear_velocity	String
 P	XRPose	angular_velocity	String
-P	XRPose	tracking_confidence	int
+P	XRPose	tracking_confidence	enum::XRPose.TrackingConfidence
 F	XRPose	set_has_tracking_data	void	0	0	bool
 F	XRPose	get_has_tracking_data	bool	0	0
 F	XRPose	set_name	void	0	0	StringName
@@ -24555,7 +24536,7 @@ F	XRPose	get_tracking_confidence	enum::XRPose.TrackingConfidence	0	0
 E	XRPose	TrackingConfidence	0	XR_TRACKING_CONFIDENCE_NONE	0	XR_TRACKING_CONFIDENCE_LOW	1	XR_TRACKING_CONFIDENCE_HIGH	2
 C	XRPositionalTracker	XRTracker	0
 P	XRPositionalTracker	profile	String
-P	XRPositionalTracker	hand	int
+P	XRPositionalTracker	hand	enum::XRPositionalTracker.TrackerHand
 F	XRPositionalTracker	get_tracker_profile	String	0	0
 F	XRPositionalTracker	set_tracker_profile	void	0	0	String
 F	XRPositionalTracker	get_tracker_hand	enum::XRPositionalTracker.TrackerHand	0	0
@@ -24611,7 +24592,7 @@ P	XRServer	tracker_updated	Signal
 P	XRServer	tracker_removed	Signal
 P	XRServer	world_origin_changed	Signal
 C	XRTracker	RefCounted	0
-P	XRTracker	type	int
+P	XRTracker	type	enum::XRServer.TrackerType
 P	XRTracker	name	String
 P	XRTracker	description	String
 F	XRTracker	get_tracker_type	enum::XRServer.TrackerType	0	0

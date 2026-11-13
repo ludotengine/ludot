@@ -6,10 +6,10 @@ Ludot is a private engine monorepo containing independent hard forks of Godot
 4.7.2-stable and Luau 0.743. GDScript remains available. Desktop targets are Linux,
 Windows, and macOS. Original source provenance is recorded in `upstreams.json`.
 
-The current release is Ludot 4.7.2-lu.2. Ludot versions keep the Godot version they
+The current release is Ludot 4.7.2-lu.3. Ludot versions keep the Godot version they
 are based on and replace Godot's release status with a Ludot release number, set
-as `status` in `engine/version.py`. The editor shows it as `4.7.2.lu.2`, and
-`Engine.get_version_info()` reports `4.7.2-lu.2`. Bump the number after `lu.` for
+as `status` in `engine/version.py`. The editor shows it as `4.7.2.lu.3`, and
+`Engine.get_version_info()` reports `4.7.2-lu.3`. Bump the number after `lu.` for
 each Ludot release; rebasing on a newer Godot release resets it to `lu.1`.
 
 Luau runs alongside GDScript as a native scripting language, with brace classes,
