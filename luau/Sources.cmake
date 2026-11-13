@@ -333,6 +333,10 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/src/IterativeTypeVisitor.cpp
     Analysis/src/IterativeTypeFunctionTypeVisitor.cpp
     Analysis/src/JsonEmitter.cpp
+    Analysis/src/LudotClasses.cpp
+    Analysis/src/LudotLint.cpp
+    Analysis/src/LudotMatches.cpp
+    Analysis/src/LudotEnums.cpp
     Analysis/src/Linter.cpp
     Analysis/src/LValue.cpp
     Analysis/src/Module.cpp

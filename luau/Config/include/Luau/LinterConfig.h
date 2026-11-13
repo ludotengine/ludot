@@ -51,6 +51,8 @@ struct LintWarning
         Code_ComparisonPrecedence = 28,
         Code_RedundantNativeAttribute = 29,
 
+        Code_MatchExhaustiveness = 30,
+
         Code__Count
     };
 
@@ -117,6 +119,7 @@ inline constexpr const char* kWarningNames[] = {
     "IntegerParsing",
     "ComparisonPrecedence",
     "RedundantNativeAttribute",
+    "MatchExhaustiveness",
 };
 // clang-format on
 

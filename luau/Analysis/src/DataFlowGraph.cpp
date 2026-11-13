@@ -379,6 +379,8 @@ ControlFlow DataFlowGraphBuilder::visit(AstStatBlock* b)
     {
         PushScope ps{scopeStack, child};
         cf = visitBlockWithoutChildScope(b);
+        if (b->nilAssignmentResult)
+            visitExpr(b->nilAssignmentResult);
     }
 
     currentScope()->inherit(child);

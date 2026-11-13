@@ -22,7 +22,8 @@ class LuauScript : public Script {
     List<PropertyInfo> properties;
     HashMap<StringName, Variant> defaults;
     HashMap<StringName, String> property_types;
-    HashMap<StringName, MethodInfo> methods;
+	HashMap<StringName, Dictionary> property_enums;
+	HashMap<StringName, MethodInfo> methods;
     HashSet<LuauScriptInstance *> instances;
 protected:
     static void _bind_methods();
@@ -40,7 +41,8 @@ public:
     void set_source_code(const String &p_code) override { source = p_code; }
     Error reload(bool p_keep_state = false) override;
     Array get_diagnostics() const;
-    StringName resolve_method_name(const StringName &p_method) const;
+	Dictionary get_enum_property(const StringName &name) const { return property_enums.has(name) ? property_enums[name] : Dictionary(); }
+	StringName resolve_method_name(const StringName &p_method) const;
     Array get_lint_warnings(const String &p_code) const;
     PackedStringArray get_completions(const String &p_code) const;
     Dictionary get_symbol_help(const String &p_code, const String &p_symbol, Object *p_owner = nullptr) const;
@@ -59,8 +61,12 @@ public:
     void get_script_signal_list(List<MethodInfo> *r_signals) const override {}
     bool get_property_default_value(const StringName &p_property, Variant &r_value) const override;
     void get_script_method_list(List<MethodInfo> *r_methods) const override;
-    void get_script_property_list(List<PropertyInfo> *r_properties) const override { *r_properties = properties; }
-    const Variant get_rpc_config() const override { return Dictionary(); }
+	void get_script_property_list(List<PropertyInfo> *r_properties) const override {
+		for (const PropertyInfo &property : properties) {
+			r_properties->push_back(property);
+		}
+	}
+	const Variant get_rpc_config() const override { return Dictionary(); }
     LuauScript();
     ~LuauScript();
 };
@@ -120,8 +126,12 @@ public:
     HashSet<String> invalidate_modules(const String &p_path);
     HashSet<StringName> native_classes;
     struct NativeMember {
-        enum Kind { PROPERTY, SIGNAL, METHOD };
-        Kind kind = PROPERTY;
+		enum Kind { PROPERTY,
+			SIGNAL,
+			METHOD,
+			CONSTANT,
+			ENUM };
+		Kind kind = PROPERTY;
         StringName name;
         Variant::Type type = Variant::NIL;
         int method_ref = LUA_NOREF;
@@ -184,8 +194,8 @@ public:
     void init() override;
     void finish() override;
     Vector<String> get_reserved_words() const override;
-    bool is_control_flow_keyword(const String &p_word) const override { return p_word == "if" || p_word == "then" || p_word == "else" || p_word == "elseif" || p_word == "for" || p_word == "while" || p_word == "repeat" || p_word == "until" || p_word == "return" || p_word == "break" || p_word == "continue"; }
-    Vector<String> get_comment_delimiters() const override { return {"--", "--[[ ]]"}; }
+	bool is_control_flow_keyword(const String &p_word) const override { return p_word == "if" || p_word == "then" || p_word == "else" || p_word == "elseif" || p_word == "for" || p_word == "while" || p_word == "repeat" || p_word == "until" || p_word == "return" || p_word == "break" || p_word == "continue" || p_word == "match" || p_word == "with" || p_word == "case" || p_word == "otherwise"; }
+	Vector<String> get_comment_delimiters() const override { return {"--", "--[[ ]]"}; }
     Vector<String> get_doc_comment_delimiters() const override { return {"---"}; }
     Vector<String> get_string_delimiters() const override { return {"\" \"", "' '", "[[ ]]", "` `"}; }
     bool validate(const String &p_script, const String &p_path, List<String> *r_functions, List<ScriptError> *r_errors, List<Warning> *r_warnings, HashSet<int> *r_safe_lines) const override;

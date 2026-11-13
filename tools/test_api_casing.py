@@ -46,6 +46,10 @@ for method_style in styles:
         node:{method('set_name')}("Casing")
         const name = node.{prop('name')}
         const id = node:{method('get_instance_id')}()
+        assert(self:{method('is_a')}("Node3D") and self:IsA("Node") and self:isA("Object"))
+        const mode: Input.MouseMode = Input.MOUSE_MODE_CAPTURED
+        assert(Input.Enums.MouseMode.from(mode) == mode)
+        assert(Key.KEY_W == 87 and Vector3.AXIS_Z == 2)
         const resource = Resource.new()
         const rid = resource:{method('get_rid')}()
         const rotation = Quaternion.{method('from_euler')}(Vector3.new())
@@ -87,6 +91,8 @@ func run():
     assert(labels.size() == unique.size(), "No duplicate native completion suggestions")
     assert(labels.count("{prop('velocity')}") == 1 and not labels.has("{wrong_property}"), str(labels))
     assert(labels.count("{method('get_name')}") == 1 and not labels.has("{wrong_method}"), str(labels))
+    for alias in ["isA", "IsA", "is_a"]:
+        assert(labels.has(alias) == (alias == "{method('is_a')}"), "Only the selected identity spelling is completed: " + alias)
     var hover = query + "{prop('velocity')}" + String.chr(0xffff) + " end }}"
     var help = script.get_symbol_help(hover, "{prop('velocity')}")
     assert(help.get("value_type") == "Vector3" and help.get("native_member") == "velocity", str(help))

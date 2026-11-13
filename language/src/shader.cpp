@@ -113,6 +113,7 @@ struct Generator {
     }
     std::string expression(Luau::AstExpr* expr, const std::string& expected = "") {
         using namespace Luau;
+		if (expr->syntax != LudotSyntax::None) fail(expr, "This Ludot language construct is not supported in shaders");
         if (auto n = expr->as<AstExprConstantNumber>()) return literal(expr, n->value, expected);
         if (auto n = expr->as<AstExprConstantBool>()) return n->value ? "true" : "false";
         if (auto n = expr->as<AstExprLocal>()) return n->local->name.value;
@@ -188,6 +189,7 @@ struct Generator {
         using namespace Luau;
         std::string code;
         for (auto stat : body->body) {
+			if (stat->syntax != LudotSyntax::None) fail(stat, "This Ludot language construct is not supported in shaders");
             code += marker(stat);
             if (auto n = stat->as<AstStatAssign>()) {
                 if (n->vars.size != n->values.size) fail(stat, "Shader assignments require one value per target");
@@ -431,6 +433,7 @@ bool unit(Generator& gen, const std::string& source, const std::string& path, bo
     try {
         std::set<std::string> entries;
         for (auto stat : parsed.root->body) {
+			if (stat->syntax != LudotSyntax::None) gen.fail(stat, "This Ludot language construct is not supported in shaders");
             gen.result.code += gen.marker(stat);
             if (auto decl = stat->as<AstStatLocal>()) {
                 const std::string declarationKey = key(stat->location.begin);

@@ -1,5 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/ConstraintGenerator.h"
+#include "Luau/LudotEnums.h"
+#include "Luau/LudotMatches.h"
 
 #include "Luau/Ast.h"
 #include "Luau/AstUtils.h"
@@ -934,6 +936,23 @@ void ConstraintGenerator::prototypeTypeDefinitions(const ScopePtr& scope, AstSta
         }
     }
 
+    for (AstStat* stat : block->body)
+    {
+        if (auto local = stat->as<AstStatLocal>(); local && local->enumInfo)
+        {
+            const auto& declaration = *local->enumInfo;
+            Name name = declaration.name.value;
+            EnumTypes types = makeEnumTypes(*arena, *builtinTypes, enumInfoFromAst(declaration), module->name, declaration.location);
+            if (declaration.exported)
+                scope->exportedTypeBindings[name] = TypeFun{{}, {}, types.value, declaration.location};
+            else
+                scope->privateTypeBindings[name] = TypeFun{{}, {}, types.value, declaration.location};
+            scope->bindings[local->vars.data[0]] = Binding{types.names, local->vars.data[0]->location};
+            scope->lvalueTypes[dfg->getDef(local->vars.data[0])] = types.names;
+            module->astTypes[local->values.data[0]] = types.names;
+        }
+    }
+
     // In order to enable mutually-recursive type aliases, we need to
     // populate the type bindings before we actually check any of the
     // alias statements.
@@ -1063,6 +1082,14 @@ void ConstraintGenerator::prototypeTypeDefinitions(const ScopePtr& scope, AstSta
             scope->exportedTypeBindings[classDeclaration->name.value] = std::move(initialFun);
 
             typeNameLocations[classDeclaration->name.value] = classDeclaration->location;
+        }
+        else if (auto local = stat->as<AstStatLocal>(); local && local->enumInfo)
+        {
+            const auto& declaration = *local->enumInfo;
+            Name name = declaration.name.value;
+            if (Location* previous = typeNameLocations.find(name))
+                reportError(declaration.location, DuplicateTypeDefinition{name, *previous});
+            typeNameLocations[name] = declaration.location;
         }
         else if (auto classDecl = stat->as<AstStatClass>())
         {
@@ -1433,6 +1460,8 @@ ControlFlow ConstraintGenerator::visit(const ScopePtr& scope, AstStat* stat)
 
 ControlFlow ConstraintGenerator::visit(const ScopePtr& scope, AstStatLocal* statLocal)
 {
+    if (statLocal->enumInfo)
+        return ControlFlow::None;
     std::vector<TypeId> annotatedTypes;
     annotatedTypes.reserve(statLocal->vars.size);
     bool hasAnnotation = false;
@@ -1952,6 +1981,19 @@ ControlFlow ConstraintGenerator::visit(const ScopePtr& scope, AstStatBlock* bloc
     ScopePtr innerScope = childScope(block, scope);
 
     ControlFlow flow = visitBlockWithoutChildScope(innerScope, block);
+    if (block->nilAssignmentResult)
+    {
+        auto branch = block->body.data[block->body.size - 1]->as<AstStatIf>();
+        auto comparison = branch->condition->as<AstExprBinary>();
+        auto assignment = branch->thenbody->body.data[0]->as<AstStatAssign>();
+        TypeId left = module->astTypes[comparison->left];
+        TypeId right = module->astTypes[assignment->values.data[0]];
+        if (left && right)
+        {
+            TypeId result = createTypeFunctionInstance(builtinTypes->typeFunctions->coalesceFunc, {left, right}, {}, innerScope, block->location);
+            updateRValueRefinements(scope, dfg->getDef(block->nilAssignmentResult), result);
+        }
+    }
 
     // An AstStatBlock has linear control flow, i.e. one entry and one exit, so we can inherit
     // all the changes to the environment occurred by the statements in that block.
@@ -2956,13 +2998,57 @@ InferencePack ConstraintGenerator::checkPack(
 
 InferencePack ConstraintGenerator::checkPack(const ScopePtr& scope, AstExprCall* call, std::optional<TypeId> expectedType)
 {
-    if (call->isClassBaseInit) return InferencePack{builtinTypes->emptyTypePack};
+    if (call->isClassBaseInit)
+        return InferencePack{builtinTypes->emptyTypePack};
+    if (call->syntax == LudotSyntax::Pipeline)
+    {
+        // Analyze the stage as a direct call. Its runtime closure only caches the
+        // input; introducing a function boundary here would generalize stage
+        // generics before the concrete input has constrained them.
+        auto function = call->func->as<AstExprFunction>();
+        auto result = function->body->body.data[0]->as<AstStatReturn>()->list.data[0]->as<AstExprGroup>();
+        auto stage = result->expr->as<AstExprCall>();
+        AstExpr* temporary = stage->args.data[0];
+        stage->args.data[0] = call->args.data[0];
+        TypeId ty = check(scope, result).ty;
+        module->astTypes[temporary] = *module->astTypes.find(call->args.data[0]);
+        stage->args.data[0] = temporary;
+        return InferencePack{arena->addTypePack({ty})};
+    }
+    if (call->syntax == LudotSyntax::Coalesce)
+    {
+        auto function = call->func->as<AstExprFunction>();
+        auto conditional = function->body->body.data[0]->as<AstStatReturn>()->list.data[0]->as<AstExprIfElse>();
+        TypeId left = check(scope, call->args.data[0]).ty;
+        TypeId right = check(scope, conditional->falseExpr).ty;
+        std::vector<TypeId> operands{left, right};
+        AstExpr* fallback = conditional->falseExpr;
+        while (auto group = fallback->as<AstExprGroup>())
+            fallback = group->expr;
+        if (auto table = fallback->as<AstExprTable>(); table && table->items.size == 0)
+            operands.push_back(builtinTypes->trueType);
+        TypeId result = createTypeFunctionInstance(builtinTypes->typeFunctions->coalesceFunc, std::move(operands), {}, scope, call->location);
+        return InferencePack{arena->addTypePack({result})};
+    }
+
     Checkpoint funcBeginCheckpoint = checkpoint(this);
 
     TypeId fnType = nullptr;
     {
         InConditionalContext icc2{&typeContext, TypeContext::Default};
-        fnType = check(scope, call->func).ty;
+        if (call->syntax != LudotSyntax::None && call->func->is<AstExprFunction>() && call->args.size >= 1)
+        {
+            TypeId input = check(scope, call->args.data[0]).ty;
+            TypeId expected = arena->addType(
+                FunctionType{
+                    arena->addTypePack({input}, call->func->as<AstExprFunction>()->vararg ? scope->varargPack : std::nullopt),
+                    arena->addTypePack({freshType(scope, Polarity::Positive)})
+                }
+            );
+            fnType = check(scope, call->func, expected).ty;
+        }
+        else
+            fnType = check(scope, call->func).ty;
     }
 
     Checkpoint funcEndCheckpoint = checkpoint(this);
@@ -3062,7 +3148,16 @@ InferencePack ConstraintGenerator::checkExprCall(
     {
         AstExpr* arg = exprArgs[i];
 
-        if (i == 0 && call->self)
+        if (i == 0 && call->syntax != LudotSyntax::None && call->func->is<AstExprFunction>())
+        {
+            // The input supplied the generated function's parameter type. Rechecking
+            // it would instantiate generic stages twice and overwrite AST call types.
+            auto input = module->astTypes.find(arg);
+            LUAU_ASSERT(input);
+            args.push_back(input ? *input : builtinTypes->errorType);
+            argumentRefinements.push_back(nullptr);
+        }
+        else if (i == 0 && call->self)
         {
             // The self type has already been computed as a side effect of
             // computing fnType.  If computing that did not cause us to exceed a
@@ -4000,8 +4095,23 @@ std::tuple<TypeId, TypeId, RefinementId> ConstraintGenerator::checkBinary(
         TypeId leftType = check(scope, left, {}, true).ty;
         TypeId rightType = check(scope, right, {}, true).ty;
 
-        RefinementId leftRefinement = refinementArena.proposition(dfg->getRefinementKey(left), rightType);
-        RefinementId rightRefinement = refinementArena.proposition(dfg->getRefinementKey(right), leftType);
+        auto discriminant = [&](AstExpr* value, AstExpr* pattern, TypeId target, TypeId other)
+        {
+            std::string key = ludotCaseKey(pattern);
+            bool enumTarget = enumPrimitiveEquality(target, other);
+            if (key.rfind("s:", 0) == 0 && !enumTarget)
+                if (auto local = value->as<AstExprLocal>(); local && local->local->annotation)
+                    if (auto annotation = module->astResolvedTypes.find(local->local->annotation))
+                        enumTarget = enumPrimitiveEquality(*annotation, other);
+            if (key.rfind("n:", 0) == 0 || (key.rfind("s:", 0) == 0 && enumTarget))
+            {
+                TypeId literal = arena->addType(SingletonType{StringSingleton{key}});
+                return createTypeFunctionInstance(builtinTypes->typeFunctions->literalCaseFunc, {target, literal}, {}, scope, pattern->location);
+            }
+            return enumPrimitiveEquality(target, other) ? builtinTypes->noRefineType : other;
+        };
+        RefinementId leftRefinement = refinementArena.proposition(dfg->getRefinementKey(left), discriminant(left, right, leftType, rightType));
+        RefinementId rightRefinement = refinementArena.proposition(dfg->getRefinementKey(right), discriminant(right, left, rightType, leftType));
 
         if (op == AstExprBinary::CompareNe)
         {

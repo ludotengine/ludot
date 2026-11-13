@@ -3,21 +3,24 @@
 #include "luau_script.h"
 #include "luau_shader.h"
 #ifdef TOOLS_ENABLED
+#include "editor_theme_tools.h"
+#include "luau_editor_assist.h"
+#include "luau_enum_editor.h"
+#include "luau_export_plugin.h"
+#include "luau_formatter.h"
+#include "luau_highlighter.h"
+#include "luau_lint.h"
+#include "luau_shader_editor.h"
+
 #include "editor/editor_node.h"
 #include "editor/export/editor_export.h"
-#include "luau_export_plugin.h"
-#include "luau_shader_editor.h"
-#include "luau_highlighter.h"
-#include "luau_formatter.h"
-#include "luau_editor_assist.h"
-#include "luau_lint.h"
-#include "editor_theme_tools.h"
 #include "editor/script/script_editor_plugin.h"
 static void initialize_luau_shader_editor() {
     LuauFormatter::initialize();
     ludot_initialize_editor_assist();
     ludot_initialize_lint();
-    Ref<LuauSyntaxHighlighter> highlighter;
+	ludot_initialize_enum_editor();
+	Ref<LuauSyntaxHighlighter> highlighter;
     highlighter.instantiate();
     ScriptEditor::get_singleton()->register_syntax_highlighter(highlighter);
     Ref<LuauShaderLanguagePlugin> plugin;

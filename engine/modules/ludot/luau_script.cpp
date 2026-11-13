@@ -1,6 +1,10 @@
 #include "luau_script.h"
-#include "luau_callbacks.h"
+
 #include "luau_callable.h"
+#include "luau_callbacks.h"
+#include "luau_enum_metadata.h"
+
+#include "core/core_constants.h"
 #include "core/object/method_bind.h"
 #ifdef TOOLS_ENABLED
 #include "luau_analysis.h"
@@ -233,6 +237,53 @@ int native_call(lua_State *L) {
     LuauLanguage::push_variant(L, result);
     return 1;
 }
+void push_native_enum(lua_State *L, const StringName &owner, const StringName &name) {
+	List<StringName> constants;
+	ClassDB::get_enum_constants(owner, name, &constants);
+	lua_pushcfunction(L, luaL_newenum, "native enum");
+	lua_createtable(L, constants.size(), 0);
+	lua_createtable(L, constants.size(), 0);
+	int index = 0;
+	for (const StringName &constant : constants) {
+		lua_pushstring(L, String(constant).utf8().get_data());
+		lua_rawseti(L, -3, ++index);
+		lua_pushnumber(L, ClassDB::get_integer_constant(owner, constant));
+		lua_rawseti(L, -2, index);
+	}
+	lua_call(L, 2, 1);
+}
+void push_native_enums(lua_State *L, const StringName &owner) {
+	lua_newtable(L);
+	List<StringName> enums;
+	ClassDB::get_enum_list(owner, &enums);
+	for (const StringName &name : enums) {
+		push_native_enum(L, owner, name);
+		lua_setfield(L, -2, String(name).utf8().get_data());
+	}
+	lua_setreadonly(L, -1, true);
+}
+void push_variant_enums(lua_State *L, Variant::Type type) {
+	lua_newtable(L);
+	List<StringName> enums;
+	Variant::get_enums_for_type(type, &enums);
+	for (const StringName &name : enums) {
+		List<StringName> constants;
+		Variant::get_enumerations_for_enum(type, name, &constants);
+		lua_pushcfunction(L, luaL_newenum, "builtin enum");
+		lua_createtable(L, constants.size(), 0);
+		lua_createtable(L, constants.size(), 0);
+		int index = 0;
+		for (const StringName &constant : constants) {
+			lua_pushstring(L, String(constant).utf8().get_data());
+			lua_rawseti(L, -3, ++index);
+			lua_pushnumber(L, Variant::get_enum_value(type, name, constant));
+			lua_rawseti(L, -2, index);
+		}
+		lua_call(L, 2, 1);
+		lua_setfield(L, -2, String(name).utf8().get_data());
+	}
+	lua_setreadonly(L, -1, true);
+}
 LuauLanguage::NativeMember *find_native_member(const Variant &p_self, const String &p_requested) {
     auto language = LuauLanguage::get_singleton();
     const Variant::Type type = p_self.get_type();
@@ -245,7 +296,14 @@ LuauLanguage::NativeMember *find_native_member(const Variant &p_self, const Stri
             List<MethodInfo> methods;
             ClassDB::get_method_list(key, &methods);
             for (const MethodInfo &method : methods) (*members)[LuauLanguage::api_name(method.name)] = { LuauLanguage::NativeMember::METHOD, method.name };
-            List<MethodInfo> signals;
+			List<String> constants;
+			ClassDB::get_integer_constant_list(key, &constants);
+			for (const String &constant : constants) {
+				(*members)[constant] = { LuauLanguage::NativeMember::CONSTANT, constant };
+				(*members)[LuauLanguage::api_name(constant, true, true)] = { LuauLanguage::NativeMember::CONSTANT, constant };
+			}
+			(*members)["Enums"] = { LuauLanguage::NativeMember::ENUM, "Enums" };
+			List<MethodInfo> signals;
             ClassDB::get_signal_list(key, &signals);
             for (const MethodInfo &signal : signals) (*members)[LuauLanguage::api_name(signal.name, true)] = { LuauLanguage::NativeMember::SIGNAL, signal.name };
             List<PropertyInfo> properties;
@@ -258,12 +316,49 @@ LuauLanguage::NativeMember *find_native_member(const Variant &p_self, const Stri
             List<StringName> methods;
             Variant::get_builtin_method_list(type, &methods);
             for (const StringName &method : methods) (*members)[LuauLanguage::api_name(method)] = { LuauLanguage::NativeMember::METHOD, method };
-            List<StringName> properties;
+			List<StringName> enums;
+			Variant::get_enums_for_type(type, &enums);
+			for (const StringName &name : enums) {
+				List<StringName> constants;
+				Variant::get_enumerations_for_enum(type, name, &constants);
+				for (const StringName &constant : constants) {
+					(*members)[constant] = { LuauLanguage::NativeMember::CONSTANT, constant };
+					(*members)[LuauLanguage::api_name(constant, true, true)] = { LuauLanguage::NativeMember::CONSTANT, constant };
+				}
+			}
+			(*members)["Enums"] = { LuauLanguage::NativeMember::ENUM, "Enums" };
+			List<StringName> properties;
             Variant::get_member_list(type, &properties);
             for (const StringName &property : properties) (*members)[LuauLanguage::api_name(property, true)] = { LuauLanguage::NativeMember::PROPERTY, property, Variant::get_member_type(type, property) };
         }
     }
     return members->getptr(p_requested);
+}
+// Object identity applies to every native Object subclass, including InputEvent resources.
+int native_is_a(lua_State *L) {
+	const StringName name = String::utf8(luaL_checkstring(L, 2));
+	bool matches = false;
+	int receiver = 1;
+	if (lua_type(L, 1) == LUA_TOBJECT) {
+		for (const LuauClass *cls = static_cast<const LuauObject *>(lua_topointer(L, 1))->lclass; cls != nullptr; cls = cls->super) {
+			matches = matches || String::utf8(getstr(cls->name)) == String(name);
+		}
+		lua_getfield(L, 1, "_native");
+		receiver = lua_gettop(L);
+	}
+	const Variant self = variant_at(L, receiver);
+	Object *object = self;
+	matches = matches || (object != nullptr && object->is_class(name));
+	Ref<Script> script;
+	if (object != nullptr) {
+		script = object->get_script();
+	}
+	while (!matches && script.is_valid()) {
+		matches = script->get_global_name() == name;
+		script = script->get_base_script();
+	}
+	lua_pushboolean(L, matches);
+	return 1;
 }
 int native_index(lua_State *L) {
     Variant self = variant_at(L, 1);
@@ -281,7 +376,14 @@ int native_index(lua_State *L) {
         return 1;
     }
     if (self.get_type() == Variant::OBJECT && static_cast<Object *>(self) == nullptr) luaL_error(L, "The native object has been freed");
-    if (LuauLanguage::NativeMember *member = find_native_member(self, requested)) {
+	if (self.get_type() == Variant::OBJECT && (requested == "isA" || requested == "IsA" || requested == LuauLanguage::api_name("is_a"))) {
+		const ScriptInstance *instance = static_cast<Object *>(self)->get_script_instance();
+		if (instance == nullptr || !instance->has_method(requested)) {
+			lua_pushcfunction(L, native_is_a, "Object.isA");
+			return 1;
+		}
+	}
+	if (LuauLanguage::NativeMember *member = find_native_member(self, requested)) {
         switch (member->kind) {
             case LuauLanguage::NativeMember::PROPERTY: {
                 bool valid;
@@ -291,7 +393,26 @@ int native_index(lua_State *L) {
             case LuauLanguage::NativeMember::SIGNAL:
                 LuauLanguage::push_variant(L, Signal(static_cast<Object *>(self), member->name));
                 return 1;
-            case LuauLanguage::NativeMember::METHOD:
+			case LuauLanguage::NativeMember::CONSTANT:
+				if (self.get_type() == Variant::OBJECT) {
+					lua_pushnumber(L, ClassDB::get_integer_constant(static_cast<Object *>(self)->get_class_name(), member->name));
+				} else {
+					lua_pushnumber(L, Variant::get_enum_value(self.get_type(), Variant::get_enum_for_enumeration(self.get_type(), member->name), member->name));
+				}
+				return 1;
+			case LuauLanguage::NativeMember::ENUM:
+				if (member->method_ref == LUA_NOREF) {
+					if (self.get_type() == Variant::OBJECT) {
+						push_native_enums(L, static_cast<Object *>(self)->get_class_name());
+					} else {
+						push_variant_enums(L, self.get_type());
+					}
+					member->method_ref = lua_ref(L, -1);
+				} else {
+					lua_getref(L, member->method_ref);
+				}
+				return 1;
+			case LuauLanguage::NativeMember::METHOD:
                 if (member->method_ref != LUA_NOREF) {
                     lua_getref(L, member->method_ref);
                     return 1;
@@ -1013,8 +1134,26 @@ void LuauLanguage::init() {
         for (const StringName &constant : constants) {
             push_variant(state, Variant::get_constant_value(type, constant));
             lua_setfield(state, -2, api_name(constant, true, true).utf8().get_data());
-        }
-        List<StringName> methods;
+			if (!Variant::get_enum_for_enumeration(type, constant).is_empty()) {
+				push_variant(state, Variant::get_constant_value(type, constant));
+				lua_setfield(state, -2, String(constant).utf8().get_data());
+			}
+		}
+		List<StringName> enums;
+		Variant::get_enums_for_type(type, &enums);
+		for (const StringName &name : enums) {
+			List<StringName> values;
+			Variant::get_enumerations_for_enum(type, name, &values);
+			for (const StringName &constant : values) {
+				lua_pushnumber(state, Variant::get_enum_value(type, name, constant));
+				lua_setfield(state, -2, String(constant).utf8().get_data());
+				lua_pushnumber(state, Variant::get_enum_value(type, name, constant));
+				lua_setfield(state, -2, api_name(constant, true, true).utf8().get_data());
+			}
+		}
+		push_variant_enums(state, type);
+		lua_setfield(state, -2, "Enums");
+		List<StringName> methods;
         Variant::get_builtin_method_list(type, &methods);
         for (const StringName &method : methods) {
             if (!Variant::is_builtin_method_static(type, method)) continue;
@@ -1034,7 +1173,46 @@ void LuauLanguage::init() {
         lua_setreadonly(state, -1, true);
         lua_setglobal(state, Variant::get_type_name(type).utf8().get_data());
     }
-    List<Engine::Singleton> singletons;
+	HashMap<String, Vector<int>> global_enums;
+	for (int i = 0; i < CoreConstants::get_global_constant_count(); ++i) {
+		const String name = CoreConstants::get_global_constant_enum(i);
+		if (!name.is_empty()) {
+			global_enums[name].push_back(i);
+		}
+	}
+	for (const auto &enumeration : global_enums) {
+		lua_pushcfunction(state, luaL_newenum, "engine global enum");
+		lua_createtable(state, enumeration.value.size(), 0);
+		lua_createtable(state, enumeration.value.size(), 0);
+		for (int i = 0; i < enumeration.value.size(); ++i) {
+			const int index = enumeration.value[i];
+			lua_pushstring(state, CoreConstants::get_global_constant_name(index));
+			lua_rawseti(state, -3, i + 1);
+			lua_pushnumber(state, CoreConstants::get_global_constant_value(index));
+			lua_rawseti(state, -2, i + 1);
+		}
+		lua_call(state, 2, 1);
+		if (!enumeration.key.contains(".")) {
+			lua_setglobal(state, enumeration.key.utf8().get_data());
+		} else {
+			const String owner = enumeration.key.get_slice(".", 0);
+			const String member = enumeration.key.get_slice(".", 1);
+			lua_getglobal(state, owner.utf8().get_data());
+			if (lua_isnil(state, -1)) {
+				lua_pop(state, 1);
+				lua_newtable(state);
+				lua_pushvalue(state, -1);
+				lua_setglobal(state, owner.utf8().get_data());
+			}
+			lua_pushvalue(state, -2);
+			lua_setfield(state, -2, member.utf8().get_data());
+			lua_pop(state, 2);
+		}
+	}
+	lua_getglobal(state, "Variant");
+	lua_setreadonly(state, -1, true);
+	lua_pop(state, 1);
+	List<Engine::Singleton> singletons;
     Engine::get_singleton()->get_singletons(&singletons);
     for (const auto &entry : singletons) { push_variant(state, entry.ptr); lua_setglobal(state, String(entry.name).utf8().get_data()); }
     GLOBAL_DEF("luau/modules/aliases", Dictionary());
@@ -1162,7 +1340,11 @@ Error LuauLanguage::ensure_native_class(const StringName &p_name) {
         if (!name.is_valid_ascii_identifier() || !names.insert(name).second) continue;
         source += " public function " + name + "(self) end\n";
         constant_values.insert(name, ClassDB::get_integer_constant(p_name, constant));
-    }
+		if (constant != name && names.insert(constant).second) {
+			source += " public function " + constant + "(self) end\n";
+			constant_values.insert(constant, ClassDB::get_integer_constant(p_name, constant));
+		}
+	}
     List<MethodInfo> methods;
     ClassDB::get_method_list(p_name, &methods);
     for (const auto &method : methods) {
@@ -1170,11 +1352,24 @@ Error LuauLanguage::ensure_native_class(const StringName &p_name) {
         if (!name.is_valid_ascii_identifier() || !names.insert(name).second || name.begins_with("__")) continue;
         source += " public function " + name + "(self, ...) return self._native:" + name + "(...) end\n";
     }
-    source += "end\nreturn " + String(p_name);
+	source += " public function Enums(self) end\n";
+	const HashSet<String> identity_names{ api_name("is_a"), "isA", "IsA" };
+	for (const String &name : identity_names) {
+		if (names.insert(name).second) {
+			source += " public function " + name + "(self, name) end\n";
+		}
+	}
+	source += "end\nreturn " + String(p_name);
     const Error error = load_chunk(source, "native/" + String(p_name));
     if (error != OK) return error;
     if (lua_pcall(state, 0, 1, 0) != LUA_OK) { last_error = String::utf8(lua_tostring(state, -1)); lua_pop(state, 1); return ERR_SCRIPT_FAILED; }
-    for (const auto &constant : constant_values) {
+	push_native_enums(state, p_name);
+	lua_setclassmember(state, -2, "Enums");
+	for (const String &name : identity_names) {
+		lua_pushcfunction(state, native_is_a, "Object.isA");
+		lua_setclassmember(state, -2, name.utf8().get_data());
+	}
+	for (const auto &constant : constant_values) {
         lua_pushnumber(state, constant.value);
         lua_setclassmember(state, -2, constant.key.utf8().get_data());
     }
@@ -1223,7 +1418,8 @@ LuauScript::~LuauScript() {
 }
 void LuauScript::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_diagnostics"), &LuauScript::get_diagnostics);
-    ClassDB::bind_method(D_METHOD("get_lint_warnings", "code"), &LuauScript::get_lint_warnings);
+	ClassDB::bind_method(D_METHOD("get_enum_property", "name"), &LuauScript::get_enum_property);
+	ClassDB::bind_method(D_METHOD("get_lint_warnings", "code"), &LuauScript::get_lint_warnings);
     ClassDB::bind_method(D_METHOD("get_completions", "code"), &LuauScript::get_completions);
     ClassDB::bind_method(D_METHOD("get_symbol_help", "code", "symbol", "owner"), &LuauScript::get_symbol_help, DEFVAL(Variant()));
 }
@@ -1255,7 +1451,8 @@ Array LuauScript::get_lint_warnings(const String &p_code) const {
     const auto parsed = Luau::Parser::parse(bytes.get_data(), bytes.length(), names, allocator, options);
     if (!parsed.errors.empty()) return result;
     List<ScriptLanguage::Warning> warnings;
-    ludot_lint(p_code, parsed, &warnings);
+	ludot_validate(p_code, get_path(), nullptr, &warnings);
+	ludot_lint(p_code, parsed, &warnings);
     for (const auto &warning : warnings) {
         Dictionary item;
         item["line"] = warning.start_line;
@@ -1429,13 +1626,18 @@ Error LuauScript::reload(bool p_keep_state) {
     class_name = new_name;
     base_type = new_base;
     base_script = new_base_script;
-    methods.clear(); properties.clear(); defaults.clear(); property_types.clear();
-    if (base_script.is_valid()) {
+	methods.clear();
+	properties.clear();
+	defaults.clear();
+	property_types.clear();
+	property_enums.clear();
+	if (base_script.is_valid()) {
         methods = base_script->methods;
         properties = base_script->properties;
         defaults = base_script->defaults;
         property_types = base_script->property_types;
-    }
+		property_enums = base_script->property_enums;
+	}
     for (const auto &member : declaration->members) {
         if (const auto property = Luau::get_if<Luau::AstClassProperty>(&member)) {
             PropertyInfo info(annotation_type(property->ty), String::utf8(property->name.value));
@@ -1445,10 +1647,31 @@ Error LuauScript::reload(bool p_keep_state) {
                 info.hint_string = String(constant_default(property->rangeMin)) + "," + String(constant_default(property->rangeMax));
                 if (property->rangeStep != nullptr) info.hint_string += "," + String(constant_default(property->rangeStep));
             }
-            properties.push_back(info);
+			Variant default_value = constant_default(property->defaultValue);
+			Dictionary enumeration = ludot_enum_metadata(parsed.root, property->ty, get_path());
+			if (!enumeration.is_empty()) {
+				const bool strings = enumeration["string"];
+				info.type = strings ? Variant::STRING : Variant::INT;
+				info.hint = PROPERTY_HINT_ENUM;
+				const PackedStringArray labels = enumeration["names"];
+				const Array values = enumeration["values"];
+				PackedStringArray hints;
+				for (int i = 0; i < labels.size(); ++i) {
+					hints.push_back(strings ? String(values[i]) : labels[i] + ":" + String::num_int64(values[i]));
+				}
+				info.hint_string = String(",").join(hints);
+				property_enums[info.name] = enumeration;
+				if (auto member = property->defaultValue ? property->defaultValue->as<Luau::AstExprIndexName>() : nullptr) {
+					const int index = labels.find(String::utf8(member->index.value));
+					if (index >= 0) {
+						default_value = values[index];
+					}
+				}
+			}
+			properties.push_back(info);
             property_types.insert(info.name, annotation_key(property->ty));
-            defaults.insert(info.name, constant_default(property->defaultValue));
-        } else if (const auto method = Luau::get_if<Luau::AstClassMethod>(&member)) {
+			defaults.insert(info.name, default_value);
+		} else if (const auto method = Luau::get_if<Luau::AstClassMethod>(&member)) {
             MethodInfo info(String::utf8(method->functionName.value));
             for (size_t i = 1; i < method->function->args.size; ++i) {
                 auto arg = method->function->args.data[i];
@@ -1562,7 +1785,13 @@ bool LuauScriptInstance::get(const StringName &p_name, Variant &r_value) const {
     lua_getref(language->state, object_ref);
     lua_getfield(language->state, -1, String(p_name).utf8().get_data());
     const bool converted = LuauLanguage::try_variant(language->state, -1, r_value);
-    lua_pop(language->state, 2);
+	if (converted) {
+		const Dictionary *enumeration = script->property_enums.getptr(p_name);
+		if (enumeration != nullptr && !bool((*enumeration)["string"])) {
+			r_value = int64_t(r_value);
+		}
+	}
+	lua_pop(language->state, 2);
     return converted;
 }
 Variant::Type LuauScriptInstance::get_property_type(const StringName &p_name, bool *r_valid) const {
@@ -1630,7 +1859,9 @@ String LuauLanguage::get_global_class_name(const String &p_path, String *r_base_
     return name;
 }
 
-Vector<String> LuauLanguage::get_reserved_words() const { return {"and", "break", "continue", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "const", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "class", "extends", "export", "private", "public", "import", "type", "from", "as", "to", "step"}; }
+Vector<String> LuauLanguage::get_reserved_words() const {
+	return { "and", "break", "continue", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "const", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "class", "extends", "export", "private", "public", "import", "type", "from", "as", "to", "step", "enum", "match", "with", "case", "otherwise" };
+}
 bool LuauLanguage::validate(const String &p_script, const String &p_path, List<String> *r_functions, List<ScriptError> *r_errors, List<Warning> *r_warnings, HashSet<int> *r_safe_lines) const {
     const CharString text = p_script.utf8();
     Luau::Allocator allocator;
@@ -1643,8 +1874,8 @@ bool LuauLanguage::validate(const String &p_script, const String &p_path, List<S
     }
 #ifdef TOOLS_ENABLED
     if (parsed.errors.empty()) {
-        bool valid = ludot_validate(p_script, p_path, r_errors);
-        ludot_lint(p_script, parsed, r_warnings);
+		bool valid = ludot_validate(p_script, p_path, r_errors, r_warnings);
+		ludot_lint(p_script, parsed, r_warnings);
         return valid;
     }
 #endif

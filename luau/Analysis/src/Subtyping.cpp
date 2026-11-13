@@ -1,6 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 
 #include "Luau/Subtyping.h"
+#include "Luau/LudotEnums.h"
 
 #include "Luau/Common.h"
 #include "Luau/Error.h"
@@ -966,6 +967,10 @@ SubtypingResult Subtyping::isCovariantWith(SubtypingEnvironment& env, TypeId sub
         result = isCovariantWith(env, p, scope);
     else if (auto p = get2<SingletonType, SingletonType>(subTy, superTy))
         result = isCovariantWith(env, p, scope);
+    else if (auto p = get2<ExternType, PrimitiveType>(subTy, superTy); p && p.first->enumInfo)
+    {
+        result.isSubtype = p.second->type == (p.first->enumInfo->isString ? PrimitiveType::String : PrimitiveType::Number);
+    }
     else if (auto p = get2<FunctionType, PrimitiveType>(subTy, superTy))
     {
         auto [subFunction, superPrimitive] = p;

@@ -313,6 +313,9 @@ struct MagicRefinementContext
     NotNull<Scope> scope;
     const class AstExprCall* callSite;
     std::vector<std::optional<TypeId>> discriminantTypes;
+    NotNull<TypeArena> arena;
+    NotNull<BuiltinTypes> builtins;
+    TypePackId arguments;
 };
 
 struct MagicFunctionTypeCheckContext
@@ -578,12 +581,16 @@ using NominalRelation = Variant<Obj, Klass>;
  * Extern types optionally have a parent type.
  * Two different extern types that share the same properties are nevertheless distinct and mutually incompatible.
  */
+struct EnumTypeInfo;
+
 struct ExternType
 {
     using Props = TableType::Props;
 
     Name name;
     Props props;
+    std::shared_ptr<EnumTypeInfo> enumInfo;
+    std::optional<size_t> enumMember;
     std::optional<TypeId> parent;
     std::optional<TypeId> metatable; // metaclass?
     Tags tags;

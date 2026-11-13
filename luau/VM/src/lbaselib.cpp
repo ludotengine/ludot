@@ -427,7 +427,81 @@ static int luaB_newproxy(lua_State* L)
     return 1;
 }
 
+// Enum values stay ordinary Lua primitives. Only the namespace has a custom
+// iterator, whose private frozen arrays retain declaration order and aliases.
+static int luaB_enum_next(lua_State* L)
+{
+    int index = lua_tointeger(L, lua_upvalueindex(3)) + 1;
+    if (index > lua_objlen(L, lua_upvalueindex(1)))
+        return 0;
+    lua_pushinteger(L, index);
+    lua_replace(L, lua_upvalueindex(3));
+    lua_rawgeti(L, lua_upvalueindex(1), index);
+    lua_rawgeti(L, lua_upvalueindex(2), index);
+    return 2;
+}
+static int luaB_enum_iter(lua_State* L)
+{
+    lua_pushvalue(L, lua_upvalueindex(1));
+    lua_pushvalue(L, lua_upvalueindex(2));
+    lua_pushinteger(L, 0);
+    lua_pushcclosure(L, luaB_enum_next, "enum iterator", 3);
+    lua_pushnil(L);
+    lua_pushnil(L);
+    return 3;
+}
+static int luaB_enum_from(lua_State* L)
+{
+    int count = lua_objlen(L, lua_upvalueindex(1));
+    for (int index = 1; index <= count; ++index)
+    {
+        lua_rawgeti(L, lua_upvalueindex(1), index);
+        if (lua_rawequal(L, 1, -1))
+            return 1;
+        lua_pop(L, 1);
+    }
+    lua_pushnil(L);
+    return 1;
+}
+int luaL_newenum(lua_State* L)
+{
+    luaL_checktype(L, 1, LUA_TTABLE);
+    luaL_checktype(L, 2, LUA_TTABLE);
+    int count = lua_objlen(L, 1);
+    lua_createtable(L, 0, count + 1);
+    for (int index = 1; index <= count; ++index)
+    {
+        lua_rawgeti(L, 1, index);
+        lua_rawgeti(L, 2, index);
+        lua_rawset(L, -3);
+    }
+    lua_setreadonly(L, 1, true);
+    lua_setreadonly(L, 2, true);
+    lua_pushvalue(L, 2);
+    lua_pushcclosure(L, luaB_enum_from, "enum checked conversion", 1);
+    lua_setfield(L, -2, "from");
+    lua_createtable(L, 0, 2);
+    lua_pushvalue(L, 1);
+    lua_pushvalue(L, 2);
+    lua_pushcclosure(L, luaB_enum_iter, "enum iteration", 2);
+    lua_setfield(L, -2, "__iter");
+    lua_pushliteral(L, "enum");
+    lua_setfield(L, -2, "__metatable");
+    lua_setreadonly(L, -1, true);
+    lua_setmetatable(L, -2);
+    lua_setreadonly(L, -1, true);
+    return 1;
+}
+
+static int luaB_match_eq(lua_State* L)
+{
+    lua_pushboolean(L, lua_rawequal(L, 1, 2));
+    return 1;
+}
+
 static const luaL_Reg base_funcs[] = {
+    {"__ludot_match_eq", luaB_match_eq},
+    {"__ludot_enum", luaL_newenum},
     {"assert", luaB_assert},
     {"error", luaB_error},
     {"gcinfo", luaB_gcinfo},

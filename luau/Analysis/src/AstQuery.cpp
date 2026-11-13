@@ -19,6 +19,68 @@ namespace Luau
 namespace
 {
 
+// Query the source operands of lowered syntax, not compiler scaffolding whose
+// synthetic ranges overlap the user's tokens. Compiler and analysis visitors
+// still traverse the full lowered tree.
+bool visitLudotSource(AstNode* node, AstVisitor& visitor, Position position)
+{
+    auto select = [&](AstNode* child)
+    {
+        if (child && child->location.containsClosed(position) && child->location.begin != child->location.end)
+        {
+            child->visit(&visitor);
+            return true;
+        }
+        return false;
+    };
+    AstMatchInfo* match = nullptr;
+    if (auto block = node->as<AstStatBlock>())
+        match = block->matchInfo;
+    if (auto call = node->as<AstExprCall>())
+        match = call->matchInfo;
+    if (match)
+    {
+        if (select(match->subject))
+            return true;
+        for (const auto& arm : match->arms)
+            if (select(arm.pattern) || select(arm.value ? static_cast<AstNode*>(arm.value) : arm.body))
+                return true;
+        return true;
+    }
+    if (auto call = node->as<AstExprCall>(); call && call->syntax != LudotSyntax::None)
+    {
+        if (select(call->args.data[0]))
+            return true;
+        auto function = call->func->as<AstExprFunction>();
+        if (call->syntax == LudotSyntax::Coalesce)
+        {
+            auto conditional = function->body->body.data[0]->as<AstStatReturn>()->list.data[0]->as<AstExprIfElse>();
+            select(conditional->falseExpr);
+        }
+        else
+            for (auto statement : function->body->body)
+            {
+                if (auto local = statement->as<AstStatLocal>())
+                    for (auto value : local->values)
+                        if (select(value))
+                            return true;
+                if (auto result = statement->as<AstStatReturn>())
+                    for (auto value : result->list)
+                        if (select(value))
+                            return true;
+            }
+        return true;
+    }
+    if (auto declaration = node->as<AstStatLocal>(); declaration && declaration->enumInfo)
+    {
+        for (const auto& member : declaration->enumInfo->members)
+            if (select(member.value))
+                return true;
+        return true;
+    }
+    return false;
+}
+
 // Clip this with LuauRefactorAutocompleteAncestry
 struct AutocompleteNodeFinder_DEPRECATED : public AstVisitor
 {
@@ -36,7 +98,7 @@ struct AutocompleteNodeFinder_DEPRECATED : public AstVisitor
         if (expr->location.begin <= pos && pos <= expr->location.end && expr->location.begin != expr->location.end)
         {
             ancestry.push_back(expr);
-            return true;
+            return !visitLudotSource(expr, *this, pos);
         }
         return false;
     }
@@ -87,7 +149,7 @@ struct AutocompleteNodeFinder_DEPRECATED : public AstVisitor
         if (ancestry.empty())
         {
             ancestry.push_back(block);
-            return true;
+            return !visitLudotSource(block, *this, pos);
         }
 
         // AstExprIndexName nodes are nested outside-in, so we want the outermost node in the case of nested nodes.
@@ -116,7 +178,7 @@ struct AutocompleteNodeFinder_DEPRECATED : public AstVisitor
         if (block->location.begin <= pos && pos <= block->location.end)
         {
             ancestry.push_back(block);
-            return true;
+            return !visitLudotSource(block, *this, pos);
         }
         return false;
     }
@@ -139,7 +201,7 @@ struct FindNode : public AstVisitor
         if (node->location.contains(pos))
         {
             best = node;
-            return true;
+            return !visitLudotSource(node, *this, pos);
         }
 
         // Edge case: If we ask for the node at the position that is the very end of the document
@@ -148,7 +210,7 @@ struct FindNode : public AstVisitor
         if (node->location.end == documentEnd && pos >= documentEnd)
         {
             best = node;
-            return true;
+            return !visitLudotSource(node, *this, pos);
         }
 
         return false;
@@ -166,6 +228,11 @@ struct FindNode : public AstVisitor
 
     bool visit(AstStatBlock* block) override
     {
+        if (block->matchInfo)
+        {
+            visit(static_cast<AstNode*>(block));
+            return false;
+        }
         visit(static_cast<AstNode*>(block));
 
         for (AstStat* stat : block->body)
@@ -222,7 +289,7 @@ bool FindFullAncestry::visit(AstNode* node)
     if (node->location.contains(pos))
     {
         nodes.push_back(node);
-        return true;
+        return !visitLudotSource(node, *this, pos);
     }
 
     // Edge case: If we ask for the node at the position that is the very end of the document
@@ -231,7 +298,7 @@ bool FindFullAncestry::visit(AstNode* node)
     if (node->location.end == documentEnd && pos >= documentEnd)
     {
         nodes.push_back(node);
-        return true;
+        return !visitLudotSource(node, *this, pos);
     }
 
     return false;
@@ -352,7 +419,7 @@ struct FindNodeForAutocomplete : public AstVisitor
         if (!seenFirst)
         {
             seenFirst = true;
-            return true;
+            return !visitLudotSource(node, *this, pos);
         }
 
         if (isNextNode(node) && !nextNode)
@@ -560,6 +627,8 @@ struct FindExprOrLocal : public AstVisitor
 
     bool visit(AstStatBlock* block) override
     {
+        if (visitLudotSource(block, *this, pos))
+            return false;
         for (AstStat* stat : block->body)
         {
             if (stat->location.end <= pos)
@@ -578,14 +647,14 @@ struct FindExprOrLocal : public AstVisitor
         if (isCloserMatch(expr->location))
         {
             result.setExpr(expr);
-            return true;
+            return !visitLudotSource(expr, *this, pos);
         }
         return false;
     }
 
     bool visitLocal(AstLocal* local)
     {
-        if (isCloserMatch(local->location))
+        if (!local->isSynthetic && isCloserMatch(local->location))
         {
             result.setLocal(local);
             return true;
@@ -605,7 +674,7 @@ struct FindExprOrLocal : public AstVisitor
         {
             visitLocal(al->vars.data[i]);
         }
-        return true;
+        return !visitLudotSource(al, *this, pos);
     }
 
     bool visit(AstExprFunction* fn) override

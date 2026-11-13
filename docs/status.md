@@ -206,11 +206,11 @@ to the formatter. Formatter and lint ignore directives have separate meanings.
 Project Settings > Luau > Api independently selects camelCase, PascalCase, or
 snake_case for engine methods and engine properties/signals. Defaults remain
 camelCase methods and PascalCase properties/signals. Builtin value components
-follow property casing, while type/class names, constants, and `.new()` retain
-their established spelling. User declarations remain exact and naming lint is
+follow property casing, while type/class names and `.new()` retain their established spelling. Native
+enum constants use their original Godot names with compatible PascalCase aliases. User declarations remain exact and naming lint is
 separate. Native bindings, editor checking/completion/hover/signature help, and
-the standalone LSP use the same member-name conversion. There are no alternate
-completion spellings or legacy native-member aliases. Casing snapshots require
+the standalone LSP use the same member-name conversion. Completion lists canonical spellings. The `isA`/`IsA` identity method and native
+constant compatibility aliases follow the policy documented in the language guide. Casing snapshots require
 an editor/game/LSP restart after setting changes; active bindings are not mutated.
 See [language.md](language.md#engine-naming) for acronym rules and compatibility.
 
@@ -219,3 +219,38 @@ passed locally on 2026-11-12. The LSP matrix, including hover and signature help
 also passed. Language/shader regressions and the full default desktop suite,
 including debugger and exported-pack checks, passed. Cross-platform CI for this
 addition has not yet been verified.
+
+
+## Combined language extension implementation
+
+The parser now lowers enums, match expressions/statements, optional property and
+method chains, nil coalescing/assignment, inclusive ranges, and first-argument
+pipelines into native AST operations. Compiler lifetime tracking accounts for
+lowered expressions with non-lexical source ranges. Assertions remain enabled.
+Enums have nominal member types, checked conversion, immutable namespaces, and
+declaration-order iteration. Match analysis checks coverage, duplicate values,
+case domains, and arm reachability, and refines matching enum values.
+
+Godot Object identity checks support nodes, resources, input events, and registered
+extension classes. Native checking and standalone LSP share their class-name
+validation/refinement logic. Both `isA` and `IsA` work; completion uses the selected
+project style. Native class, builtin, and global enum metadata now includes typed
+constant names and enum namespaces. Inspector exports retain the underlying
+numeric/string values and display enum member names.
+
+The editor preserves unsupported extended syntax through StyLua and supplies a
+line-preserving view to Selene. Native match warnings support the editor's Selene
+ignore directives. Match entry/arms support indentation and auto-end. The shader
+subset rejects the new constructs with source diagnostics.
+
+Local verification passed on 2026-11-13: the four language/extension/shader/LSP
+CTest suites, 5,573 upstream unit cases with 35,373 assertions, a separate Linux
+editor build, and the complete headless desktop suite. Desktop checks include
+engine/debugger/exported-pack behavior, formatting and Inspector editing, enum
+scene serialization, typed input-event identity, and all nine API casing
+combinations. The user's existing engine executable was not replaced.
+
+The detailed checklist is
+[language-features-checklist.md](development/language-features-checklist.md).
+Cross-platform CI for the combined revision is pending. No queued or unrun job
+is counted as verified.

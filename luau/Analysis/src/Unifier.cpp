@@ -1,5 +1,6 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/Unifier.h"
+#include "Luau/LudotEnums.h"
 
 #include "Luau/Common.h"
 #include "Luau/Instantiation.h"
@@ -417,6 +418,10 @@ void Unifier::tryUnify_(TypeId subTy, TypeId superTy, bool isFunctionCall, bool 
 
     if (superTy == subTy)
         return;
+    if (auto underlying = enumUnderlyingType(subTy))
+        if (auto primitive = get<PrimitiveType>(superTy); primitive && primitive->type == *underlying)
+            return;
+
 
     if (isBlocked(log, subTy) && isBlocked(log, superTy))
     {

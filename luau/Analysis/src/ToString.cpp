@@ -5,6 +5,7 @@
 #include "Luau/Constraint.h"
 #include "Luau/DenseHash.h"
 #include "Luau/Location.h"
+#include "Luau/LudotEnums.h"
 #include "Luau/Scope.h"
 #include "Luau/TxnLog.h"
 #include "Luau/TypeInfer.h"
@@ -986,6 +987,44 @@ struct TypeStringifier
         }
 
         LUAU_ASSERT(uv.options.size() > 1);
+
+        // A complete enum domain has a useful nominal name. Keep subsets explicit
+        // so hover and diagnostics still explain refinements of individual cases.
+        std::shared_ptr<EnumTypeInfo> enumeration;
+        std::vector<size_t> members;
+        for (TypeId option : uv.options)
+        {
+            const auto member = get<ExternType>(follow(option));
+            if (!member || !member->enumInfo || !member->enumMember || (enumeration && enumeration != member->enumInfo))
+            {
+                enumeration.reset();
+                break;
+            }
+            enumeration = member->enumInfo;
+            members.push_back(*member->enumMember);
+        }
+        if (enumeration)
+        {
+            bool complete = true;
+            for (const auto& declared : enumeration->members)
+            {
+                bool represented = std::any_of(
+                    members.begin(),
+                    members.end(),
+                    [&](size_t index)
+                    {
+                        const auto& candidate = enumeration->members[index];
+                        return enumeration->isString ? candidate.string == declared.string : candidate.number == declared.number;
+                    }
+                );
+                complete = complete && represented;
+            }
+            if (complete)
+            {
+                state.emit(enumeration->name);
+                return;
+            }
+        }
 
         bool optional = false;
         bool hasNonNilDisjunct = false;

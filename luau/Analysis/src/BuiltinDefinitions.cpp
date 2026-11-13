@@ -1,5 +1,6 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/BuiltinDefinitions.h"
+#include "Luau/LudotMatches.h"
 
 #include "Luau/Ast.h"
 #include "Luau/BuiltinTypeFunctions.h"
@@ -356,6 +357,18 @@ void registerBuiltinGlobals(Frontend& frontend, GlobalTypes& globals, bool typeC
     TypeArena& arena = globals.globalTypes;
     NotNull<BuiltinTypes> builtinTypes = globals.builtinTypes;
     NotNull<Scope> globalScope{globals.globalScope.get()};
+
+    globalScope->bindings[globals.globalNames.names->getOrAdd("__ludot_enum")] =
+        Binding{builtinTypes->anyType, Location(), false, "", "@luau/global/__ludot_enum"};
+    TypeId matchEquality = arena.addType(
+        FunctionType{
+            arena.addTypePack({builtinTypes->unknownType, builtinTypes->unknownType}, arena.addTypePack(VariadicTypePack{builtinTypes->unknownType})),
+            arena.addTypePack({builtinTypes->booleanType})
+        }
+    );
+    getMutable<FunctionType>(matchEquality)->magic = makeMatchEqualityMagic();
+    globalScope->bindings[globals.globalNames.names->getOrAdd("__ludot_match_eq")] =
+        Binding{matchEquality, Location(), false, "", "@luau/global/__ludot_match_eq"};
 
     if (frontend.getLuauSolverMode() == SolverMode::New)
         builtinTypes->typeFunctions->addToScope(NotNull{&arena}, NotNull{globals.globalScope.get()});

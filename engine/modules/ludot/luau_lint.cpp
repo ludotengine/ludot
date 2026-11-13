@@ -2,6 +2,7 @@
 #include "luau_lint.h"
 
 #include "Luau/Parser.h"
+#include "Luau/LudotLint.h"
 #include "luau_formatter.h"
 
 #include "core/io/file_access.h"
@@ -51,7 +52,8 @@ struct Naming : Luau::AstVisitor {
 	}
 	bool visit(Luau::AstStatLocal *node) override {
 		for (size_t i = 0; i < node->vars.size; ++i) {
-			const char *kind = node->isConst ? "constant" : "variable";
+			const char *kind = node->enumInfo ? "class" : node->isConst ? "constant"
+																		: "variable";
 			if (i < node->values.size && node->values.data[i]->is<Luau::AstExprFunction>()) {
 				kind = "function";
 			}
@@ -91,63 +93,19 @@ struct Naming : Luau::AstVisitor {
 		return true;
 	}
 };
-struct Statements : Luau::AstVisitor {
-	std::vector<Luau::Location> locations;
-	bool visit(Luau::AstStat *node) override {
-		locations.push_back(node->location);
-		return true;
-	}
-};
 void suppress(const String &source, const Luau::ParseResult &parsed, List<ScriptLanguage::Warning> *warnings) {
-	Statements statements;
-	parsed.root->visit(&statements);
-	PackedStringArray lines = source.split("\n");
-	for (const auto &comment : parsed.commentLocations) {
-		int line = comment.location.begin.line;
-		String directive = lines[line].substr(comment.location.begin.column).strip_edges();
-		bool global = directive.begins_with("--# selene: allow(");
-		if (!global && !directive.begins_with("-- selene: allow(")) {
-			continue;
+	const CharString bytes = source.utf8();
+	for (auto *element = warnings->front(); element;) {
+		auto *next = element->next();
+		const auto &warning = element->get();
+		const Luau::Location location({ unsigned(warning.start_line - 1), 0 }, { unsigned(warning.end_line - 1), 0 });
+		if (Luau::ludotLintSuppressed(std::string_view(bytes.get_data(), bytes.length()), parsed.root, parsed.commentLocations, location, warning.string_code.utf8().get_data())) {
+			warnings->erase(element);
 		}
-		int start = directive.find("("), end = directive.find(")", start);
-		if (end < 0) {
-			continue;
-		}
-		PackedStringArray codes = directive.substr(start + 1, end - start - 1).split(",");
-		unsigned int first = 0, last = UINT32_MAX;
-		if (global) {
-			if (parsed.root->body.size && !(comment.location.end <= parsed.root->body.data[0]->location.begin)) {
-				continue;
-			}
-		} else {
-			Luau::Position next(UINT32_MAX, UINT32_MAX);
-			for (const auto &location : statements.locations) {
-				if (location.begin >= comment.location.end && location.begin < next) {
-					next = location.begin;
-					first = location.begin.line;
-					last = location.end.line;
-				}
-			}
-			if (next.line == UINT32_MAX) {
-				continue;
-			}
-		}
-		for (auto *element = warnings->front(); element;) {
-			auto *following = element->next();
-			const auto &warning = element->get();
-			bool match = false;
-			for (const String &code : codes) {
-				if (code.strip_edges() == warning.string_code || code.strip_edges() == "all") {
-					match = true;
-				}
-			}
-			if (match && unsigned(warning.start_line - 1) >= first && unsigned(warning.start_line - 1) <= last) {
-				warnings->erase(element);
-			}
-			element = following;
-		}
+		element = next;
 	}
 }
+
 } //namespace
 void ludot_initialize_lint() {
 	EDITOR_DEF(prefix + "enabled", true);
@@ -162,7 +120,11 @@ void ludot_initialize_lint() {
 	}
 }
 void ludot_lint(const String &source, const Luau::ParseResult &parsed, List<ScriptLanguage::Warning> *warnings) {
-	if (!warnings || !EditorSettings::get_singleton() || !bool(EDITOR_GET(prefix + "enabled"))) {
+	if (!warnings) {
+		return;
+	}
+	if (!EditorSettings::get_singleton() || !bool(EDITOR_GET(prefix + "enabled"))) {
+		suppress(source, parsed, warnings);
 		return;
 	}
 	Naming naming;

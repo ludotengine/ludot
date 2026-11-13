@@ -1,5 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/TypeInfer.h"
+#include "Luau/LudotEnums.h"
+#include "Luau/LudotMatches.h"
 
 #include "Luau/ApplyTypeFunction.h"
 #include "Luau/Common.h"
@@ -293,6 +295,35 @@ ModulePtr TypeChecker::checkWithoutRecursionCheck(const SourceModule& module, Mo
         currentModule->cancelled = true;
     }
 
+    struct MatchValidation : AstVisitor
+    {
+        TypeChecker& checker;
+        const Module& module;
+        MatchValidation(TypeChecker& checker, const Module& module)
+            : checker(checker)
+            , module(module)
+        {
+        }
+        void validate(const AstMatchInfo* info)
+        {
+            if (info)
+                for (const auto& diagnostic : checkLudotMatch(*info, module))
+                    if (!diagnostic.warning)
+                        checker.reportError(diagnostic.location, GenericError{diagnostic.message});
+        }
+        bool visit(AstExprCall* node) override
+        {
+            validate(node->matchInfo);
+            return true;
+        }
+        bool visit(AstStatBlock* node) override
+        {
+            validate(node->matchInfo);
+            return true;
+        }
+    } matches(*this, *currentModule);
+    module.root->visit(&matches);
+
     if (FFlag::LuauExportValueSyntax && FFlag::LuauExportValueTypecheck && !currentModule->timeout && !currentModule->cancelled)
         synthesizeExportReturn(builtinTypes, NotNull{currentModule.get()});
 
@@ -423,6 +454,18 @@ ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStatBlock& block)
 
     ControlFlow flow = checkBlock(child, block);
     scope->inheritRefinements(child);
+    if (block.nilAssignmentResult)
+    {
+        auto branch = block.body.data[block.body.size - 1]->as<AstStatIf>();
+        auto comparison = branch->condition->as<AstExprBinary>();
+        auto assignment = branch->thenbody->body.data[0]->as<AstStatAssign>();
+        auto left = currentModule->astTypes.find(comparison->left);
+        auto right = currentModule->astTypes.find(assignment->values.data[0]);
+        if (left && right)
+            if (auto lvalue = tryGetLValue(*block.nilAssignmentResult))
+                scope->refinements[*lvalue] =
+                    unionOfTypes(Luau::stripNil(builtinTypes, *currentModule->internalTypes, *left), *right, scope, block.location);
+    }
 
     return flow;
 }
@@ -1067,6 +1110,19 @@ ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStatCompoundAssig
 
 ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStatLocal& local)
 {
+    if (local.enumInfo)
+    {
+        const auto& declaration = *local.enumInfo;
+        EnumTypes types =
+            makeEnumTypes(*currentModule->internalTypes, *builtinTypes, enumInfoFromAst(declaration), currentModule->name, declaration.location);
+        if (declaration.exported)
+            scope->exportedTypeBindings[declaration.name.value] = TypeFun{{}, {}, types.value, declaration.location};
+        else
+            scope->privateTypeBindings[declaration.name.value] = TypeFun{{}, {}, types.value, declaration.location};
+        scope->bindings[local.vars.data[0]] = Binding{types.names, local.vars.data[0]->location};
+        currentModule->astTypes[local.values.data[0]] = types.names;
+        return ControlFlow::None;
+    }
     // Important subtlety: A local variable is not in scope while its initializer is being evaluated.
     // For instance, you cannot do this:
     //     local a = function() return a end
@@ -2785,6 +2841,8 @@ TypeId TypeChecker::checkRelationalOperation(
     };
 
     bool isEquality = expr.op == AstExprBinary::CompareEq || expr.op == AstExprBinary::CompareNe;
+    if (isEquality && enumPrimitiveEquality(lhsType, rhsType))
+        return booleanType;
 
     lhsType = stripNil(lhsType, expr.op == AstExprBinary::Or);
     rhsType = stripNil(rhsType);
@@ -3251,11 +3309,18 @@ WithPredicate<TypeId> TypeChecker::checkExpr(const ScopePtr& scope, const AstExp
 
             PredicateVec predicates;
 
+            auto discriminant = [&](AstExpr* pattern, TypeId target, TypeId other)
+            {
+                std::string key = ludotCaseKey(pattern);
+                if (!key.empty() && enumUnderlyingType(target))
+                    return ludotCaseType(*currentModule->internalTypes, *builtinTypes, target, key);
+                return other;
+            };
             if (auto lvalue = tryGetLValue(*expr.left))
-                predicates.emplace_back(EqPredicate{std::move(*lvalue), rhs.type, expr.location});
+                predicates.emplace_back(EqPredicate{std::move(*lvalue), discriminant(expr.right, lhs.type, rhs.type), expr.location});
 
             if (auto lvalue = tryGetLValue(*expr.right))
-                predicates.emplace_back(EqPredicate{std::move(*lvalue), lhs.type, expr.location});
+                predicates.emplace_back(EqPredicate{std::move(*lvalue), discriminant(expr.left, rhs.type, lhs.type), expr.location});
 
             if (!predicates.empty() && expr.op == AstExprBinary::CompareNe)
                 predicates = {NotPredicate{std::move(predicates)}};
@@ -4517,6 +4582,16 @@ void TypeChecker::checkArgumentList(
 
 WithPredicate<TypePackId> TypeChecker::checkExprPackHelper(const ScopePtr& scope, const AstExprCall& expr)
 {
+    if (expr.syntax == LudotSyntax::Coalesce)
+    {
+        auto function = expr.func->as<AstExprFunction>();
+        auto conditional = function->body->body.data[0]->as<AstStatReturn>()->list.data[0]->as<AstExprIfElse>();
+        TypeId left = checkExpr(scope, *expr.args.data[0]).type;
+        TypeId right = checkExpr(scope, *conditional->falseExpr).type;
+        TypeId result =
+            isOptional(left) ? unionOfTypes(Luau::stripNil(builtinTypes, *currentModule->internalTypes, left), right, scope, expr.location) : left;
+        return WithPredicate<TypePackId>{addTypePack({result})};
+    }
     // evaluate type of function
     // decompose an intersection into its component overloads
     // Compute typeArguments of parameters
@@ -4556,7 +4631,36 @@ WithPredicate<TypePackId> TypeChecker::checkExprPackHelper(const ScopePtr& scope
     }
     else
     {
-        functionType = checkExpr(scope, *expr.func).type;
+        if (expr.syntax != LudotSyntax::None && expr.func->is<AstExprFunction>() && expr.args.size)
+        {
+            TypeId input = checkExpr(scope, *expr.args.data[0]).type;
+            TypeId expected =
+                addType(FunctionType{addTypePack({input}, expr.func->as<AstExprFunction>()->vararg ? scope->varargPack : std::nullopt), anyTypePack});
+            functionType = checkExpr(scope, *expr.func, expected).type;
+            struct Returns : AstVisitor
+            {
+                std::vector<AstExpr*> values;
+                bool visit(AstExprFunction*) override
+                {
+                    return false;
+                }
+                bool visit(AstStatReturn* node) override
+                {
+                    if (node->list.size)
+                        values.push_back(node->list.data[0]);
+                    return false;
+                }
+            } returns;
+            expr.func->as<AstExprFunction>()->body->visit(&returns);
+            TypeId result = builtinTypes->neverType;
+            for (auto value : returns.values)
+                if (auto type = currentModule->astTypes.find(value))
+                    result = unionOfTypes(result, *type, scope, value->location);
+            if (auto function = getMutable<FunctionType>(follow(functionType)))
+                function->retTypes = addTypePack({result});
+        }
+        else
+            functionType = checkExpr(scope, *expr.func).type;
         actualFunctionType = instantiate(scope, functionType, expr.func->location);
     }
 
@@ -6680,7 +6784,7 @@ void TypeChecker::resolve(const EqPredicate& eqP, RefinementMap& refis, const Sc
         if (!sense && isNil(eqP.type))
             return (isUndecidable(option) || !isNil(option)) ? std::optional<TypeId>(option) : std::nullopt;
 
-        if (maybeSingleton(eqP.type))
+        if (maybeSingleton(eqP.type) || !ludotEnumValueKey(eqP.type).empty())
         {
             bool optionIsSubtype = canUnify(option, eqP.type, scope, eqP.location).empty();
             bool targetIsSubtype = canUnify(eqP.type, option, scope, eqP.location).empty();
@@ -6715,7 +6819,7 @@ void TypeChecker::resolve(const EqPredicate& eqP, RefinementMap& refis, const Sc
             }
             else
             {
-                bool isOptionSingleton = get<SingletonType>(option);
+                bool isOptionSingleton = get<SingletonType>(option) || !ludotEnumValueKey(option).empty();
                 if (!isOptionSingleton)
                     return option;
                 else if (optionIsSubtype && targetIsSubtype)

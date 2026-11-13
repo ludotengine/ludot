@@ -1,5 +1,6 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/Linter.h"
+#include "Luau/LudotMatches.h"
 
 #include "Luau/AstQuery.h"
 #include "Luau/Module.h"
@@ -577,6 +578,8 @@ private:
 
     bool visit(AstStatBlock* node) override
     {
+        if (node->syntax != LudotSyntax::None)
+            return true;
         for (size_t i = 1; i < node->body.size; ++i)
         {
             const Location& last = node->body.data[i - 1]->location;
@@ -658,6 +661,30 @@ private:
         }
 
         return true;
+    }
+
+    bool visit(AstExprCall* node) override
+    {
+        if (node->syntax == LudotSyntax::Pipeline)
+        {
+            auto function = node->func->as<AstExprFunction>();
+            auto result = function->body->body.data[0]->as<AstStatReturn>()->list.data[0]->as<AstExprGroup>();
+            auto stage = result->expr->as<AstExprCall>();
+            node->args.data[0]->visit(this);
+            stage->func->visit(this);
+            for (size_t i = 1; i < stage->args.size; ++i)
+                stage->args.data[i]->visit(this);
+            return false;
+        }
+        if (node->syntax == LudotSyntax::Coalesce)
+        {
+            auto function = node->func->as<AstExprFunction>();
+            auto conditional = function->body->body.data[0]->as<AstStatReturn>()->list.data[0]->as<AstExprIfElse>();
+            node->args.data[0]->visit(this);
+            conditional->falseExpr->visit(this);
+            return false;
+        }
+        return visit(static_cast<AstExpr*>(node));
     }
 
     bool visit(AstExprTable* node) override
@@ -3560,6 +3587,29 @@ std::vector<LintWarning> lint(
     context.module = module;
 
     fillBuiltinGlobals(context, names, env);
+    if (module && context.warningEnabled(LintWarning::Code_MatchExhaustiveness))
+    {
+        struct Matches : AstVisitor
+        {
+            LintContext& context;
+            explicit Matches(LintContext& context)
+                : context(context)
+            {
+            }
+            bool visit(AstStatBlock* block) override
+            {
+                if (block->matchInfo)
+                    for (const auto& diagnostic : checkLudotMatch(*block->matchInfo, *context.module))
+                    {
+                        if (diagnostic.warning)
+                            context.result.push_back({LintWarning::Code_MatchExhaustiveness, diagnostic.location, diagnostic.message});
+                    }
+                return true;
+            }
+        } matches(context);
+        root->visit(&matches);
+    }
+
 
     if (context.warningEnabled(LintWarning::Code_UnknownGlobal) || context.warningEnabled(LintWarning::Code_DeprecatedGlobal) ||
         context.warningEnabled(LintWarning::Code_GlobalUsedAsLocal) || context.warningEnabled(LintWarning::Code_PlaceholderRead) ||

@@ -6,6 +6,7 @@
 #include "Luau/ToString.h"
 #include "Luau/Config.h"
 #include "Luau/Frontend.h"
+#include "Luau/LudotLint.h"
 #include "Luau/LuauConfig.h"
 #include "Luau/ModuleResolver.h"
 #include "Luau/PrettyPrinter.h"
@@ -688,6 +689,33 @@ int main(int argc, char** argv)
                 object.writePair("endLine", error.location.end.line);
                 object.writePair("endColumn", error.location.end.column);
                 object.writePair("message", Luau::toString(error, Luau::TypeErrorToStringOptions{frontend.fileResolver}));
+            }
+        }
+        for (const auto& name : files)
+        {
+            auto checked = frontend.getCheckResult(name, true);
+            if (!checked)
+                continue;
+            for (const auto& warning : checked->lintResult.warnings)
+            {
+                if (warning.code != Luau::LintWarning::Code_MatchExhaustiveness)
+                    continue;
+                auto parsed = frontend.getSourceModule(name);
+                auto code = frontend.fileResolver->readSource(name);
+                if (parsed && code &&
+                    Luau::ludotLintSuppressed(code->source, parsed->root, parsed->commentLocations, warning.location, "match_exhaustiveness"))
+                    continue;
+                if (!first)
+                    json.writeRaw(',');
+                first = false;
+                auto object = json.writeObject();
+                object.writePair("path", name);
+                object.writePair("line", warning.location.begin.line);
+                object.writePair("column", warning.location.begin.column);
+                object.writePair("endLine", warning.location.end.line);
+                object.writePair("endColumn", warning.location.end.column);
+                object.writePair("message", warning.text);
+                object.writePair("severity", 2);
             }
         }
         json.writeRaw("],\"completions\":[");

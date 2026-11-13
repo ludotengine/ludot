@@ -1374,12 +1374,14 @@ void translateInstForNPrep(IrBuilder& build, const Instruction* pc, int pcpos)
         build.inst(IrCmd::CHECK_TAG, tagStep, build.constTag(LUA_TNUMBER), build.vmExit(pcpos));
 
         IrOp step = build.inst(IrCmd::LOAD_DOUBLE, build.vmReg(ra + 1));
+        build.inst(IrCmd::CHECK_CMP_NUM, step, build.constDouble(0), build.cond(IrCondition::NotEqual), build.vmExit(pcpos));
 
         build.inst(IrCmd::JUMP_FORN_LOOP_COND, idx, limit, step, loopStart, loopExit);
     }
     else
     {
         double stepN = build.function.doubleOp(stepK);
+        build.inst(IrCmd::CHECK_CMP_NUM, stepK, build.constDouble(0), build.cond(IrCondition::NotEqual), build.vmExit(pcpos));
 
         // Condition to start the loop: step > 0 ? idx <= limit : limit <= idx
         // We invert the condition so that loopStart is the fallthrough (false) label

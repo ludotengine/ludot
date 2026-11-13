@@ -7,8 +7,13 @@ from generate_api_types import casing
 
 
 def generate(api):
-    rows = ['LUDOT_API_2']
+    rows = ['LUDOT_API_3']
     primitives = {'Nil', 'bool', 'int', 'float', 'String', 'StringName', 'NodePath'}
+    for enum in api.get('global_enums', []):
+        fields = ['G', enum['name'], str(int(enum.get('is_bitfield', False)))]
+        for constant in enum.get('values', []):
+            fields.extend([constant['name'], str(constant['value'])])
+        rows.append('\t'.join(fields))
     for entry in api['builtin_classes'] + api['classes']:
         name = entry['name']
         if name in primitives:
@@ -36,8 +41,10 @@ def generate(api):
         for constant in entry.get('constants', []):
             rows.append('\t'.join(['K', name, casing(constant['name'], True), constant.get('type', 'int')]))
         for enum in entry.get('enums', []):
+            fields = ['E', name, enum['name'], str(int(enum.get('is_bitfield', False)))]
             for constant in enum.get('values', []):
-                rows.append('\t'.join(['K', name, casing(constant['name'], True), 'int']))
+                fields.extend([constant['name'], str(constant['value'])])
+            rows.append('\t'.join(fields))
         for signal in entry.get('signals', []):
             rows.append('\t'.join(['P', name, signal['name'], 'Signal']))
     for singleton in api.get('singletons', []):

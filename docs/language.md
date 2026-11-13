@@ -89,6 +89,211 @@ resolves `.luau` files and directory `init.luau` modules. The engine and the CLI
 both read `.luaurc` files in the importing file's directory and its ancestors, and
 nearer files override outer ones. The engine applies the project setting first.
 
+## Enums
+
+Enums declare immutable numeric or string values and a distinct nominal type.
+Numeric members start at 1. An explicit integer resets the sequence for subsequent
+implicit members. Integer values must fit exactly in Luau's number representation.
+String enums require an explicit string for every member. Mixed numeric/string
+enums are errors.
+
+```lua
+enum Action = {
+	Join,
+	Chat,
+	Leave = 10,
+}
+enum Message = {
+	Join = "join",
+	Chat = "chat",
+}
+const action: Action = Action.Chat
+const checked: Action? = Action.from(2)
+```
+
+`Action.from(value)` checks membership and returns an enum value or nil. Assigning
+an arbitrary number/string to an enum, or assigning one enum to another enum, is a
+type error. Enum values remain ordinary numbers/strings at runtime, including when
+passed to Godot. Equality with the underlying number/string is permitted. Member
+aliases with equal underlying values compare equal and represent the same case
+for matching. The name `from` is reserved for checked conversion.
+
+Use `export enum` with the existing module import forms. Enum types can annotate
+class fields, including exported Inspector fields. Numeric and string exports use
+dropdowns with member names; scene files store the underlying values. String
+values may contain commas or colons. Inspector dropdowns keep the names and values
+separate rather than parsing the display text.
+
+Direct iteration yields members in declaration order, including aliases. It does
+not expose the `from` method:
+
+```lua
+for name, value in Action do
+	print(name, value)
+end
+```
+
+Native class enums expose Godot's original constant names, such as
+`Input.MOUSE_MODE_CAPTURED` and `Control.PRESET_TOP_LEFT`. Their typed namespaces
+live under `.Enums`, such as `Input.Enums.MouseMode.from(value)`. The annotation
+is `Input.MouseMode`; `Input.MouseMode` in a value expression remains the engine's
+mouse-mode property. This avoids a namespace/property collision. Global Godot
+enums use their own namespaces, such as `Key.KEY_W`, `MouseButton.MOUSE_BUTTON_LEFT`,
+and `Variant.Type.TYPE_INT`. Enum names and constant names are independent of
+project method/property casing. Existing PascalCase constant spellings remain
+compatible; completion favors the original constant names. Native bitfield
+parameters/properties continue to accept numeric masks.
+
+## Match expressions and statements
+
+A match evaluates its subject once and tests arms in source order. Only the first
+matching arm runs. There is no fallthrough.
+
+```lua
+const text = match action with
+	case Action.Join then "joined"
+	case Action.Chat then "chatting"
+	case Action.Leave then "left"
+end
+
+match health with
+	case 0 then
+		print("Dead")
+	case if health < 25 then
+		print("Critical health")
+	otherwise
+		print("Alive")
+end
+```
+
+Expression arms contain one expression and produce one value. Their types form a
+union. Value cases accept literals and enum members. Guards use `case if` and do
+not establish exhaustive coverage. Expressions require exhaustive coverage or
+`otherwise`. The diagnostic lists missing enum members. Statements report a
+`match_exhaustiveness` warning when cases are missing. Duplicate values, invalid
+case domains, and arms after `otherwise` are diagnosed. Equal-valued aliases count
+as the same case. A guard that always evaluates true makes subsequent arms
+unreachable, but still does not replace explicit exhaustive coverage.
+
+Match statements keep ordinary `return`, `break`, and `continue` behavior in the
+enclosing function/loop. Match expressions have their own expression boundary.
+`case` and `otherwise` mark arms at statement boundaries inside a match; they are
+contextual names elsewhere. An ordinary function named `match` can still be
+called with parentheses.
+
+## Optional access and nil coalescing
+
+```lua
+const parentName = node?:getParent()?.Name ?? "No parent"
+const enabled = settings.Enabled ?? true
+local value: boolean? = nil
+value ??= false
+```
+
+`?.` accesses a property and `?:` calls a method. A nil receiver skips the rest of
+its uninterrupted chain, including argument expressions. Each optional receiver
+is evaluated once. A nonexistent member on a valid receiver remains a type error.
+An ordinary access later in the chain still requires its own receiver to be valid:
+`node?.Child.Name` guards `node`; `node?.Child?.Name` also guards `Child`.
+Parentheses end the chain, so `(node?.Child).Name` performs an ordinary access on
+the parenthesized result.
+
+`??` evaluates the fallback only for nil. False is preserved. `??=` reads the
+target once and assigns only when it is nil. Indexed receivers and keys are
+calculated once. Const bindings and invalid assignment targets are rejected.
+Analysis refines assigned locals and stable indexed locations; it does not assume
+an effectful receiver expression denotes the same object on a later evaluation.
+
+## Inclusive ranges
+
+```lua
+for i in 1 to 10 do
+	print(i)
+end
+for i in 1 to 10 step 5 do
+	print(i) -- 1, then 6
+end
+for i in 10 to 1 step -3 do
+	print(i) -- 10, 7, 4, 1
+end
+```
+
+Bounds and step are evaluated once, in that order. The default step is 1. A zero
+step raises a runtime error before the body runs, in both the VM and JIT. Existing
+numeric `for i = start, limit, step` and generic iteration forms remain available.
+Range variables have ordinary numeric-for scope and closure capture behavior.
+
+## Pipelines and precedence
+
+A pipeline passes its input as the first argument of an ordinary function:
+
+```lua
+const result = enemies
+	|> filter(isAlive)
+	|> sort(byDistance)
+	|> first()
+```
+
+`x |> f(a, b)` calls `f(x, a, b)`. `x |> f` calls `f(x)`. Inputs are evaluated
+once, before the stage's function reference and explicit arguments. Stages may be
+ordinary function references or calls, including parenthesized references and
+explicit generic instantiation. Method-call stages and placeholder syntax are
+rejected. Each stage consumes one input value and produces one output value;
+ordinary Lua expansion of a stage's final explicit argument is preserved. Varargs
+inside a lazy fallback, optional method, or pipeline stage keep their enclosing
+function's values.
+
+`|>` and `??` share the lowest precedence tier and associate left to right.
+Existing arithmetic, concatenation, comparisons, `and`, and `or` bind more tightly.
+Thus:
+
+```lua
+enemies |> filter(isAlive) ?? {} |> sort(byDistance)
+-- ((enemies |> filter(isAlive)) ?? {}) |> sort(byDistance)
+
+enemies |> filter(isAlive) ?? (fallback |> sort(byDistance))
+-- Parentheses keep sorting inside the fallback.
+```
+
+## Godot class identity
+
+```lua
+if event:IsA("InputEventMouseMotion") then
+	print(event.Relative)
+end
+```
+
+Every Godot Object subclass supports class identity checks, including nodes,
+resources, input events, and extension classes registered in ClassDB. Both `isA`
+and `IsA` are accepted. Completion shows only the spelling selected by method
+casing, including `is_a` in snake_case projects. This is a deliberate compatibility
+exception to the single-spelling rule for ordinary engine methods.
+
+A valid literal name narrows the receiver using inheritance information. Invalid
+literal class names are diagnosed, and completion offers known class names inside
+the string. Dynamic strings return booleans without selecting a narrowed class.
+Negative branches retain alternatives that could still match at runtime.
+Imported Godot-backed script classes and script classes visible to the current
+analysis context use their declared class names, not import aliases. Runtime
+checks follow native class identity, the attached script inheritance chain, and
+Luau object class ancestry. Pure Luau classes without a Godot Object base do not
+receive this engine method automatically.
+
+## Tooling for the extended syntax
+
+The editor and standalone LSP share parser and analysis support for these
+constructs. Match block/arm entry supports indentation and auto-end completion.
+StyLua preserves statements containing syntax its parser does not understand,
+byte for byte, while formatting surrounding statements. Selene receives a
+line-preserving compatibility view; the native checker validates the protected
+constructs. Existing StyLua ignore comments remain effective.
+
+Use `-- selene: allow(match_exhaustiveness)` for the next statement, or
+`--# selene: allow(match_exhaustiveness)` at the start of a file, to suppress the
+native editor or LSP warning. Naming rules remain separate from engine casing settings.
+The shader subset rejects these new constructs with source diagnostics; its
+existing numeric-for syntax remains supported.
+
 ## Engine naming
 
 Project Settings > Luau > Api provides two independent settings:
@@ -101,8 +306,8 @@ Project Settings > Luau > Api provides two independent settings:
 The property setting also controls signals and builtin value components. Static
 methods use the method setting. Native class/type names retain their original
 engine spelling, including acronym names such as `HTTPClient`, `RID`, and `AABB`.
-Constructors always use `.new()`. Constants retain their existing fixed PascalCase
-spelling. GDScript and engine internals keep Godot's original API names.
+Constructors always use `.new()`. Native enum constants use their original Godot spelling and retain existing
+PascalCase aliases. Other builtin constants keep their fixed PascalCase spelling. GDScript and engine internals keep Godot's original API names.
 
 Examples for each selected style:
 
@@ -127,8 +332,8 @@ already-renamed completions.
 ### Compatibility and setting changes
 
 Existing projects without these settings keep the defaults above. Each engine
-member exposes only its selected spelling. There are no legacy casing aliases,
-and completions do not list alternate spellings. Changing a style can therefore
+method/property exposes only its selected spelling, except the documented
+`isA`/`IsA` compatibility pair. Completions do not list alternate spellings. Changing a style can therefore
 require source edits. Existing source is never automatically renamed.
 
 The editor and game take an immutable naming snapshot when their language runtime

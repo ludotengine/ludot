@@ -1,6 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 
 #include "Luau/BuiltinTypeFunctions.h"
+#include "Luau/LudotMatches.h"
 
 #include "Luau/Common.h"
 #include "Luau/ConstraintSolver.h"
@@ -1481,7 +1482,7 @@ TypeFunctionReductionResult<TypeId> singletonTypeFunction(
         followed = follow(negation->ty);
 
     // if we have a singleton type or `nil`, which is its own singleton type...
-    if (get<SingletonType>(followed) || isNil(followed))
+    if (get<SingletonType>(followed) || isNil(followed) || !ludotEnumValueKey(followed).empty())
         return {type, Reduction::MaybeOk, {}, {}};
 
     // otherwise, we'll return the top type, `unknown`.
@@ -1582,6 +1583,78 @@ TypeFunctionReductionResult<TypeId> unionTypeFunction(
     return {resultTy, Reduction::MaybeOk, {}, {}};
 }
 
+
+TypeFunctionReductionResult<TypeId> literalCaseTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
+{
+    LUAU_ASSERT(typeParams.size() == 2 && packParams.empty());
+    struct CaseBlockers : FindRefinementBlockers
+    {
+        bool free = false;
+        using FindRefinementBlockers::visit;
+        bool visit(TypeId type, const TypeFunctionInstanceType& function) override
+        {
+            if (function.state == TypeFunctionInstanceState::Unsolved)
+                found.insert(type);
+            return false;
+        }
+        bool visit(TypeId, const FreeType&) override
+        {
+            free = true;
+            return false;
+        }
+        bool visit(TypeId, const GenericType&) override
+        {
+            free = true;
+            return false;
+        }
+    } blockers;
+    blockers.traverse(typeParams[0]);
+    if (!blockers.found.empty())
+        return {std::nullopt, Reduction::MaybeOk, {blockers.found.begin(), blockers.found.end()}, {}};
+    auto singleton = get<SingletonType>(follow(typeParams[1]));
+    LUAU_ASSERT(singleton && get<StringSingleton>(singleton));
+    return {ludotCaseType(*ctx->arena, *ctx->builtins, typeParams[0], get<StringSingleton>(singleton)->value), Reduction::MaybeOk, {}, {}};
+}
+
+// Unlike `or`, false is retained. Delay nil removal until the input is solved.
+TypeFunctionReductionResult<TypeId> coalesceTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
+{
+    LUAU_ASSERT((typeParams.size() == 2 || typeParams.size() == 3) && packParams.empty());
+    auto nonNil = simplifyIntersection(ctx->builtins, ctx->arena, follow(typeParams[0]), ctx->builtins->notNilType);
+    if (!nonNil.blockedTypes.empty())
+        return {std::nullopt, Reduction::MaybeOk, {nonNil.blockedTypes.begin(), nonNil.blockedTypes.end()}, {}};
+    auto nilPart = simplifyIntersection(ctx->builtins, ctx->arena, follow(typeParams[0]), ctx->builtins->nilType);
+    if (!nilPart.blockedTypes.empty())
+        return {std::nullopt, Reduction::MaybeOk, {nilPart.blockedTypes.begin(), nilPart.blockedTypes.end()}, {}};
+    if (is<NeverType>(follow(nilPart.result)))
+        return {nonNil.result, Reduction::MaybeOk, {}, {}};
+    if (typeParams.size() == 3)
+    {
+        // An empty literal is a valid empty array/dictionary, but not a record
+        // with required fields. Retain the element type inferred by the pipeline.
+        auto target = get<TableType>(follow(nonNil.result));
+        auto fallback = getMutable<TableType>(follow(typeParams[1]));
+        if (target && target->props.empty() && target->indexer && fallback && fallback->props.empty() && !fallback->indexer)
+        {
+            fallback->indexer = target->indexer;
+            return {nonNil.result, Reduction::MaybeOk, {}, {}};
+        }
+    }
+    auto result = simplifyUnion(ctx->builtins, ctx->arena, nonNil.result, follow(typeParams[1]));
+    if (!result.blockedTypes.empty())
+        return {std::nullopt, Reduction::MaybeOk, {result.blockedTypes.begin(), result.blockedTypes.end()}, {}};
+    return {result.result, Reduction::MaybeOk, {}, {}};
+}
 
 TypeFunctionReductionResult<TypeId> intersectTypeFunction(
     TypeId instance,
@@ -2634,6 +2707,8 @@ BuiltinTypeFunctions::BuiltinTypeFunctions()
     , concatFunc{"concat", concatTypeFunction}
     , andFunc{"and", andTypeFunction, /*canReduceGenerics*/ true}
     , orFunc{"or", orTypeFunction, /*canReduceGenerics*/ true}
+    , coalesceFunc{"coalesce", coalesceTypeFunction, /*canReduceGenerics*/ true}
+    , literalCaseFunc{"literalcase", literalCaseTypeFunction, /*canReduceGenerics*/ true}
     , ltFunc{"lt", ltTypeFunction}
     , leFunc{"le", leTypeFunction}
     , refineFunc{"refine", refineTypeFunction, /*canReduceGenerics*/ true}

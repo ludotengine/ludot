@@ -31,6 +31,24 @@ class ShaderTests(unittest.TestCase):
                 r = self.compile('shader canvas_item\nfunction fragment() ' + body + ' end')
                 self.assertNotEqual(r.returncode, 0)
                 self.assertEqual(r.stdout, '')
+    def test_reject_language_extensions_with_source_diagnostics(self):
+        statements = [
+            'enum E = { A, B }',
+            'local v: number = nil ?? 1',
+            'local v: number = 1 |> abs',
+            'local v: number = node?.Value',
+            'local v: number = match 1 with case 1 then 2 otherwise 3 end',
+            'match 1 with case 1 then Color = vec4(1) otherwise Color = vec4(0) end',
+            'for i in 1 to 3 do end',
+            'local v: number = 1; v ??= 2',
+        ]
+        for statement in statements:
+            with self.subTest(statement=statement):
+                result = self.compile('shader canvas_item\nfunction fragment()\n' + statement + '\nend')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('not supported in shaders', result.stderr)
+                self.assertIn(':3:', result.stderr)
+
     def test_integer_uniform(self):
         r = self.compile('shader spatial\nexport Count: int = 3\nexport Seed: uint = 7\nfunction vertex() end')
         self.assertEqual(r.returncode, 0, r.stderr)

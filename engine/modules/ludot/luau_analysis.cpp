@@ -1,21 +1,28 @@
 #ifdef TOOLS_ENABLED
 #include "luau_analysis.h"
-#include "luau_script.h"
-#include "Luau/Autocomplete.h"
+
 #include "Luau/AstQuery.h"
-#include "Luau/TypePack.h"
-#include "Luau/Clone.h"
-#include "Luau/ConstraintSolver.h"
-#include "editor/editor_node.h"
-#include "core/os/thread.h"
-#include "scene/main/node.h"
+#include "Luau/Autocomplete.h"
 #include "Luau/BuiltinDefinitions.h"
+#include "Luau/Clone.h"
 #include "Luau/Config.h"
+#include "Luau/ConstraintSolver.h"
 #include "Luau/Frontend.h"
+#include "Luau/LudotClasses.h"
+#include "Luau/LudotEnums.h"
 #include "Luau/ToString.h"
+#include "Luau/TypePack.h"
+#include "luau_script.h"
+
 #include "core/config/engine.h"
+#include "core/core_constants.h"
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
+#include "core/os/thread.h"
+#include "editor/editor_node.h"
+#include "scene/main/node.h"
+
+#include <map>
 #include <memory>
 #include <set>
 #include <unordered_map>
@@ -59,7 +66,8 @@ struct Session {
     Luau::Frontend frontend;
     std::unordered_map<std::string, Luau::TypeId> instances;
     std::unordered_map<std::string, Luau::TypeId> classes;
-    String scene_fingerprint;
+	std::unordered_map<std::string, Luau::EnumTypes> enums;
+	String scene_fingerprint;
     ObjectID scene_root;
     ObjectID analysis_owner;
     String primary_path;
@@ -90,7 +98,91 @@ struct Session {
             scope->bindings[frontend.globals.globalNames.names->getOrAdd(name.c_str())] = Binding{cls, Location()};
             scope->exportedTypeBindings[name] = TypeFun{{}, {}, instance};
         }
-        for (const StringName &name : classes) {
+		std::map<std::string, std::shared_ptr<EnumTypeInfo>> globals;
+		for (int i = 0; i < CoreConstants::get_global_constant_count(); ++i) {
+			const std::string name = utf8(CoreConstants::get_global_constant_enum(i));
+			if (name.empty()) {
+				continue;
+			}
+			auto &info = globals[name];
+			if (!info) {
+				info = std::make_shared<EnumTypeInfo>();
+				info->name = name;
+			}
+			info->members.push_back({ CoreConstants::get_global_constant_name(i), double(CoreConstants::get_global_constant_value(i)), {}, {} });
+		}
+		for (const auto &[name, info] : globals) {
+			auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
+			enums[name] = enumeration;
+			const auto dot = name.find('.');
+			if (dot == std::string::npos) {
+				scope->exportedTypeBindings[name] = TypeFun{ {}, {}, enumeration.value };
+				scope->bindings[frontend.globals.globalNames.names->getOrAdd(name.c_str())] = Binding{ enumeration.names, {} };
+			} else {
+				const std::string owner = name.substr(0, dot), member = name.substr(dot + 1);
+				scope->importedTypeBindings[owner][member] = TypeFun{ {}, {}, enumeration.value };
+				auto symbol = frontend.globals.globalNames.names->getOrAdd(owner.c_str());
+				if (!scope->bindings.count(symbol)) {
+					scope->bindings[symbol] = Binding{ arena.addType(TableType{ {}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed }), {} };
+				}
+				getMutable<TableType>(scope->bindings.at(symbol).typeId)->props[member] = Property::readonly(enumeration.names);
+			}
+		}
+		for (int i = ::Variant::VECTOR2; i < ::Variant::VARIANT_MAX; ++i) {
+			const auto kind = ::Variant::Type(i);
+			const std::string owner = utf8(::Variant::get_type_name(kind));
+			List<StringName> declarations;
+			::Variant::get_enums_for_type(kind, &declarations);
+			for (const StringName &name : declarations) {
+				auto info = std::make_shared<EnumTypeInfo>();
+				info->name = owner + "." + utf8(name);
+				List<StringName> constants;
+				::Variant::get_enumerations_for_enum(kind, name, &constants);
+				for (const StringName &constant : constants) {
+					info->members.push_back({ utf8(constant), double(::Variant::get_enum_value(kind, name, constant)), {}, {} });
+				}
+				auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
+				enums[info->name] = enumeration;
+				scope->importedTypeBindings[owner][utf8(name)] = TypeFun{ {}, {}, enumeration.value };
+				for (auto target : { getMutable<ExternType>(this->classes.at(owner)), getMutable<ExternType>(instances.at(owner)) }) {
+					if (!target->props.count("Enums")) {
+						target->props["Enums"] = Property::readonly(arena.addType(TableType{ {}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed }));
+					}
+					getMutable<TableType>(*target->props.at("Enums").readTy)->props[utf8(name)] = Property::readonly(enumeration.names);
+					const auto table = get<TableType>(get<MetatableType>(enumeration.names)->table);
+					for (const StringName &constant : constants) {
+						auto legacy = table->props.at(utf8(constant));
+						legacy.tags.push_back("LudotHiddenAlias");
+						target->props[utf8(LuauLanguage::api_name(constant, true, true))] = legacy;
+						target->props[utf8(constant)] = table->props.at(utf8(constant));
+					}
+				}
+			}
+		}
+		// Allocate enum domains before reflecting signatures that reference them.
+		for (const StringName &name : classes) {
+			List<StringName> declarations;
+			ClassDB::get_enum_list(name, &declarations, true);
+			for (const StringName &declaration : declarations) {
+				auto info = std::make_shared<EnumTypeInfo>();
+				info->name = utf8(String(name) + "." + String(declaration));
+				List<StringName> constants;
+				ClassDB::get_enum_constants(name, declaration, &constants, true);
+				for (const StringName &constant : constants) {
+					info->members.push_back({ utf8(constant), double(ClassDB::get_integer_constant(name, constant)), {}, {} });
+				}
+				auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
+				enums[info->name] = enumeration;
+				scope->importedTypeBindings[utf8(name)][utf8(declaration)] = TypeFun{ {}, {}, enumeration.value };
+				for (auto target : { getMutable<ExternType>(this->classes.at(utf8(name))), getMutable<ExternType>(instances.at(utf8(name))) }) {
+					if (!target->props.count("Enums")) {
+						target->props["Enums"] = Property::readonly(arena.addType(TableType{ {}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed }));
+					}
+					getMutable<TableType>(*target->props.at("Enums").readTy)->props[utf8(declaration)] = Property::readonly(enumeration.names);
+				}
+			}
+		}
+		for (const StringName &name : classes) {
             auto object = getMutable<ExternType>(instances.at(utf8(name)));
             const StringName parent = ClassDB::get_parent_class(name);
             if (instances.count(utf8(parent))) {
@@ -112,8 +204,22 @@ struct Session {
             }
             List<String> constants;
             ClassDB::get_integer_constant_list(name, &constants, true);
-            for (const String &constant : constants) getMutable<ExternType>(this->classes.at(utf8(name)))->props[utf8(LuauLanguage::api_name(constant, true, true))] = Property::readonly(builtins->numberType);
-            List<MethodInfo> signals;
+			for (const String &constant : constants) {
+				const StringName declaration = ClassDB::get_integer_constant_enum(name, constant, true);
+				auto enumeration = enums.find(utf8(String(name) + "." + String(declaration)));
+				TypeId value = builtins->numberType;
+				if (enumeration != enums.end()) {
+					auto table = get<TableType>(get<MetatableType>(enumeration->second.names)->table);
+					value = *table->props.at(utf8(constant)).readTy;
+				}
+				auto legacy = Property::readonly(value);
+				legacy.tags.push_back("LudotHiddenAlias");
+				for (auto target : { getMutable<ExternType>(this->classes.at(utf8(name))), object }) {
+					target->props[utf8(LuauLanguage::api_name(constant, true, true))] = legacy;
+					target->props[utf8(constant)] = Property::readonly(value);
+				}
+			}
+			List<MethodInfo> signals;
             ClassDB::get_signal_list(name, &signals, true);
             for (const auto &signal : signals) object->props[utf8(LuauLanguage::api_name(signal.name, true))] = Property::readonly(instances.at("Signal"));
         }
@@ -139,8 +245,23 @@ struct Session {
             ::Variant::get_constants_for_type(::Variant::Type(i), &constants);
             for (const auto &constant : constants) {
                 const ::Variant value = ::Variant::get_constant_value(::Variant::Type(i), constant);
-                getMutable<ExternType>(this->classes.at(it->first))->props[utf8(LuauLanguage::api_name(constant, true, true))] = Property::readonly(type(PropertyInfo(value.get_type(), "")));
-            }
+				TypeId member_type = type(PropertyInfo(value.get_type(), ""));
+				const StringName declaration = ::Variant::get_enum_for_enumeration(::Variant::Type(i), constant);
+				auto enumeration = enums.find(it->first + "." + utf8(declaration));
+				auto target = getMutable<ExternType>(this->classes.at(it->first));
+				if (enumeration != enums.end()) {
+					auto table = get<TableType>(get<MetatableType>(enumeration->second.names)->table);
+					member_type = *table->props.at(utf8(constant)).readTy;
+					auto legacy = Property::readonly(member_type);
+					legacy.tags.push_back("LudotHiddenAlias");
+					for (auto destination : { target, object }) {
+						destination->props[utf8(LuauLanguage::api_name(constant, true, true))] = legacy;
+						destination->props[utf8(constant)] = Property::readonly(member_type);
+					}
+				} else {
+					target->props[utf8(LuauLanguage::api_name(constant, true, true))] = Property::readonly(member_type);
+				}
+			}
             TableType::Props operations;
             const std::pair<const char *, ::Variant::Operator> arithmetic[] = {
                 {"__add", ::Variant::OP_ADD}, {"__sub", ::Variant::OP_SUBTRACT},
@@ -174,7 +295,9 @@ struct Session {
             const auto fn = getMutable<FunctionType>(*node->props.at(method).readTy);
             fn->magic = std::make_shared<SceneNodeLookup>([this](const MagicFunctionCallContext &context) { return scene_result(context); });
         }
-        freeze(arena);
+		addLudotIsA(arena, *builtins, instances.at("Object"), LuauLanguage::get_singleton()->method_casing);
+		function_docs[*getMutable<ExternType>(instances.at("Object"))->props.at(utf8(LuauLanguage::api_name("is_a"))).readTy] = { "Object", "is_class" };
+		freeze(arena);
     }
     Node *find_script_node(Node *node, const String &path) const {
         if (node == nullptr) return nullptr;
@@ -257,7 +380,13 @@ struct Session {
     }
     Luau::TypeId type(const PropertyInfo &info) {
         const auto builtin = frontend.builtinTypes;
-        switch (info.type) {
+		if ((info.usage & PROPERTY_USAGE_CLASS_IS_ENUM) != 0 && (info.usage & PROPERTY_USAGE_CLASS_IS_BITFIELD) == 0) {
+			auto found = enums.find(utf8(info.class_name));
+			if (found != enums.end()) {
+				return found->second.value;
+			}
+		}
+		switch (info.type) {
             case ::Variant::NIL: return (info.usage & PROPERTY_USAGE_NIL_IS_VARIANT) != 0 ? builtin->anyType : builtin->nilType;
             case ::Variant::BOOL: return builtin->booleanType;
             case ::Variant::INT: case ::Variant::FLOAT: return builtin->numberType;
@@ -327,14 +456,18 @@ Session &get_session(const String &path, Object *owner = nullptr) {
     return *session;
 }
 }
-bool ludot_validate(const String &source, const String &path, List<ScriptLanguage::ScriptError> *errors) {
-    MutexLock lock(analysis_mutex);
+bool ludot_validate(const String &source, const String &path, List<ScriptLanguage::ScriptError> *errors, List<ScriptLanguage::Warning> *warnings) {
+	MutexLock lock(analysis_mutex);
     auto &analysis = get_session(path);
     const auto name = analysis.update(source, path);
     Luau::FrontendOptions options;
     options.retainFullTypeGraphs = true;
     options.moduleTimeLimitSec = 2.0;
-    Luau::CheckResult checked;
+	options.runLintChecks = warnings != nullptr;
+	Luau::LintOptions lint;
+	lint.enableWarning(Luau::LintWarning::Code_MatchExhaustiveness);
+	options.enabledLintWarnings = lint;
+	Luau::CheckResult checked;
     try {
         checked = analysis.frontend.check(name, options);
     } catch (const Luau::InternalCompilerError &error) {
@@ -359,7 +492,21 @@ bool ludot_validate(const String &source, const String &path, List<ScriptLanguag
             errors->push_back(diagnostic);
         }
     }
-    return checked.errors.empty();
+	if (warnings != nullptr) {
+		for (const auto &warning : checked.lintResult.warnings) {
+			if (warning.code != Luau::LintWarning::Code_MatchExhaustiveness) {
+				continue;
+			}
+			ScriptLanguage::Warning diagnostic;
+			diagnostic.start_line = warning.location.begin.line + 1;
+			diagnostic.end_line = warning.location.end.line + 1;
+			diagnostic.code = 2001;
+			diagnostic.string_code = "match_exhaustiveness";
+			diagnostic.message = String::utf8(warning.text.c_str());
+			warnings->push_back(diagnostic);
+		}
+	}
+	return checked.errors.empty();
 }
 Error ludot_complete(const String &source, const String &path, List<ScriptLanguage::CodeCompletionOption> *options, String &call_hint, Object *owner) {
     MutexLock lock(analysis_mutex);

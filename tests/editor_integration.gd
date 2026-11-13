@@ -66,6 +66,14 @@ func run() -> void:
             if format_menu.get_item_text(index) == "Format Selection":
                 format_menu.id_pressed.emit(format_menu.get_item_id(index))
         check(code.get_line(0) == 'const first={x="café"}' and code.get_line(1) == "const second = { y = 2 }", "Selection formatting preserves unselected source and maps UTF-8 offsets")
+        var extensions = 'enum Action = { Join, Chat }\nconst result = match Action.Join with case Action.Join then "join" otherwise "chat" end\nconst name = node?:getParent()?.Name ?? "missing"\nlocal value = nil\nvalue ??= true\nfor i in 1 to 10 step 5 do print(i) end\nconst output = things |> first() ?? {} |> sort()\n'
+        code.text = extensions + 'const formatted={x=1}\n'
+        format_menu.id_pressed.emit(format_id)
+        check(code.text.begins_with(extensions), "StyLua preserves all lowered language constructs byte for byte")
+        check(code.text.contains("const formatted = { x = 1 }"), "StyLua still formats statements around protected language syntax")
+        var preserved = code.text
+        format_menu.id_pressed.emit(format_id)
+        check(code.text == preserved, "Formatting new syntax is idempotent")
         format_menu.hide()
     code.text = saved_editor_source
     code.text = "if true then"
@@ -81,7 +89,19 @@ func run() -> void:
     code.set_caret_column(code.get_line(0).length())
     code.gui_input.emit(enter)
     check(code.text.count("end") == 1, "Block completion preserves an existing end")
+    for opener in ["match value with", "case Action.Join then", "otherwise"]:
+        code.text = opener
+        code.set_caret_line(0)
+        code.set_caret_column(opener.length())
+        code.gui_input.emit(enter)
+        check(code.get_caret_line() == 1 and code.get_caret_column() > 0, "Enter indents " + opener)
+        check(code.text.count("end") == (1 if opener.ends_with("with") else 0), "Match arms share the match block's end")
     code.text = saved_editor_source
+    var match_source = "enum Action = { Join, Chat }\nconst action: Action = Action.Join\nmatch action with case Action.Join then print(1) end"
+    var match_warnings = script.get_lint_warnings(match_source)
+    check(match_warnings.any(func(w): return w.code == "match_exhaustiveness"), "Non-exhaustive match statements produce native warnings")
+    var ignored_match = script.get_lint_warnings("--# selene: allow(match_exhaustiveness)\n" + match_source)
+    check(not ignored_match.any(func(w): return w.code == "match_exhaustiveness"), "Selene ignore comments suppress native match warnings")
     var naming_warnings = script.get_lint_warnings("const bad_name = 1\nprint(bad_name)")
     check(naming_warnings.any(func(w): return w.code == "naming_convention"), "Naming rules flag inconsistent immutable binding names")
     var ignored_warnings = script.get_lint_warnings("--# selene: allow(naming_convention)\nconst bad_name = 1\nprint(bad_name)")
@@ -90,6 +110,28 @@ func run() -> void:
     check(unused_warnings.any(func(w): return w.code == "unused_variable"), "Selene checks immutable bindings in unsaved buffers")
     var suppressed_unused = script.get_lint_warnings("-- selene: allow(unused_variable)\nconst unused = 1")
     check(not suppressed_unused.any(func(w): return w.code == "unused_variable"), "Selene comments suppress the following statement")
+    var enum_script = LuauScript.new()
+    enum_script.source_code = 'enum Choice = { First = "hello, world", Second = "second: value" }\nclass EnumInspectorProbe extends Node = { export Choice: Choice = Choice.First }'
+    check(ResourceSaver.save(enum_script, "res://EnumInspectorProbe.luau") == OK, "Enum Inspector script saves")
+    enum_script.take_over_path("res://EnumInspectorProbe.luau")
+    check(enum_script.reload() == OK, "String enum Inspector script loads")
+    var enum_node = Node.new()
+    enum_node.set_script(enum_script)
+    get_tree().root.add_child(enum_node)
+    EditorInterface.inspect_object(enum_node)
+    for frame in range(4):
+        await get_tree().process_frame
+    var enum_editors = EditorInterface.get_inspector().find_children("*", "LuauEnumProperty", true, false)
+    check(not enum_editors.is_empty(), "Inspector selects the Luau enum property editor")
+    if not enum_editors.is_empty():
+        var options: OptionButton = enum_editors[0].find_children("*", "OptionButton", true, false)[0]
+        check(options.item_count == 2 and options.get_item_text(0) == "First", "Enum dropdown labels use member names")
+        options.select(1)
+        options.item_selected.emit(1)
+        await get_tree().process_frame
+        check(enum_node.get("Choice") == "second: value", "Enum dropdown stores the underlying string including punctuation")
+    EditorInterface.inspect_object(null)
+    enum_node.free()
     var normal: Color = code.get_theme_color("font_color")
     check(highlighter.get_line_syntax_highlighting(0)[0].color != normal, "class keyword has a color")
     check(highlighter.get_line_syntax_highlighting(3)[14].color != normal, "strings have a color")
