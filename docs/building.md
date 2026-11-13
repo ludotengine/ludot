@@ -220,8 +220,11 @@ every platform has passed. Consult the workflow runs for actual results.
 
 CI uploads build artifacts after engine compilation and headless regressions, so
 an artifact-storage failure cannot prevent those checks from running. Uploaded
-editor and LSP artifacts are retained for seven days. Upload failures still fail
-the job; a storage-quota error does not count as a successful build delivery.
+editor and LSP artifacts are retained for one day. The organization's free plan
+stores 500 MB of artifacts, about one run's uploads, and GitHub recalculates usage
+only every 6 to 12 hours. Upload steps therefore continue on error: a green job
+means the build and tests passed, not that its downloads exist. Check the run's
+artifact list before relying on a download.
 
 CI runs on Blacksmith runners: 32 vCPU Linux, 16 vCPU Windows Server 2025, and
 12 vCPU Apple Silicon macOS 26. The Blacksmith GitHub app must stay installed on
