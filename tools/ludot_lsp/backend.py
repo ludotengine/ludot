@@ -24,8 +24,8 @@ class Backend:
         with self.state_lock:
             return self.slot['process'].pid if self.slot else None
 
-    def _start(self, path, definitions, api):
-        args = [str(self.analyzer), '--ludot-session']
+    def _start(self, path, definitions, api, casing):
+        args = [str(self.analyzer), '--ludot-session', f'--ludot-method-casing={casing[0]}', f'--ludot-property-casing={casing[1]}']
         if definitions:
             args.append(f'--ludot-definitions={definitions}')
         if api:
@@ -41,7 +41,7 @@ class Backend:
                 replies.put(None)
         reader = threading.Thread(target=read_replies, daemon=True)
         reader.start()
-        return {'process': process, 'replies': replies, 'reader': reader, 'errors': errors, 'options': (definitions, api)}
+        return {'process': process, 'replies': replies, 'reader': reader, 'errors': errors, 'options': (definitions, api, casing)}
 
     def _discard(self, slot):
         with self.state_lock:
@@ -67,17 +67,17 @@ class Backend:
             if slot:
                 self._discard(slot)
 
-    def query(self, path, line, column, overlays, definitions, api, cancelled=None):
+    def query(self, path, line, column, overlays, definitions, api, cancelled=None, casing=('camelCase', 'PascalCase')):
         with self.query_lock:
             if cancelled is not None and cancelled.is_set():
                 raise RequestCancelled('Request cancelled')
             with self.state_lock:
                 slot = self.slot
-            if slot and (slot['options'] != (definitions, api) or slot['process'].poll() is not None):
+            if slot and (slot['options'] != (definitions, api, casing) or slot['process'].poll() is not None):
                 self._discard(slot)
                 slot = None
             if slot is None:
-                slot = self._start(path, definitions, api)
+                slot = self._start(path, definitions, api, casing)
                 with self.state_lock:
                     self.slot = slot
             name = path.as_posix().encode('utf-8')

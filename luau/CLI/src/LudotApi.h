@@ -3,17 +3,18 @@
 #include "Luau/Frontend.h"
 #include "Luau/Type.h"
 #include "Luau/TypeArena.h"
+#include "Luau/LudotNaming.h"
 #include <sstream>
 #include <unordered_map>
 
-inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source)
+inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Luau::ApiCase methodCase = Luau::ApiCase::Camel, Luau::ApiCase propertyCase = Luau::ApiCase::Pascal)
 {
     using namespace Luau;
     std::istringstream stream(source);
     std::string line;
     if (!std::getline(stream, line)) return false;
     if (!line.empty() && line.back() == '\r') line.pop_back();
-    if (line != "LUDOT_API_1") return false;
+    if (line != "LUDOT_API_1" && line != "LUDOT_API_2") return false;
     std::vector<std::vector<std::string>> rows;
     while (std::getline(stream, line))
     {
@@ -104,7 +105,7 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source)
                 found->second = Property::readonly(arena.addType(IntersectionType{std::move(parts)}));
             }
         }
-        else if (row[0] == "P" && row.size() == 4) instance->props[row[2]] = Property::rw(type(type, row[3]));
+        else if (row[0] == "P" && row.size() == 4) instance->props[engineApiName(row[2], propertyCase)] = Property::rw(type(type, row[3]));
         else if (row[0] == "K" && row.size() == 4) cls->props[row[2]] = Property::readonly(type(type, row[3]));
         else if (row[0] == "F" && row.size() >= 6)
         {
@@ -121,7 +122,7 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source)
             TypePackId returns = row[3] == "void" ? builtins->emptyTypePack : arena.addTypePack({type(type, row[3])});
             TypeId fn = arena.addType(FunctionType{arena.addTypePack(args, tail), returns});
             getMutable<FunctionType>(fn)->hasSelf = !isStatic;
-            (isStatic ? cls : instance)->props[row[2]] = Property::readonly(fn);
+            (isStatic ? cls : instance)->props[engineApiName(row[2], methodCase)] = Property::readonly(fn);
         }
     }
     return true;

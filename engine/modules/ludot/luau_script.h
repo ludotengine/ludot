@@ -5,6 +5,7 @@
 #include "core/io/resource_saver.h"
 #include "core/os/mutex.h"
 #include "lua.h"
+#include "Luau/LudotNaming.h"
 
 class LuauLanguage;
 class LuauScriptInstance;
@@ -39,6 +40,7 @@ public:
     void set_source_code(const String &p_code) override { source = p_code; }
     Error reload(bool p_keep_state = false) override;
     Array get_diagnostics() const;
+    StringName resolve_method_name(const StringName &p_method) const;
     Array get_lint_warnings(const String &p_code) const;
     PackedStringArray get_completions(const String &p_code) const;
     Dictionary get_symbol_help(const String &p_code, const String &p_symbol, Object *p_owner = nullptr) const;
@@ -126,9 +128,13 @@ public:
     };
     // Static members of native classes and builtin types, keyed by class or type name and then Luau name.
     HashMap<StringName, HashMap<String, NativeMember>> native_members;
+    HashMap<StringName, HashSet<StringName>> native_callbacks;
     String last_error;
     static LuauLanguage *get_singleton() { return singleton; }
-    static String api_name(const String &p_name, bool p_property = false);
+    Luau::ApiCase method_casing = Luau::ApiCase::Camel;
+    Luau::ApiCase property_casing = Luau::ApiCase::Pascal;
+    static String callback_name(const StringName &p_base, const StringName &p_name);
+    static String api_name(const String &p_name, bool p_property = false, bool p_constant = false);
     static void push_variant(lua_State *L, const Variant &p_value);
     static Variant to_variant(lua_State *L, int p_index, int p_depth = 0);
     // Converts without raising a Luau error. On failure last_error holds the reason.

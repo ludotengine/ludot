@@ -154,7 +154,7 @@ the checker. Regenerate it after changing engine classes:
 
 ```sh
 engine/bin/ludot.linuxbsd.editor.x86_64 --headless --dump-extension-api
-python tools/generate_api_manifest.py extension_api.json types/engine.api
+python tools/generate_api_manifest.py extension_api.json types/engine.api --callbacks engine/modules/ludot/luau_callbacks.h
 ```
 
 `--definitions` adds a Luau declaration file on top of the engine API.
@@ -240,3 +240,16 @@ are lint settings, rather than StyLua rewrites, so formatting does not rename
 references or public API members.
 The pinned Selene source and license are available at
 https://github.com/Kampfkarren/selene/tree/0.32.0.
+
+The API manifest uses `LUDOT_API_2` with raw native method/property/signal names.
+The native editor and standalone analyzer share the C++ naming conversion in
+`Luau/LudotNaming.h`. The analyzer also accepts version 1 manifests, converting
+those member names to the selected style. Regenerate both the manifest and the
+callback catalog after native API changes. The compact callback catalog retains
+native callback identity in release templates where full ClassDB virtual-method
+metadata is unavailable.
+
+`python tools/test_api_casing.py <editor-binary>` checks all nine method/property
+style combinations in temporary headless projects. It is part of the desktop
+suite. The LSP suite covers project casing, completion uniqueness, hovers,
+signature help, unsaved overlays, and the restart policy.

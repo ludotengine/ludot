@@ -57,6 +57,7 @@ class Server:
         self.lock = threading.RLock()
         self.output_lock = threading.Lock()
         self.workers = ThreadPoolExecutor(max_workers=2)
+        self.project_casing = {}
         self.require_completion = True
         self.shader_words = None
         self.shutdown = False
@@ -67,6 +68,31 @@ class Server:
         with self.output_lock:
             sys.stdout.buffer.write(f'Content-Length: {len(data)}\r\n\r\n'.encode() + data)
             sys.stdout.buffer.flush()
+
+    def api_casing(self, path):
+        project = next((parent / 'project.godot' for parent in path.parents if (parent / 'project.godot').is_file()), None)
+        with self.lock:
+            if project in self.project_casing:
+                return self.project_casing[project]
+            selected = ['camelCase', 'PascalCase']
+            if project:
+                section = ''
+                for raw in project.read_text(encoding='utf-8').splitlines():
+                    line = raw.strip()
+                    if line.startswith('['):
+                        section = line
+                    if section != '[luau]' or '=' not in line:
+                        continue
+                    key, value = line.split('=', 1)
+                    if key.strip() not in ('api/method_casing', 'api/property_casing'):
+                        continue
+                    style = json.loads(value.split(';', 1)[0].strip())
+                    if style not in ('camelCase', 'PascalCase', 'snake_case'):
+                        print('Invalid Luau API casing in project.godot; using the default.', file=sys.stderr)
+                        continue
+                    selected[0 if key.strip() == 'api/method_casing' else 1] = style
+            self.project_casing[project] = tuple(selected)
+            return tuple(selected)
 
     def analyze(self, uri, position=None):
         with self.lock:
@@ -81,7 +107,7 @@ class Server:
         request_id = getattr(self.request_context, 'request_id', None)
         with self.lock:
             cancelled = self.cancellations.get(request_id)
-        result = self.backend.query(path, position['line'], byte_column(text, position), content, self.definitions, self.api, cancelled)
+        result = self.backend.query(path, position['line'], byte_column(text, position), content, self.definitions, self.api, cancelled, self.api_casing(path))
         return result, documents
 
     def close(self):

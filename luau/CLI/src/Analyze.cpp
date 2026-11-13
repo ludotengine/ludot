@@ -452,6 +452,7 @@ int main(int argc, char** argv)
     unsigned queryLine = 0, queryColumn = 0;
     std::string ludotDefinitions;
     std::string ludotApi;
+    Luau::ApiCase methodCase = Luau::ApiCase::Camel, propertyCase = Luau::ApiCase::Pascal;
     int threadCount = 0;
     std::string basePath = "";
     Luau::SolverMode solverMode = Luau::SolverMode::New;
@@ -470,6 +471,12 @@ int main(int argc, char** argv)
             ludotQuery = true;
             if (sscanf(argv[i] + 14, "%u,%u", &queryLine, &queryColumn) != 2)
                 return 2;
+        }
+        else if (strncmp(argv[i], "--ludot-method-casing=", 22) == 0) {
+            if (!Luau::parseApiCase(argv[i] + 22, methodCase)) return 2;
+        }
+        else if (strncmp(argv[i], "--ludot-property-casing=", 24) == 0) {
+            if (!Luau::parseApiCase(argv[i] + 24, propertyCase)) return 2;
         }
         else if (strncmp(argv[i], "--ludot-api=", 12) == 0)
             ludotApi = argv[i] + 12;
@@ -584,7 +591,7 @@ int main(int argc, char** argv)
     }
     if (!ludotApi.empty()) {
         auto api = readFile(ludotApi);
-        if (!api || !loadLudotApi(frontend, *api)) { fprintf(stderr, "Invalid Ludot API manifest\n"); return 2; }
+        if (!api || !loadLudotApi(frontend, *api, methodCase, propertyCase)) { fprintf(stderr, "Invalid Ludot API manifest\n"); return 2; }
     }
     Luau::freeze(frontend.globals.globalTypes);
 

@@ -199,3 +199,23 @@ class declarations and properties. `-- selene: allow(rule)` and file-level
 `--# selene: allow(rule)` suppress diagnostics; `naming_convention` controls naming.
 StyLua's `-- stylua: ignore` and `-- stylua: ignore start` / `-- stylua: ignore end` comments pass through
 to the formatter. Formatter and lint ignore directives have separate meanings.
+
+
+### Project engine API casing
+
+Project Settings > Luau > Api independently selects camelCase, PascalCase, or
+snake_case for engine methods and engine properties/signals. Defaults remain
+camelCase methods and PascalCase properties/signals. Builtin value components
+follow property casing, while type/class names, constants, and `.new()` retain
+their established spelling. User declarations remain exact and naming lint is
+separate. Native bindings, editor checking/completion/hover/signature help, and
+the standalone LSP use the same member-name conversion. There are no alternate
+completion spellings or legacy native-member aliases. Casing snapshots require
+an editor/game/LSP restart after setting changes; active bindings are not mutated.
+See [language.md](language.md#engine-naming) for acronym rules and compatibility.
+
+The Linux native build and headless nine-combination runtime/editor-query matrix
+passed locally on 2026-11-12. The LSP matrix, including hover and signature help,
+also passed. Language/shader regressions and the full default desktop suite,
+including debugger and exported-pack checks, passed. Cross-platform CI for this
+addition has not yet been verified.

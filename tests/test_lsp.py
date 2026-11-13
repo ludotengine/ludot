@@ -66,6 +66,57 @@ class LspTests(unittest.TestCase):
         checked, _ = self.server.analyze(uri)
         self.assertTrue(checked['diagnostics'])
 
+    def test_project_api_casing_matrix(self):
+        self.server.api = ROOT / 'types/engine.api'
+        styles = ('camelCase', 'PascalCase', 'snake_case')
+        def name(raw, style):
+            if style == 'snake_case':
+                return raw
+            result = ''.join(word.title() for word in raw.split('_'))
+            return result[:1].lower() + result[1:] if style == 'camelCase' else result
+        for method_style in styles:
+            for property_style in styles:
+                with self.subTest(methods=method_style, properties=property_style):
+                    project = self.root / (method_style + '-' + property_style)
+                    project.mkdir()
+                    (project / 'project.godot').write_text('config_version=5\n[luau]\napi/method_casing=' + json.dumps(method_style) + '\napi/property_casing=' + json.dumps(property_style) + '\n')
+                    method = name('get_instance_id', method_style)
+                    prop = name('position', property_style)
+                    component = name('x', property_style)
+                    text = '--!strict\nconst node = Node3D.new()\nnode.' + prop + ' = Vector3.new()\nconst component: number = node.' + prop + '.' + component + '\nconst id: number = node:' + method + '()\nconst q: Quaternion = Quaternion.' + name('from_euler', method_style) + '(Vector3.new())\nreturn component + id'
+                    text = text.replace('\nreturn component + id', '')
+                    text += '\nconst rid: RID = Resource.new():' + name('get_rid', method_style) + '()\nconst http: HTTPClient = HTTPClient.new()'
+                    uri = self.open(text, str(project.relative_to(self.root) / 'Main.luau'))
+                    checked, _ = self.server.analyze(uri)
+                    self.assertEqual(checked['diagnostics'], [])
+                    completion = 'const node = Node3D.new()\nnode.'
+                    self.server.documents[uri] = {'version': 2, 'text': completion}
+                    result = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 5}}})
+                    labels = [item['label'] for item in result]
+                    self.assertEqual(len(labels), len(set(labels)))
+                    self.assertEqual(labels.count(prop), 1)
+                    self.assertEqual(labels.count(method), 1)
+                    for alternative in styles:
+                        if name('position', alternative) != prop:
+                            self.assertNotIn(name('position', alternative), labels)
+                        if name('get_instance_id', alternative) != method:
+                            self.assertNotIn(name('get_instance_id', alternative), labels)
+                    hover_text = 'const node = Node3D.new()\nprint(node.' + prop + ')'
+                    self.server.documents[uri] = {'version': 3, 'text': hover_text}
+                    hover = self.server.request({'method': 'textDocument/hover', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 12}}})
+                    self.assertIn('Vector3', hover['contents']['value'])
+                    call = 'const node = Node.new()\nnode:' + name('set_name', method_style) + '("test")'
+                    self.server.documents[uri] = {'version': 4, 'text': call}
+                    signature = self.server.request({'method': 'textDocument/signatureHelp', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': call.split('\n')[1].index('(') + 1}}})
+                    self.assertIsNotNone(signature)
+                    self.assertIn('string', signature['signatures'][0]['label'])
+                    # User identifiers are independent of engine and lint casing.
+                    self.server.documents[uri] = {'version': 3, 'text': '--!strict\nclass Custom_Name = { public custom_field: number = 1 function Do_Not_Change(): number return self.custom_field end }\nreturn Custom_Name.new():Do_Not_Change()'}
+                    checked, _ = self.server.analyze(uri)
+                    self.assertEqual(checked['diagnostics'], [])
+                    (project / 'project.godot').write_text('config_version=5\n[luau]\napi/method_casing="snake_case"\napi/property_casing="snake_case"\n')
+                    self.assertEqual(self.server.api_casing(project / 'Main.luau'), (method_style, property_style))
+
     def test_persistent_session_and_import_invalidation(self):
         (self.root / 'helper.luau').write_text('return {Value = 1}')
         uri = self.open('--!strict\nimport "./helper" as helper\nlocal value: number = helper.Value\nreturn value')

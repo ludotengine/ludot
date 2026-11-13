@@ -1,4 +1,5 @@
 #include "luau_script.h"
+#include "luau_callbacks.h"
 #include "luau_callable.h"
 #include "core/object/method_bind.h"
 #ifdef TOOLS_ENABLED
@@ -219,7 +220,10 @@ int native_call(lua_State *L) {
             if (!source.begins_with("native/")) break;
         }
         const String type = self.get_type() == Variant::OBJECT ? String(static_cast<Object *>(self)->get_class_name()) : Variant::get_type_name(self.get_type());
-        language->profile_enter(source + "::0::" + type + "." + LuauLanguage::api_name(method), true);
+        const Object *object = self.get_type() == Variant::OBJECT ? static_cast<Object *>(self) : nullptr;
+        const ScriptInstance *instance = object != nullptr ? object->get_script_instance() : nullptr;
+        const String display = instance != nullptr && instance->has_method(method) ? String(method) : LuauLanguage::api_name(method);
+        language->profile_enter(source + "::0::" + type + "." + display, true);
     }
     self.callp(method, pointers.ptrw(), count, result, error);
     if (profiled) language->profile_exit();
@@ -301,7 +305,7 @@ int native_index(lua_State *L) {
     List<PropertyInfo> properties;
     self.get_property_list(&properties);
     for (const PropertyInfo &property : properties) {
-        if (LuauLanguage::api_name(property.name, true) == requested) {
+        if (((property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE) ? String(property.name) : LuauLanguage::api_name(property.name, true)) == requested) {
             bool valid;
             LuauLanguage::push_variant(L, self.get_named(property.name, valid));
             return 1;
@@ -313,7 +317,7 @@ int native_index(lua_State *L) {
         List<MethodInfo> signals;
         object->get_signal_list(&signals);
         for (const auto &signal : signals) {
-            if (LuauLanguage::api_name(signal.name, true) == requested) {
+            if ((ClassDB::has_signal(object->get_class_name(), signal.name) ? LuauLanguage::api_name(signal.name, true) : String(signal.name)) == requested) {
                 LuauLanguage::push_variant(L, Signal(object, signal.name));
                 return 1;
             }
@@ -325,7 +329,7 @@ int native_index(lua_State *L) {
     ScriptInstance *script_instance = object != nullptr ? object->get_script_instance() : nullptr;
     for (const MethodInfo &method : methods) {
         const bool exact_script_method = method.name == requested && script_instance != nullptr && script_instance->has_method(method.name);
-        if (exact_script_method || LuauLanguage::api_name(method.name) == requested) {
+        if (exact_script_method || (!(script_instance != nullptr && script_instance->has_method(method.name)) && LuauLanguage::api_name(method.name) == requested)) {
             lua_pushstring(L, String(method.name).utf8().get_data());
             lua_pushcclosure(L, native_call, "native method", 1);
             return 1;
@@ -356,7 +360,7 @@ int native_newindex(lua_State *L) {
     List<PropertyInfo> properties;
     self.get_property_list(&properties);
     for (const PropertyInfo &property : properties) {
-        if (LuauLanguage::api_name(property.name, true) == requested) {
+        if (((property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE) ? String(property.name) : LuauLanguage::api_name(property.name, true)) == requested) {
             bool valid;
             self.set_named(property.name, native_argument(L, 3, property.type), valid);
             if (!valid) luaL_error(L, "Invalid native property assignment");
@@ -662,12 +666,23 @@ bool push_converted(lua_State *L, int p_index, Luau::AstType *p_type) {
 }
 }
 
-String LuauLanguage::api_name(const String &p_name, bool p_property) {
-    const bool internal = p_name.begins_with("_");
-    const String body = internal ? p_name.substr(1) : p_name;
-    const String renamed = p_property && !internal ? body.to_pascal_case() : body.to_camel_case();
-    return internal ? "_" + renamed : renamed;
+String LuauLanguage::callback_name(const StringName &p_base, const StringName &p_name) {
+    // The compact reflected name catalog also works in release templates, where
+    // ClassDB omits full virtual MethodInfo metadata.
+    StringName current = p_base;
+    while (ClassDB::class_exists(current)) {
+        if (const auto names = singleton->native_callbacks.getptr(current); names && names->has(p_name)) return api_name(p_name);
+        current = ClassDB::get_parent_class(current);
+    }
+    return p_name;
 }
+String LuauLanguage::api_name(const String &p_name, bool p_property, bool p_constant) {
+    if (p_constant) return p_name.to_pascal_case();
+    const CharString source = p_name.utf8();
+    const auto style = p_property ? singleton->property_casing : singleton->method_casing;
+    return String::utf8(Luau::engineApiName(std::string(source.get_data(), source.length()), style).c_str());
+}
+
 void LuauLanguage::push_variant(lua_State *L, const Variant &p_value) {
     if (p_value.get_type() == Variant::OBJECT && static_cast<Object *>(p_value) == nullptr) { lua_pushnil(L); return; }
     switch (p_value.get_type()) {
@@ -958,6 +973,11 @@ void LuauLanguage::commit_chunk(lua_State *L, const String &p_key, int p_chunk) 
     chunk_refs[p_key] = p_chunk;
 }
 void LuauLanguage::init() {
+    const String methods = GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "luau/api/method_casing", PROPERTY_HINT_ENUM, "camelCase,PascalCase,snake_case"), "camelCase");
+    const String properties = GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "luau/api/property_casing", PROPERTY_HINT_ENUM, "camelCase,PascalCase,snake_case"), "PascalCase");
+    if (!Luau::parseApiCase(methods.utf8().get_data(), method_casing)) WARN_PRINT("Invalid luau/api/method_casing; using camelCase.");
+    if (!Luau::parseApiCase(properties.utf8().get_data(), property_casing)) WARN_PRINT("Invalid luau/api/property_casing; using PascalCase.");
+    for (const auto &entry : ludot_native_callbacks) native_callbacks[entry.owner].insert(entry.name);
     static uint64_t next_generation = 0;
     generation = ++next_generation;
     state = luaL_newstate();
@@ -992,7 +1012,7 @@ void LuauLanguage::init() {
         Variant::get_constants_for_type(type, &constants);
         for (const StringName &constant : constants) {
             push_variant(state, Variant::get_constant_value(type, constant));
-            lua_setfield(state, -2, api_name(constant, true).utf8().get_data());
+            lua_setfield(state, -2, api_name(constant, true, true).utf8().get_data());
         }
         List<StringName> methods;
         Variant::get_builtin_method_list(type, &methods);
@@ -1030,6 +1050,7 @@ void LuauLanguage::finish() {
     module_dependencies.clear();
     native_classes.clear();
     native_members.clear();
+    native_callbacks.clear();
     chunk_refs.clear();
     debug_cursors.clear();
     stepping_state = nullptr;
@@ -1137,7 +1158,7 @@ Error LuauLanguage::ensure_native_class(const StringName &p_name) {
     ClassDB::get_integer_constant_list(p_name, &constants);
     HashMap<String, int64_t> constant_values;
     for (const String &constant : constants) {
-        const String name = api_name(constant, true);
+        const String name = api_name(constant, true, true);
         if (!name.is_valid_ascii_identifier() || !names.insert(name).second) continue;
         source += " public function " + name + "(self) end\n";
         constant_values.insert(name, ClassDB::get_integer_constant(p_name, constant));
@@ -1459,10 +1480,13 @@ Error LuauScript::reload(bool p_keep_state) {
     }
     return OK;
 }
-bool LuauScript::has_method(const StringName &p_method) const { return methods.has(p_method) || methods.has(LuauLanguage::api_name(p_method)); }
+StringName LuauScript::resolve_method_name(const StringName &p_method) const {
+    if (methods.has(p_method)) return p_method;
+    return LuauLanguage::callback_name(base_type, p_method);
+}
+bool LuauScript::has_method(const StringName &p_method) const { return methods.has(resolve_method_name(p_method)); }
 MethodInfo LuauScript::get_method_info(const StringName &p_method) const {
-    const MethodInfo *info = methods.getptr(p_method);
-    if (info == nullptr) info = methods.getptr(LuauLanguage::api_name(p_method));
+    const MethodInfo *info = methods.getptr(resolve_method_name(p_method));
     return info != nullptr ? *info : MethodInfo();
 }
 ScriptLanguage *LuauScript::get_language() const { return LuauLanguage::get_singleton(); }
@@ -1553,7 +1577,7 @@ Variant LuauScriptInstance::callp(const StringName &p_method, const Variant **p_
     MutexLock lock(language->mutex);
     lua_State *L = language->state;
     const int top = lua_gettop(L);
-    const String method = script->methods.has(p_method) ? String(p_method) : LuauLanguage::api_name(p_method);
+    const String method = script->resolve_method_name(p_method);
     lua_getref(L, object_ref);
     lua_getfield(L, -1, method.utf8().get_data());
     lua_pushvalue(L, -2);
@@ -1740,6 +1764,15 @@ _TS_end
 )";
         }
     } else return result;
+    for (const char *method : {"_ready", "_process", "_physics_process", "is_on_floor", "get_gravity", "is_action_just_pressed", "get_axis", "get_vector", "move_and_slide", "normalized"}) {
+        const String original = String(method).to_camel_case();
+        const String before = String(method).begins_with("_") ? "function _" + String(method).trim_prefix("_").to_camel_case() : ":" + original;
+        const String after = String(method).begins_with("_") ? "function " + api_name(method) : ":" + api_name(method);
+        entry.content = entry.content.replace(before + "(", after + "(");
+    }
+    for (const char *property : {"velocity", "transform", "basis", "x", "y", "z"}) {
+        entry.content = entry.content.replace("." + String(property).to_pascal_case(), "." + api_name(property, true));
+    }
     result.push_back(entry);
     return result;
 }
@@ -1759,7 +1792,8 @@ int LuauLanguage::find_function(const String &p_function, const String &p_code) 
     return -1;
 }
 String LuauLanguage::make_function(const String &p_class, const String &p_name, const PackedStringArray &p_args) const {
-    return "    function " + api_name(p_name) + "(" + String(", ").join(p_args) + ")\n    end\n";
+    const String name = callback_name(p_class, p_name);
+    return "    function " + name + "(" + String(", ").join(p_args) + ")\n    end\n";
 }
 void LuauLanguage::add_global_constant(const StringName &p_variable, const Variant &p_value) { if (state != nullptr) { MutexLock lock(mutex); push_variant(state, p_value); lua_setglobal(state, String(p_variable).utf8().get_data()); } }
 void LuauLanguage::reload_all_scripts() { for (LuauScript *script : scripts) script->reload(true); }

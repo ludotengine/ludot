@@ -112,7 +112,7 @@ struct Session {
             }
             List<String> constants;
             ClassDB::get_integer_constant_list(name, &constants, true);
-            for (const String &constant : constants) getMutable<ExternType>(this->classes.at(utf8(name)))->props[utf8(LuauLanguage::api_name(constant, true))] = Property::readonly(builtins->numberType);
+            for (const String &constant : constants) getMutable<ExternType>(this->classes.at(utf8(name)))->props[utf8(LuauLanguage::api_name(constant, true, true))] = Property::readonly(builtins->numberType);
             List<MethodInfo> signals;
             ClassDB::get_signal_list(name, &signals, true);
             for (const auto &signal : signals) object->props[utf8(LuauLanguage::api_name(signal.name, true))] = Property::readonly(instances.at("Signal"));
@@ -139,7 +139,7 @@ struct Session {
             ::Variant::get_constants_for_type(::Variant::Type(i), &constants);
             for (const auto &constant : constants) {
                 const ::Variant value = ::Variant::get_constant_value(::Variant::Type(i), constant);
-                getMutable<ExternType>(this->classes.at(it->first))->props[utf8(LuauLanguage::api_name(constant, true))] = Property::readonly(type(PropertyInfo(value.get_type(), "")));
+                getMutable<ExternType>(this->classes.at(it->first))->props[utf8(LuauLanguage::api_name(constant, true, true))] = Property::readonly(type(PropertyInfo(value.get_type(), "")));
             }
             TableType::Props operations;
             const std::pair<const char *, ::Variant::Operator> arithmetic[] = {
@@ -168,7 +168,8 @@ struct Session {
             const auto it = instances.find(utf8(entry.ptr->get_class_name()));
             if (it != instances.end()) scope->bindings[frontend.globals.globalNames.names->getOrAdd(utf8(entry.name).c_str())] = Binding{it->second, Location()};
         }
-        for (const char *method : {"getNode", "getNodeOrNull", "getParent"}) {
+        for (const char *native_method : {"get_node", "get_node_or_null", "get_parent"}) {
+            const std::string method = utf8(LuauLanguage::api_name(native_method));
             const auto node = getMutable<ExternType>(instances.at("Node"));
             const auto fn = getMutable<FunctionType>(*node->props.at(method).readTy);
             fn->magic = std::make_shared<SceneNodeLookup>([this](const MagicFunctionCallContext &context) { return scene_result(context); });
@@ -196,8 +197,8 @@ struct Session {
         if (index == nullptr) return nullptr;
         auto receiver = resolve_scene_expression(index->expr, path);
         if (receiver == nullptr) return nullptr;
-        if (index->index == "getParent" && call->args.size == 0) return receiver->get_parent();
-        if ((index->index == "getNode" || index->index == "getNodeOrNull") && call->args.size == 1) {
+        if (String::utf8(index->index.value) == LuauLanguage::api_name("get_parent") && call->args.size == 0) return receiver->get_parent();
+        if ((String::utf8(index->index.value) == LuauLanguage::api_name("get_node") || String::utf8(index->index.value) == LuauLanguage::api_name("get_node_or_null")) && call->args.size == 1) {
             if (auto literal = call->args.data[0]->as<Luau::AstExprConstantString>())
                 return receiver->get_node_or_null(NodePath(String::utf8(literal->value.data, literal->value.size)));
         }
@@ -218,7 +219,7 @@ struct Session {
             }
         }
         const auto index = context.callSite->func->as<Luau::AstExprIndexName>();
-        if (index && index->index == "getNodeOrNull") return context.solver->arena->addType(Luau::UnionType{{type, frontend.builtinTypes->nilType}});
+        if (index && String::utf8(index->index.value) == LuauLanguage::api_name("get_node_or_null")) return context.solver->arena->addType(Luau::UnionType{{type, frontend.builtinTypes->nilType}});
         return type;
     }
     void prepare_scene(Node *root, Node *owner, const String &path) {
@@ -293,7 +294,7 @@ struct Session {
         fn->hasSelf = !is_static;
         if (auto owner_type = get<ExternType>(self)) function_docs[result] = {String::utf8(owner_type->name.c_str()), method.name};
         if (!is_static) fn->argNames.push_back(FunctionArgument{"self", Location()});
-        for (const PropertyInfo &arg : method.arguments) fn->argNames.push_back(FunctionArgument{utf8(LuauLanguage::api_name(arg.name)), Location()});
+        for (const PropertyInfo &arg : method.arguments) fn->argNames.push_back(FunctionArgument{Luau::engineApiName(utf8(arg.name), Luau::ApiCase::Camel), Location()});
         return result;
     }
     std::string update(const String &source, const String &path) {
@@ -621,6 +622,24 @@ Dictionary ludot_symbol_help(const String &source, const String &path, const Str
                 description = comment.substr(3).strip_edges() + (description.is_empty() ? String() : "\n" + description);
             }
             info["description"] = description.replace("[", "[lb]");
+        }
+    }
+    if (!info.has("declaring_class") && fn->hasSelf && !args.empty()) {
+        auto receiver = Luau::get<Luau::ExternType>(Luau::follow(args.front()));
+        while (receiver && !info.has("declaring_class")) {
+            String class_name = String::utf8(receiver->name.c_str());
+            if (ClassDB::class_exists(class_name)) {
+                List<MethodInfo> virtuals;
+                ClassDB::get_virtual_methods(class_name, &virtuals, true);
+                for (const auto &method : virtuals) {
+                    if (LuauLanguage::api_name(method.name) == symbol) {
+                        info["declaring_class"] = class_name;
+                        info["native_member"] = method.name;
+                        break;
+                    }
+                }
+            }
+            receiver = receiver->parent ? Luau::get<Luau::ExternType>(Luau::follow(*receiver->parent)) : nullptr;
         }
     }
     return info;
