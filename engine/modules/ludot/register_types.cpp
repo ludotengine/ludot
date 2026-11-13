@@ -8,8 +8,15 @@
 #include "luau_export_plugin.h"
 #include "luau_shader_editor.h"
 #include "luau_highlighter.h"
+#include "luau_formatter.h"
+#include "luau_editor_assist.h"
+#include "luau_lint.h"
+#include "editor_theme_tools.h"
 #include "editor/script/script_editor_plugin.h"
 static void initialize_luau_shader_editor() {
+    LuauFormatter::initialize();
+    ludot_initialize_editor_assist();
+    ludot_initialize_lint();
     Ref<LuauSyntaxHighlighter> highlighter;
     highlighter.instantiate();
     ScriptEditor::get_singleton()->register_syntax_highlighter(highlighter);
@@ -30,6 +37,7 @@ void initialize_ludot_module(ModuleInitializationLevel level) {
 #ifdef TOOLS_ENABLED
     if (level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
         GDREGISTER_CLASS(LuauSyntaxHighlighter);
+        GDREGISTER_INTERNAL_CLASS(LudotThemeTools);
         EditorNode::add_init_callback(initialize_luau_shader_editor);
     }
 #endif

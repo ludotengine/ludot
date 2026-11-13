@@ -149,6 +149,29 @@ jobs:
         with:
           path: ${{ env.CACHE_DIRECTORY }}
           key: scons-${{ matrix.platform }}-${{ github.ref_name }}-${{ github.sha }}
+      - name: Install StyLua
+        uses: JohnnyMorganz/stylua-action@v4
+        with:
+          version: v2.6.0
+          args: --version
+      - name: Bundle StyLua
+        shell: python
+        run: |
+          import io, pathlib, shutil, sys, urllib.request, zipfile
+          directory = pathlib.Path("engine/bin")
+          if sys.platform == "darwin":
+              directory /= "ludot_macos_editor.app/Contents/MacOS"
+          suffix = ".exe" if sys.platform == "win32" else ""
+          shutil.copy2(shutil.which("stylua"), directory / ("ludot.stylua" + suffix))
+          shutil.copy2("thirdparty/stylua/LICENSE.md", directory / "ludot.stylua.LICENSE.md")
+          platform = {"linux": "linux", "darwin": "macos", "win32": "windows"}[sys.platform]
+          url = f"https://github.com/Kampfkarren/selene/releases/download/0.32.0/selene-0.32.0-{platform}.zip"
+          archive = zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(url).read()))
+          binary = next(name for name in archive.namelist() if pathlib.PurePosixPath(name).name == "selene" + suffix)
+          destination = directory / ("ludot.selene" + suffix)
+          destination.write_bytes(archive.read(binary))
+          destination.chmod(0o755)
+          shutil.copy2("thirdparty/selene/LICENSE.md", directory / "ludot.selene.LICENSE.md")
       - name: Native engine, debugger, and export tests
         if: runner.os != 'macOS'
         run: python tools/test_desktop.py

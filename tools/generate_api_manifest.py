@@ -15,6 +15,13 @@ def generate(api):
             continue
         builtin = entry in api['builtin_classes']
         rows.append('\t'.join(['C', name, entry.get('inherits', ''), str(int(builtin))]))
+        operators = {'+': '__add', '-': '__sub', '*': '__mul', '/': '__div'}
+        for operator in entry.get('operators', []):
+            if operator['name'] in operators and operator.get('right_type'):
+                right = 'float' if operator['right_type'] == 'int' else operator['right_type']
+                row = '\t'.join(['O', name, operators[operator['name']], right, operator['return_type']])
+                if row not in rows:
+                    rows.append(row)
         for prop in entry.get('members', []) + entry.get('properties', []):
             renamed = casing(prop['name'], True)
             if renamed.isidentifier():

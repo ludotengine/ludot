@@ -148,3 +148,54 @@ Linux, Windows, and macOS passed the complete desktop workflow at `8b23494`
 language/shader/LSP tests, standalone packaging, native engine checks, debugging,
 exported-pack checks, and the nested native constructor regression. The macOS suites ran the executable selected by the
 generated app bundle's `Info.plist`.
+
+### StyLua editor formatting
+
+The script editor provides Format Document and Format Selection in the Luau
+right-click menu. StyLua and format on save default to enabled. Editor Settings
+under Text Editor > Luau > StyLua exposes the executable, indentation, line width,
+quotes, call parentheses, simple statement collapsing, block spacing, function
+name spacing, line endings, and require sorting. The syntax is fixed to Luau.
+Desktop packages bundle StyLua 2.6.0. Source builds use `stylua` on PATH unless
+an executable is selected in settings.
+
+The native Ludot parser protects imports, class headers, property declarations,
+and qualified methods while formatting the rest with StyLua. Protected declarations
+retain their spelling and internal formatting. This is not a StyLua parser fork.
+Invalid source or formatter errors leave the editor buffer unchanged. Selection
+formatting follows StyLua's complete-statement range behavior.
+
+The Linux editor build, headless engine regression, and headless editor regression
+passed locally on 2026-11-12. Language, shader, and LSP regressions also passed.
+Cross-platform CI results are not yet verified.
+
+### Editor assistance
+
+The CharacterBody3D movement template uses four-direction input on the X/Z plane,
+with positive jump velocity. Movement templates use immutable bindings.
+Native arithmetic signatures now come from Godot's operator table, including
+Basis/Transform3D multiplied by Vector3. Hover cards also carry inferred variable
+types and native property documentation, in addition to function signatures.
+Luau block completion inserts indentation and `end` on Enter after block headers;
+it can be disabled under Text Editor > Luau > Completion.
+
+Editor Settings > Themes saves named themes and imports/exports compressed
+`LDT1:` share codes. See [themes.md](themes.md) for palettes and customization.
+
+The editor runs optional Selene 0.32.0 checks on unsaved buffers. Desktop packages
+bundle Selene with its license. Source builds use `selene` on PATH. Text Editor >
+Luau > Lint controls the executable, a custom Selene TOML configuration, and naming
+rules for variables, constants, functions, methods, properties, and classes.
+Bindings and functions default to camelCase, properties and classes to PascalCase.
+Leading underscores are allowed. Naming diagnostics never rename symbols.
+
+Selene receives a parser-identified compatibility view: imports, class properties,
+and qualified methods are omitted, class braces become blocks, and `const` becomes
+`local`. Native type checking still validates the original document. Selene's
+undefined-global and standard-library checks default to disabled because the
+native checker owns engine API types. This is an integration, not a Selene parser
+fork; omitted regions do not receive Selene checks. Native naming checks cover
+class declarations and properties. `-- selene: allow(rule)` and file-level
+`--# selene: allow(rule)` suppress diagnostics; `naming_convention` controls naming.
+StyLua's `-- stylua: ignore` and `-- stylua: ignore start` / `-- stylua: ignore end` comments pass through
+to the formatter. Formatter and lint ignore directives have separate meanings.

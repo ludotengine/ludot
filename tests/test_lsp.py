@@ -57,6 +57,15 @@ class LspTests(unittest.TestCase):
         self.server.documents[uri] = {'version': 2, 'text': text}
         result = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 7}}})
         self.assertIn('projectRayNormal', [entry['label'] for entry in result])
+    def test_transform_operator_results(self):
+        self.server.api = ROOT / 'types/engine.api'
+        uri = self.open('--!strict\nconst direction = Basis.new() * Vector3.new(1, 2, 3)\nconst x: number = direction.X\nconst translated: Vector3 = Transform3D.new() * direction\nreturn translated')
+        checked, _ = self.server.analyze(uri)
+        self.assertEqual(checked['diagnostics'], [])
+        self.server.documents[uri] = {'version': 2, 'text': '--!strict\nconst direction = Basis.new() * Vector3.new(1, 2, 3)\nreturn direction.X.X'}
+        checked, _ = self.server.analyze(uri)
+        self.assertTrue(checked['diagnostics'])
+
     def test_persistent_session_and_import_invalidation(self):
         (self.root / 'helper.luau').write_text('return {Value = 1}')
         uri = self.open('--!strict\nimport "./helper" as helper\nlocal value: number = helper.Value\nreturn value')

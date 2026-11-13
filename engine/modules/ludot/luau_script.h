@@ -39,6 +39,7 @@ public:
     void set_source_code(const String &p_code) override { source = p_code; }
     Error reload(bool p_keep_state = false) override;
     Array get_diagnostics() const;
+    Array get_lint_warnings(const String &p_code) const;
     PackedStringArray get_completions(const String &p_code) const;
     Dictionary get_symbol_help(const String &p_code, const String &p_symbol, Object *p_owner = nullptr) const;
 #ifdef TOOLS_ENABLED

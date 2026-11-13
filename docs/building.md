@@ -222,3 +222,21 @@ For visual hover-card checks on a desktop session, run
 `python tools/test_editor.py <editor-binary> --screenshots build/hover-cards`.
 This opens an isolated editor project, captures GDScript and Luau cards with the
 real renderer, and verifies their maximum height and fixed documentation footer.
+
+### Script formatter
+
+Source editor builds can use StyLua 2.6.0 from PATH, or the executable selected in
+Editor Settings under Text Editor > Luau > StyLua. CI bundles that version beside
+the editor as `ludot.stylua`, with `.exe` on Windows, and includes its MPL-2.0
+license. The original source is https://github.com/JohnnyMorganz/StyLua/tree/v2.6.0.
+The syntax setting is always Luau. The deprecated `no_call_parentheses` option is
+represented by its replacement, `call_parentheses`.
+
+Selene 0.32.0 is bundled as `ludot.selene` in the same directory. Source builds
+can install it separately or choose a path in Text Editor > Luau > Lint. Its TOML
+configuration can select individual lint rules. The default uses the `luau`
+standard library; native checking supplies the engine API types. Naming styles
+are lint settings, rather than StyLua rewrites, so formatting does not rename
+references or public API members.
+The pinned Selene source and license are available at
+https://github.com/Kampfkarren/selene/tree/0.32.0.

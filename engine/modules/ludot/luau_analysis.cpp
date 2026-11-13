@@ -17,6 +17,7 @@
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
 #include <memory>
+#include <set>
 #include <unordered_map>
 
 namespace {
@@ -141,7 +142,24 @@ struct Session {
                 getMutable<ExternType>(this->classes.at(it->first))->props[utf8(LuauLanguage::api_name(constant, true))] = Property::readonly(type(PropertyInfo(value.get_type(), "")));
             }
             TableType::Props operations;
-            for (const char *operation : {"__add", "__sub", "__mul", "__div"}) operations[operation] = Property::readonly(arena.addType(FunctionType{arena.addTypePack({it->second, builtins->anyType}), arena.addTypePack({it->second})}));
+            const std::pair<const char *, ::Variant::Operator> arithmetic[] = {
+                {"__add", ::Variant::OP_ADD}, {"__sub", ::Variant::OP_SUBTRACT},
+                {"__mul", ::Variant::OP_MULTIPLY}, {"__div", ::Variant::OP_DIVIDE},
+            };
+            for (const auto &operation : arithmetic) {
+                std::vector<TypeId> overloads;
+                std::set<std::pair<TypeId, TypeId>> signatures;
+                for (int right = ::Variant::BOOL; right < ::Variant::VARIANT_MAX; ++right) {
+                    const auto result = ::Variant::get_operator_return_type(operation.second, ::Variant::Type(i), ::Variant::Type(right));
+                    if (result == ::Variant::NIL) continue;
+                    TypeId argument = type(PropertyInfo(::Variant::Type(right), ""));
+                    TypeId returned = type(PropertyInfo(result, ""));
+                    if (!signatures.emplace(argument, returned).second) continue;
+                    overloads.push_back(arena.addType(FunctionType{arena.addTypePack({it->second, argument}), arena.addTypePack({returned})}));
+                }
+                if (overloads.size() == 1) operations[operation.first] = Property::readonly(overloads.front());
+                else if (!overloads.empty()) operations[operation.first] = Property::readonly(arena.addType(IntersectionType{std::move(overloads)}));
+            }
             object->metatable = arena.addType(TableType{operations, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
         }
         List<Engine::Singleton> singletons;
@@ -454,6 +472,14 @@ Dictionary ludot_symbol_help(const String &source, const String &path, const Str
     if (!type) {
         const auto ancestry = Luau::findAstAncestryOfPosition(*parsed, position, true);
         for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it) {
+            if (auto annotation = (*it)->asType()) {
+                if (auto found = module->astResolvedTypes.find(annotation)) { type = *found; break; }
+            }
+        }
+    }
+    if (!type) {
+        const auto ancestry = Luau::findAstAncestryOfPosition(*parsed, position, true);
+        for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it) {
             if (auto expr = (*it)->as<Luau::AstExprFunction>()) {
                 if (auto found = module->astTypes.find(expr)) { type = *found; break; }
             }
@@ -482,7 +508,74 @@ Dictionary ludot_symbol_help(const String &source, const String &path, const Str
             }
         }
     }
-    if (!fn) return {};
+    if (!fn) {
+        Dictionary value;
+        value["kind"] = "value";
+        value["display_name"] = symbol;
+        value["value_type"] = String::utf8(Luau::toString(resolved).c_str());
+        value["symbol_type"] = "Variable";
+        if (const auto native = analysis.classes.find(utf8(symbol)); native != analysis.classes.end() && Luau::follow(native->second) == resolved) {
+            value["symbol_type"] = "Type";
+            value["declaring_class"] = symbol;
+            value["value_type"] = symbol;
+        }
+        const auto ancestry = Luau::findAstAncestryOfPosition(*parsed, position, true);
+        for (auto *node : ancestry) {
+            if (!node->asType()) continue;
+            value["symbol_type"] = "Type";
+            if (const auto external = Luau::get<Luau::ExternType>(resolved)) {
+                if (analysis.instances.count(external->name)) value["declaring_class"] = String::utf8(external->name.c_str());
+            }
+        }
+        const std::pair<const char *, const char *> primitive_docs[] = {
+            {"number", "A double-precision numeric value used for arithmetic."},
+            {"string", "A sequence of bytes used for text and binary data."},
+            {"boolean", "The logical values true and false."},
+            {"nil", "The absence of a value."},
+            {"any", "A value whose type is not checked. Operations on it are permitted without type validation."},
+            {"unknown", "A value of an unknown type. Refine its type before using it."},
+            {"never", "A type with no possible values, used for unreachable code."},
+            {"thread", "A Luau coroutine."},
+            {"buffer", "A mutable sequence of bytes with typed read and write operations."},
+        };
+        if (String(value["symbol_type"]) == "Type") {
+            for (const auto &primitive : primitive_docs) {
+                if (symbol == primitive.first) value["description"] = primitive.second;
+            }
+        }
+        for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it) {
+            auto index = (*it)->as<Luau::AstExprIndexName>();
+            if (!index || !index->indexLocation.contains(position)) continue;
+            auto receiver = module->astTypes.find(index->expr);
+            if (!receiver) break;
+            auto external = Luau::get<Luau::ExternType>(Luau::follow(*receiver));
+            while (external) {
+                String class_name = String::utf8(external->name.c_str());
+                List<PropertyInfo> properties;
+                if (ClassDB::class_exists(class_name)) ClassDB::get_property_list(class_name, &properties, true);
+                else {
+                    for (int builtin = ::Variant::VECTOR2; builtin < ::Variant::VARIANT_MAX; ++builtin) {
+                        if (::Variant::get_type_name(::Variant::Type(builtin)) != class_name) continue;
+                        ::Variant instance;
+                        Callable::CallError error;
+                        ::Variant::construct(::Variant::Type(builtin), instance, nullptr, 0, error);
+                        if (error.error == Callable::CallError::CALL_OK) instance.get_property_list(&properties);
+                        break;
+                    }
+                }
+                for (const PropertyInfo &property : properties) {
+                    if (LuauLanguage::api_name(property.name, true) != symbol) continue;
+                    value["symbol_type"] = "Property";
+                    value["declaring_class"] = class_name;
+                    value["native_member"] = property.name;
+                    return value;
+                }
+                external = external->parent ? Luau::get<Luau::ExternType>(Luau::follow(*external->parent)) : nullptr;
+            }
+            break;
+        }
+        return value;
+    }
     Dictionary info;
     info["display_name"] = symbol;
     info["return_type"] = String::utf8(Luau::toString(fn->retTypes).c_str());

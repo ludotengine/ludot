@@ -8,6 +8,29 @@ func check(condition: bool, message: String) -> void:
         push_error(message)
 
 func _init() -> void:
+    var operator_script = ClassDB.instantiate("LuauScript")
+    operator_script.set_source_code("""class OperatorTypes extends RefCounted = {
+    function component(): number
+        const direction = Basis.new() * Vector3.new(1, 2, 3)
+        return direction.X
+    end
+    function translated(): number
+        const direction = Transform3D.new() * Vector3.new(1, 2, 3)
+        return direction.Z
+    end
+}""")
+    check(operator_script.get_diagnostics().is_empty(), "Basis and Transform3D products infer Vector3 components")
+    check(operator_script.reload() == OK, "Transform multiplication script compiles")
+    var operator_instance = RefCounted.new()
+    operator_instance.set_script(operator_script)
+    check(operator_instance.call("component") == 1, "Basis product has numeric X at runtime")
+    operator_script.set_source_code("""class InvalidOperatorTypes extends RefCounted = {
+    function component(): number
+        const direction = Basis.new() * Vector3.new(1, 2, 3)
+        return direction.X.X
+    end
+}""")
+    check(not operator_script.get_diagnostics().is_empty(), "Vector3 component cannot be indexed as another vector")
     var nested_script = ClassDB.instantiate("LuauScript")
     nested_script.set_source_code("""class NestedConstruction extends Node = {
     private Child: Node = Node.new()

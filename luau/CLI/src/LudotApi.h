@@ -85,9 +85,23 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source)
             if (row[3] == "1")
             {
                 TableType::Props operations;
-                for (const char* operation : {"__add", "__sub", "__mul", "__div"})
-                    operations[operation] = Property::readonly(arena.addType(FunctionType{arena.addTypePack({it->second, builtins->anyType}), arena.addTypePack({it->second})}));
                 instance->metatable = arena.addType(TableType{operations, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed});
+            }
+        }
+        else if (row[0] == "O" && row.size() == 5 && instance->metatable)
+        {
+            auto operations = getMutable<TableType>(*instance->metatable);
+            TypeId overload = arena.addType(FunctionType{arena.addTypePack({it->second, type(type, row[3])}), arena.addTypePack({type(type, row[4])})});
+            auto found = operations->props.find(row[2]);
+            if (found == operations->props.end()) operations->props[row[2]] = Property::readonly(overload);
+            else
+            {
+                TypeId previous = *found->second.readTy;
+                std::vector<TypeId> parts;
+                if (auto intersection = get<IntersectionType>(previous)) parts = intersection->parts;
+                else parts.push_back(previous);
+                parts.push_back(overload);
+                found->second = Property::readonly(arena.addType(IntersectionType{std::move(parts)}));
             }
         }
         else if (row[0] == "P" && row.size() == 4) instance->props[row[2]] = Property::rw(type(type, row[3]));

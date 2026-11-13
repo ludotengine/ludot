@@ -33,6 +33,63 @@ func run() -> void:
     if highlighter.get_class() != "LuauSyntaxHighlighter":
         get_tree().quit(1)
         return
+    # Exercise the actual context-menu action, including AST dialect protection.
+    var formatter_source = 'import "@helpers/setup"\nclass FormatTest extends Node = {\n\texport Speed: number = 1 in 0 to 2 step 0.1\n\tfunction _ready()\n\t\tconst value={a=1,b="café class import"}\n\t\t-- stylua: ignore\n\t\tconst ignored={x=1}\n\t\tprint(value)\n\tend\n}\n'
+    code.text = formatter_source
+    var click = InputEventMouseButton.new()
+    click.button_index = MOUSE_BUTTON_RIGHT
+    click.pressed = true
+    click.position = Vector2(10, 10)
+    code.gui_input.emit(click)
+    var format_menu: PopupMenu = null
+    var format_id = -1
+    for popup in editor.find_children("*", "PopupMenu", true, false):
+        for index in range(popup.item_count):
+            if popup.get_item_text(index) == "Format Document":
+                format_menu = popup
+                format_id = popup.get_item_id(index)
+    check(format_menu != null, "Luau offers Format Document in its context menu")
+    if format_menu != null:
+        format_menu.id_pressed.emit(format_id)
+        check(code.text.contains('const value = { a = 1, b = "café class import" }'), "StyLua formats const, Unicode, and table expressions")
+        check(code.text.contains('export Speed: number = 1 in 0 to 2 step 0.1'), "Formatting preserves export range declarations")
+        check(code.text.contains('import "@helpers/setup"'), "Formatting preserves Ludot imports")
+        check(code.text.contains("const ignored={x=1}"), "StyLua ignore comments preserve the following statement")
+        var formatted_once = code.text
+        format_menu.id_pressed.emit(format_id)
+        check(code.text == formatted_once, "Dialect formatting is idempotent")
+        code.undo()
+        check(code.text == formatter_source, "Formatting is one undo operation")
+        code.text = 'const first={x="café"}\nconst second={y=2}\n'
+        code.select(1, 0, 1, code.get_line(1).length())
+        for index in range(format_menu.item_count):
+            if format_menu.get_item_text(index) == "Format Selection":
+                format_menu.id_pressed.emit(format_menu.get_item_id(index))
+        check(code.get_line(0) == 'const first={x="café"}' and code.get_line(1) == "const second = { y = 2 }", "Selection formatting preserves unselected source and maps UTF-8 offsets")
+        format_menu.hide()
+    code.text = saved_editor_source
+    code.text = "if true then"
+    code.set_caret_line(0)
+    code.set_caret_column(code.get_line(0).length())
+    var enter = InputEventKey.new()
+    enter.keycode = KEY_ENTER
+    enter.pressed = true
+    code.gui_input.emit(enter)
+    check(code.get_line_count() == 3 and code.get_line(2) == "end" and code.get_caret_line() == 1, "Enter inserts an indented block and end")
+    code.text = "if true then\nend"
+    code.set_caret_line(0)
+    code.set_caret_column(code.get_line(0).length())
+    code.gui_input.emit(enter)
+    check(code.text.count("end") == 1, "Block completion preserves an existing end")
+    code.text = saved_editor_source
+    var naming_warnings = script.get_lint_warnings("const bad_name = 1\nprint(bad_name)")
+    check(naming_warnings.any(func(w): return w.code == "naming_convention"), "Naming rules flag inconsistent immutable binding names")
+    var ignored_warnings = script.get_lint_warnings("--# selene: allow(naming_convention)\nconst bad_name = 1\nprint(bad_name)")
+    check(not ignored_warnings.any(func(w): return w.code == "naming_convention"), "File-level Selene comments suppress naming diagnostics")
+    var unused_warnings = script.get_lint_warnings("const unused = 1")
+    check(unused_warnings.any(func(w): return w.code == "unused_variable"), "Selene checks immutable bindings in unsaved buffers")
+    var suppressed_unused = script.get_lint_warnings("-- selene: allow(unused_variable)\nconst unused = 1")
+    check(not suppressed_unused.any(func(w): return w.code == "unused_variable"), "Selene comments suppress the following statement")
     var normal: Color = code.get_theme_color("font_color")
     check(highlighter.get_line_syntax_highlighting(0)[0].color != normal, "class keyword has a color")
     check(highlighter.get_line_syntax_highlighting(3)[14].color != normal, "strings have a color")
@@ -102,6 +159,15 @@ func run() -> void:
     check(help.get("return_type") == "Node" and help.parameters[0].name == "path", "Luau hover includes native parameter and return types")
     var boundary_help = script.get_symbol_help(hover_source.replace("getNo" + String.chr(0xffff) + "de", "getNode" + String.chr(0xffff)), "getNode")
     check(boundary_help.get("native_member") == "get_node", "Luau hover resolves the trailing edge of a function name")
+    var property_source = 'class Player extends CharacterBody3D = { function _physicsProcess(delta: number) print(self.Velo' + String.chr(0xffff) + 'city) end }'
+    var property_help = script.get_symbol_help(property_source, "Velocity")
+    check(property_help.get("value_type") == "Vector3", "Property hover reports its datatype")
+    check(property_help.get("declaring_class") == "CharacterBody3D" and property_help.get("native_member") == "velocity", "Property hover maps to the native property documentation")
+    var type_source = 'const speed: num' + String.chr(0xffff) + 'ber = 5'
+    var type_help = script.get_symbol_help(type_source, "number")
+    check(type_help.get("symbol_type") == "Type" and type_help.get("value_type") == "number", "Primitive type annotations provide a type hover")
+    var variable_source = 'const speed = 5\nprint(sp' + String.chr(0xffff) + 'eed)'
+    check(script.get_symbol_help(variable_source, "speed").get("value_type") == "number", "Variable hover reports the inferred type")
     var local_source = '--- Adds two numbers.\nconst function add(a: number, b: number): number\n    return a + b\nend\nclass Player extends Node = { function _ready() ad' + String.chr(0xffff) + 'd(1, 2) end }'
     help = script.get_symbol_help(local_source, "add")
     check(help.get("return_type") == "number" and help.parameters.size() == 2, "Local Luau function hover retains its full signature")
@@ -209,6 +275,10 @@ func run() -> void:
         if FileAccess.file_exists(path):
             var generated = load(path)
             check(generated.get_diagnostics().is_empty(), base + " template passes type checking: " + str(generated.get_diagnostics()))
+            check(not generated.source_code.contains("local "), "Templates use const for immutable bindings")
+            if base == "CharacterBody3D":
+                check(generated.source_code.contains('"ui_up", "ui_down"'), "3D movement includes forward and backward input")
+                check(generated.source_code.contains("velocity.Z = direction.Z"), "3D movement updates the Z axis")
             var expected_name = "Walker" if base == "CharacterBody3D" else base + "Script"
             check(generated.source_code.begins_with("class " + expected_name + " extends " + base), "Template class names avoid native type collisions")
     dialog.queue_free()
@@ -228,6 +298,39 @@ func run() -> void:
         for word in ["export", "in", "to", "step"]:
             check(shader_colors[range_line.find(word)].color == keyword_color, "Lushader " + word + " uses the keyword color")
         check(shader_colors[range_line.find("number")].color == EditorInterface.get_editor_settings().get_setting("text_editor/theme/highlighting/base_type_color"), "Lushader scalar types use the type color")
+    var theme_panels = EditorInterface.get_base_control().find_children("*", "LudotThemeTools", true, false)
+    check(theme_panels.size() == 1, "Editor Settings provides the Themes tab")
+    if theme_panels.size() == 1:
+        var panel = theme_panels[0]
+        var preset: OptionButton = panel.find_children("*", "OptionButton", true, false)[0]
+        check(preset.item_count >= 5, "All five palette presets are available")
+        preset.item_selected.emit(2)
+        var settings = EditorInterface.get_editor_settings()
+        check(settings.get_setting("interface/theme/base_color").to_html(false) == "2e3440", "Nord sets the editor window color")
+        var code_box: TextEdit = panel.find_children("*", "TextEdit", true, false)[0]
+        var buttons = panel.find_children("*", "Button", true, false)
+        for button in buttons:
+            if button.text == "Copy Current Theme Code": button.pressed.emit()
+        var nord_code = code_box.text
+        check(nord_code.begins_with("LDT1:"), "Theme export produces a versioned share code")
+        preset.item_selected.emit(4)
+        code_box.text = nord_code
+        for button in buttons:
+            if button.text == "Apply Theme Code": button.pressed.emit()
+        check(settings.get_setting("interface/theme/base_color").to_html(false) == "2e3440", "Theme share code restores editor colors")
+        var name_field: LineEdit = panel.get_node("ThemeName")
+        name_field.text = "Regression Nord"
+        for button in buttons:
+            if button.text == "Save Theme": button.pressed.emit()
+        check(settings.get_setting("interface/theme/ludot_saved_themes").has("Regression Nord"), "Named themes are stored in editor settings")
+        check(not settings.property_get_revert("interface/theme/ludot_saved_themes").has("Regression Nord"), "Saving a theme preserves the empty default for persistence")
+        for button in buttons:
+            if button.text == "Delete Saved Theme": button.pressed.emit()
+        check(not settings.get_setting("interface/theme/ludot_saved_themes").has("Regression Nord"), "Saved themes can be deleted")
+        code_box.text = "LDT1:broken"
+        for button in buttons:
+            if button.text == "Apply Theme Code": button.pressed.emit()
+        check(settings.get_setting("interface/theme/base_color").to_html(false) == "2e3440", "Invalid theme codes leave colors unchanged")
     # Do not leave the deliberately incomplete completion buffer dirty at exit.
     code.text = script.source_code
     if failures.is_empty():

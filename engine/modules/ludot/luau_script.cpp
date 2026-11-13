@@ -3,6 +3,7 @@
 #include "core/object/method_bind.h"
 #ifdef TOOLS_ENABLED
 #include "luau_analysis.h"
+#include "luau_lint.h"
 #endif
 #include "Luau/Compiler.h"
 #include "Luau/ExperimentalFlags.h"
@@ -1201,6 +1202,7 @@ LuauScript::~LuauScript() {
 }
 void LuauScript::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_diagnostics"), &LuauScript::get_diagnostics);
+    ClassDB::bind_method(D_METHOD("get_lint_warnings", "code"), &LuauScript::get_lint_warnings);
     ClassDB::bind_method(D_METHOD("get_completions", "code"), &LuauScript::get_completions);
     ClassDB::bind_method(D_METHOD("get_symbol_help", "code", "symbol", "owner"), &LuauScript::get_symbol_help, DEFVAL(Variant()));
 }
@@ -1220,6 +1222,29 @@ Dictionary LuauScript::get_symbol_help(const String &p_code, const String &p_sym
 #else
     return {};
 #endif
+}
+Array LuauScript::get_lint_warnings(const String &p_code) const {
+    Array result;
+#ifdef TOOLS_ENABLED
+    const CharString bytes = p_code.utf8();
+    Luau::Allocator allocator;
+    Luau::AstNameTable names(allocator);
+    Luau::ParseOptions options;
+    options.captureComments = true;
+    const auto parsed = Luau::Parser::parse(bytes.get_data(), bytes.length(), names, allocator, options);
+    if (!parsed.errors.empty()) return result;
+    List<ScriptLanguage::Warning> warnings;
+    ludot_lint(p_code, parsed, &warnings);
+    for (const auto &warning : warnings) {
+        Dictionary item;
+        item["line"] = warning.start_line;
+        item["end_line"] = warning.end_line;
+        item["code"] = warning.string_code;
+        item["message"] = warning.message;
+        result.push_back(item);
+    }
+#endif
+    return result;
 }
 Array LuauScript::get_diagnostics() const {
     List<ScriptLanguage::ScriptError> errors;
@@ -1586,12 +1611,18 @@ bool LuauLanguage::validate(const String &p_script, const String &p_path, List<S
     const CharString text = p_script.utf8();
     Luau::Allocator allocator;
     Luau::AstNameTable names(allocator);
-    const auto parsed = Luau::Parser::parse(text.get_data(), text.length(), names, allocator);
+    Luau::ParseOptions parse_options;
+    parse_options.captureComments = true;
+    const auto parsed = Luau::Parser::parse(text.get_data(), text.length(), names, allocator, parse_options);
     for (const auto &error : parsed.errors) {
         if (r_errors != nullptr) { ScriptError info; info.path = p_path; info.line = error.getLocation().begin.line + 1; info.column = error.getLocation().begin.column + 1; info.message = String::utf8(error.what()); r_errors->push_back(info); }
     }
 #ifdef TOOLS_ENABLED
-    if (parsed.errors.empty()) return ludot_validate(p_script, p_path, r_errors);
+    if (parsed.errors.empty()) {
+        bool valid = ludot_validate(p_script, p_path, r_errors);
+        ludot_lint(p_script, parsed, r_warnings);
+        return valid;
+    }
 #endif
     return parsed.errors.empty();
 }
@@ -1676,14 +1707,11 @@ _TS_export Speed: number = 300 in 0 to 1000 step 1
 _TS_export JumpVelocity: number = -400
 
 _TS_function _physicsProcess(delta: number)
-_TS__TS_local velocity = self.Velocity
-_TS__TS_if not self:isOnFloor() then
-_TS__TS__TS_velocity += self:getGravity() * delta
-_TS__TS_end
+_TS__TS_const velocity = self.Velocity + (if self:isOnFloor() then Vector2.new() else self:getGravity() * delta)
 _TS__TS_if Input:isActionJustPressed("ui_accept") and self:isOnFloor() then
 _TS__TS__TS_velocity.Y = self.JumpVelocity
 _TS__TS_end
-_TS__TS_local direction = Input:getAxis("ui_left", "ui_right")
+_TS__TS_const direction = Input:getAxis("ui_left", "ui_right")
 _TS__TS_velocity.X = direction * self.Speed
 _TS__TS_self.Velocity = velocity
 _TS__TS_self:moveAndSlide()
@@ -1691,7 +1719,25 @@ _TS_end
 }
 )";
         if (p_object == "CharacterBody3D") {
-            entry.content = entry.content.replace("= 300 in 0 to 1000 step 1", "= 5 in 0 to 100 step 0.1").replace("= -400", "= 4.5");
+            entry.description = "3D movement on the X/Z plane, gravity, and jumping using the built-in UI actions.";
+            entry.content = R"(class _CLASS_ extends _BASE_ = {
+_TS_export Speed: number = 5 in 0 to 100 step 0.1
+_TS_export JumpVelocity: number = 4.5
+
+_TS_function _physicsProcess(delta: number)
+_TS__TS_const velocity = self.Velocity + (if self:isOnFloor() then Vector3.new() else self:getGravity() * delta)
+_TS__TS_if Input:isActionJustPressed("ui_accept") and self:isOnFloor() then
+_TS__TS__TS_velocity.Y = self.JumpVelocity
+_TS__TS_end
+_TS__TS_const input = Input:getVector("ui_left", "ui_right", "ui_up", "ui_down")
+_TS__TS_const direction = (self.Transform.Basis * Vector3.new(input.X, 0, input.Y)):normalized()
+_TS__TS_velocity.X = direction.X * self.Speed
+_TS__TS_velocity.Z = direction.Z * self.Speed
+_TS__TS_self.Velocity = velocity
+_TS__TS_self:moveAndSlide()
+_TS_end
+}
+)";
         }
     } else return result;
     result.push_back(entry);

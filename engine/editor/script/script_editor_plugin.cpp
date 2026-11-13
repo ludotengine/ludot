@@ -30,6 +30,8 @@
 
 #include "script_editor_plugin.h"
 
+#include "modules/ludot/luau_formatter.h"
+
 #include "core/config/project_settings.h"
 #include "core/input/input.h"
 #include "core/io/config_file.h"
@@ -2592,6 +2594,9 @@ void ScriptEditor::_reload_scripts(bool p_refresh_only) {
 }
 
 void ScriptEditor::_auto_format_text(ScriptEditorBase *p_seb) {
+	if (ScriptTextEditor *editor = Object::cast_to<ScriptTextEditor>(p_seb)) {
+		LuauFormatter::format(editor, false, true);
+	}
 	if (TextEditorBase *teb = Object::cast_to<TextEditorBase>(p_seb)) {
 		if (trim_trailing_whitespace_on_save) {
 			teb->trim_trailing_whitespace();

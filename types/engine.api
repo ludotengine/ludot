@@ -1,5 +1,12 @@
 LUDOT_API_1
 C	Vector2		1
+O	Vector2	__mul	float	Vector2
+O	Vector2	__div	float	Vector2
+O	Vector2	__add	Vector2	Vector2
+O	Vector2	__sub	Vector2	Vector2
+O	Vector2	__mul	Vector2	Vector2
+O	Vector2	__div	Vector2	Vector2
+O	Vector2	__mul	Transform2D	Vector2
 P	Vector2	X	float
 P	Vector2	Y	float
 F	Vector2	angle	float	0	0
@@ -60,6 +67,14 @@ K	Vector2	DOWN	Vector2
 K	Vector2	AXISX	int
 K	Vector2	AXISY	int
 C	Vector2i		1
+O	Vector2i	__mul	float	Vector2i
+O	Vector2i	__div	float	Vector2i
+O	Vector2i	__mul	float	Vector2
+O	Vector2i	__div	float	Vector2
+O	Vector2i	__add	Vector2i	Vector2i
+O	Vector2i	__sub	Vector2i	Vector2i
+O	Vector2i	__mul	Vector2i	Vector2i
+O	Vector2i	__div	Vector2i	Vector2i
 P	Vector2i	X	int
 P	Vector2i	Y	int
 F	Vector2i	aspect	float	0	0
@@ -90,6 +105,7 @@ K	Vector2i	DOWN	Vector2i
 K	Vector2i	AXISX	int
 K	Vector2i	AXISY	int
 C	Rect2		1
+O	Rect2	__mul	Transform2D	Rect2
 P	Rect2	Position	Vector2
 P	Rect2	Size	Vector2
 P	Rect2	End	Vector2
@@ -127,6 +143,15 @@ F	Rect2i	growSide	Rect2i	0	0	int	int
 F	Rect2i	growIndividual	Rect2i	0	0	int	int	int	int
 F	Rect2i	abs	Rect2i	0	0
 C	Vector3		1
+O	Vector3	__mul	float	Vector3
+O	Vector3	__div	float	Vector3
+O	Vector3	__add	Vector3	Vector3
+O	Vector3	__sub	Vector3	Vector3
+O	Vector3	__mul	Vector3	Vector3
+O	Vector3	__div	Vector3	Vector3
+O	Vector3	__mul	Quaternion	Vector3
+O	Vector3	__mul	Basis	Vector3
+O	Vector3	__mul	Transform3D	Vector3
 P	Vector3	X	float
 P	Vector3	Y	float
 P	Vector3	Z	float
@@ -197,6 +222,14 @@ K	Vector3	AXISX	int
 K	Vector3	AXISY	int
 K	Vector3	AXISZ	int
 C	Vector3i		1
+O	Vector3i	__mul	float	Vector3i
+O	Vector3i	__div	float	Vector3i
+O	Vector3i	__mul	float	Vector3
+O	Vector3i	__div	float	Vector3
+O	Vector3i	__add	Vector3i	Vector3i
+O	Vector3i	__sub	Vector3i	Vector3i
+O	Vector3i	__mul	Vector3i	Vector3i
+O	Vector3i	__div	Vector3i	Vector3i
 P	Vector3i	X	int
 P	Vector3i	Y	int
 P	Vector3i	Z	int
@@ -230,6 +263,12 @@ K	Vector3i	AXISX	int
 K	Vector3i	AXISY	int
 K	Vector3i	AXISZ	int
 C	Transform2D		1
+O	Transform2D	__mul	float	Transform2D
+O	Transform2D	__div	float	Transform2D
+O	Transform2D	__mul	Vector2	Vector2
+O	Transform2D	__mul	Rect2	Rect2
+O	Transform2D	__mul	Transform2D	Transform2D
+O	Transform2D	__mul	PackedVector2Array	PackedVector2Array
 P	Transform2D	X	Vector2
 P	Transform2D	Y	Vector2
 P	Transform2D	Origin	Vector2
@@ -258,6 +297,13 @@ K	Transform2D	IDENTITY	Transform2D
 K	Transform2D	FLIPX	Transform2D
 K	Transform2D	FLIPY	Transform2D
 C	Vector4		1
+O	Vector4	__mul	float	Vector4
+O	Vector4	__div	float	Vector4
+O	Vector4	__add	Vector4	Vector4
+O	Vector4	__sub	Vector4	Vector4
+O	Vector4	__mul	Vector4	Vector4
+O	Vector4	__div	Vector4	Vector4
+O	Vector4	__mul	Projection	Vector4
 P	Vector4	X	float
 P	Vector4	Y	float
 P	Vector4	Z	float
@@ -302,6 +348,14 @@ K	Vector4	AXISY	int
 K	Vector4	AXISZ	int
 K	Vector4	AXISW	int
 C	Vector4i		1
+O	Vector4i	__mul	float	Vector4i
+O	Vector4i	__div	float	Vector4i
+O	Vector4i	__mul	float	Vector4
+O	Vector4i	__div	float	Vector4
+O	Vector4i	__add	Vector4i	Vector4i
+O	Vector4i	__sub	Vector4i	Vector4i
+O	Vector4i	__mul	Vector4i	Vector4i
+O	Vector4i	__div	Vector4i	Vector4i
 P	Vector4i	X	int
 P	Vector4i	Y	int
 P	Vector4i	Z	int
@@ -331,6 +385,7 @@ K	Vector4i	AXISY	int
 K	Vector4i	AXISZ	int
 K	Vector4i	AXISW	int
 C	Plane		1
+O	Plane	__mul	Transform3D	Plane
 P	Plane	X	float
 P	Plane	Y	float
 P	Plane	Z	float
@@ -351,6 +406,12 @@ K	Plane	PLANEYZ	Plane
 K	Plane	PLANEXZ	Plane
 K	Plane	PLANEXY	Plane
 C	Quaternion		1
+O	Quaternion	__mul	float	Quaternion
+O	Quaternion	__div	float	Quaternion
+O	Quaternion	__mul	Vector3	Vector3
+O	Quaternion	__add	Quaternion	Quaternion
+O	Quaternion	__sub	Quaternion	Quaternion
+O	Quaternion	__mul	Quaternion	Quaternion
 P	Quaternion	X	float
 P	Quaternion	Y	float
 P	Quaternion	Z	float
@@ -376,6 +437,7 @@ F	Quaternion	getAxis	Vector3	0	0
 F	Quaternion	getAngle	float	0	0
 K	Quaternion	IDENTITY	Quaternion
 C	AABB		1
+O	AABB	__mul	Transform3D	AABB
 P	AABB	Position	Vector3
 P	AABB	Size	Vector3
 P	AABB	End	Vector3
@@ -405,6 +467,10 @@ F	AABB	getEndpoint	Vector3	0	0	int
 F	AABB	intersectsSegment	Variant	0	0	Vector3	Vector3
 F	AABB	intersectsRay	Variant	0	0	Vector3	Vector3
 C	Basis		1
+O	Basis	__mul	float	Basis
+O	Basis	__div	float	Basis
+O	Basis	__mul	Vector3	Vector3
+O	Basis	__mul	Basis	Basis
 P	Basis	X	Vector3
 P	Basis	Y	Vector3
 P	Basis	Z	Vector3
@@ -434,6 +500,13 @@ K	Basis	FLIPX	Basis
 K	Basis	FLIPY	Basis
 K	Basis	FLIPZ	Basis
 C	Transform3D		1
+O	Transform3D	__mul	float	Transform3D
+O	Transform3D	__div	float	Transform3D
+O	Transform3D	__mul	Vector3	Vector3
+O	Transform3D	__mul	Plane	Plane
+O	Transform3D	__mul	AABB	AABB
+O	Transform3D	__mul	Transform3D	Transform3D
+O	Transform3D	__mul	PackedVector3Array	PackedVector3Array
 P	Transform3D	Basis	Basis
 P	Transform3D	Origin	Vector3
 F	Transform3D	inverse	Transform3D	0	0
@@ -454,6 +527,8 @@ K	Transform3D	FLIPX	Transform3D
 K	Transform3D	FLIPY	Transform3D
 K	Transform3D	FLIPZ	Transform3D
 C	Projection		1
+O	Projection	__mul	Vector4	Vector4
+O	Projection	__mul	Projection	Projection
 P	Projection	X	Vector4
 P	Projection	Y	Vector4
 P	Projection	Z	Vector4
@@ -493,6 +568,12 @@ K	Projection	PLANETOP	int
 K	Projection	PLANERIGHT	int
 K	Projection	PLANEBOTTOM	int
 C	Color		1
+O	Color	__mul	float	Color
+O	Color	__div	float	Color
+O	Color	__add	Color	Color
+O	Color	__sub	Color	Color
+O	Color	__mul	Color	Color
+O	Color	__div	Color	Color
 P	Color	R	float
 P	Color	G	float
 P	Color	B	float
@@ -751,6 +832,7 @@ F	Dictionary	makeReadOnly	void	0	0
 F	Dictionary	isReadOnly	bool	0	0
 F	Dictionary	recursiveEqual	bool	0	0	Dictionary	int
 C	Array		1
+O	Array	__add	Array	Array
 F	Array	size	int	0	0
 F	Array	isEmpty	bool	0	0
 F	Array	clear	void	0	0
@@ -803,6 +885,7 @@ F	Array	getTypedScript	Variant	0	0
 F	Array	makeReadOnly	void	0	0
 F	Array	isReadOnly	bool	0	0
 C	PackedByteArray		1
+O	PackedByteArray	__add	PackedByteArray	PackedByteArray
 F	PackedByteArray	get	int	0	0	int
 F	PackedByteArray	set	void	0	0	int	int
 F	PackedByteArray	size	int	0	0
@@ -873,6 +956,7 @@ F	PackedByteArray	encodeFloat	void	0	0	int	float
 F	PackedByteArray	encodeDouble	void	0	0	int	float
 F	PackedByteArray	encodeVar	int	0	0	int	Variant	bool?
 C	PackedInt32Array		1
+O	PackedInt32Array	__add	PackedInt32Array	PackedInt32Array
 F	PackedInt32Array	get	int	0	0	int
 F	PackedInt32Array	set	void	0	0	int	int
 F	PackedInt32Array	size	int	0	0
@@ -897,6 +981,7 @@ F	PackedInt32Array	rfind	int	0	0	int	int?
 F	PackedInt32Array	count	int	0	0	int
 F	PackedInt32Array	erase	bool	0	0	int
 C	PackedInt64Array		1
+O	PackedInt64Array	__add	PackedInt64Array	PackedInt64Array
 F	PackedInt64Array	get	int	0	0	int
 F	PackedInt64Array	set	void	0	0	int	int
 F	PackedInt64Array	size	int	0	0
@@ -921,6 +1006,7 @@ F	PackedInt64Array	rfind	int	0	0	int	int?
 F	PackedInt64Array	count	int	0	0	int
 F	PackedInt64Array	erase	bool	0	0	int
 C	PackedFloat32Array		1
+O	PackedFloat32Array	__add	PackedFloat32Array	PackedFloat32Array
 F	PackedFloat32Array	get	float	0	0	int
 F	PackedFloat32Array	set	void	0	0	int	float
 F	PackedFloat32Array	size	int	0	0
@@ -945,6 +1031,7 @@ F	PackedFloat32Array	rfind	int	0	0	float	int?
 F	PackedFloat32Array	count	int	0	0	float
 F	PackedFloat32Array	erase	bool	0	0	float
 C	PackedFloat64Array		1
+O	PackedFloat64Array	__add	PackedFloat64Array	PackedFloat64Array
 F	PackedFloat64Array	get	float	0	0	int
 F	PackedFloat64Array	set	void	0	0	int	float
 F	PackedFloat64Array	size	int	0	0
@@ -969,6 +1056,7 @@ F	PackedFloat64Array	rfind	int	0	0	float	int?
 F	PackedFloat64Array	count	int	0	0	float
 F	PackedFloat64Array	erase	bool	0	0	float
 C	PackedStringArray		1
+O	PackedStringArray	__add	PackedStringArray	PackedStringArray
 F	PackedStringArray	get	String	0	0	int
 F	PackedStringArray	set	void	0	0	int	String
 F	PackedStringArray	size	int	0	0
@@ -993,6 +1081,8 @@ F	PackedStringArray	rfind	int	0	0	String	int?
 F	PackedStringArray	count	int	0	0	String
 F	PackedStringArray	erase	bool	0	0	String
 C	PackedVector2Array		1
+O	PackedVector2Array	__mul	Transform2D	PackedVector2Array
+O	PackedVector2Array	__add	PackedVector2Array	PackedVector2Array
 F	PackedVector2Array	get	Vector2	0	0	int
 F	PackedVector2Array	set	void	0	0	int	Vector2
 F	PackedVector2Array	size	int	0	0
@@ -1017,6 +1107,8 @@ F	PackedVector2Array	rfind	int	0	0	Vector2	int?
 F	PackedVector2Array	count	int	0	0	Vector2
 F	PackedVector2Array	erase	bool	0	0	Vector2
 C	PackedVector3Array		1
+O	PackedVector3Array	__mul	Transform3D	PackedVector3Array
+O	PackedVector3Array	__add	PackedVector3Array	PackedVector3Array
 F	PackedVector3Array	get	Vector3	0	0	int
 F	PackedVector3Array	set	void	0	0	int	Vector3
 F	PackedVector3Array	size	int	0	0
@@ -1041,6 +1133,7 @@ F	PackedVector3Array	rfind	int	0	0	Vector3	int?
 F	PackedVector3Array	count	int	0	0	Vector3
 F	PackedVector3Array	erase	bool	0	0	Vector3
 C	PackedColorArray		1
+O	PackedColorArray	__add	PackedColorArray	PackedColorArray
 F	PackedColorArray	get	Color	0	0	int
 F	PackedColorArray	set	void	0	0	int	Color
 F	PackedColorArray	size	int	0	0
@@ -1065,6 +1158,7 @@ F	PackedColorArray	rfind	int	0	0	Color	int?
 F	PackedColorArray	count	int	0	0	Color
 F	PackedColorArray	erase	bool	0	0	Color
 C	PackedVector4Array		1
+O	PackedVector4Array	__add	PackedVector4Array	PackedVector4Array
 F	PackedVector4Array	get	Vector4	0	0	int
 F	PackedVector4Array	set	void	0	0	int	Vector4
 F	PackedVector4Array	size	int	0	0
@@ -9160,6 +9254,7 @@ P	GDExtensionManager	ExtensionsReloaded	Signal
 P	GDExtensionManager	ExtensionLoaded	Signal
 P	GDExtensionManager	ExtensionUnloading	Signal
 C	GDScript	Script	0
+F	GDScript	getSymbolHelp	Dictionary	0	0	String	String	Object?
 F	GDScript	new	Variant	0	1
 C	GDScriptLanguageProtocol	JSONRPC	0
 F	GDScriptLanguageProtocol	getTextDocument	GDScriptTextDocument	0	0
@@ -12599,12 +12694,18 @@ K	LookAtModifier3D	ORIGINFROMSELF	int
 K	LookAtModifier3D	ORIGINFROMSPECIFICBONE	int
 K	LookAtModifier3D	ORIGINFROMEXTERNALNODE	int
 C	LuauScript	Script	0
+F	LuauScript	getDiagnostics	Array	0	0
+F	LuauScript	getLintWarnings	Array	0	0	String
+F	LuauScript	getCompletions	PackedStringArray	0	0	String
+F	LuauScript	getSymbolHelp	Dictionary	0	0	String	String	Object?
 C	LuauShader	Shader	0
 P	LuauShader	Source	String
 P	LuauShader	Diagnostics	String
 F	LuauShader	setSource	void	0	0	String
 F	LuauShader	getSource	String	0	0
 F	LuauShader	getDiagnostics	String	0	0
+F	LuauShader	isLibrary	bool	0	0
+C	LuauSyntaxHighlighter	EditorSyntaxHighlighter	0
 C	MainLoop	Object	0
 F	MainLoop	_initialize	void	0	0
 F	MainLoop	_physicsProcess	bool	0	0	float

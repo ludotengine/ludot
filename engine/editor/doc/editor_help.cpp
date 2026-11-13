@@ -4741,6 +4741,22 @@ void EditorHelpBit::parse_symbol(const String &p_symbol, const String &p_prologu
 		symbol_type = TTR("Theme Property");
 		symbol_hint = SYMBOL_HINT_ASSIGNABLE;
 		help_data = _get_theme_item_help_data(class_name, item_name);
+	} else if (item_type == "value") {
+		symbol_type = item_data.get("symbol_type", TTR("Value"));
+		symbol_name = item_data.get("display_name", item_name);
+		symbol_hint = SYMBOL_HINT_ASSIGNABLE;
+		if (!class_name.is_empty()) {
+			if (item_data.has("native_member")) {
+				help_data = _get_property_help_data(class_name, item_name);
+				symbol_doc_link = vformat("@member %s.%s", class_name, item_name);
+			} else {
+				help_data = _get_class_help_data(class_name);
+				symbol_doc_link = vformat("#%s", class_name);
+			}
+		}
+		help_data.doc_type = {item_data.get("value_type", "any"), String(), false};
+		const String description = item_data.get("description", "");
+		if (!description.is_empty()) help_data.description = description;
 	} else if (item_type == "function") {
 		symbol_type = TTR("Function");
 		symbol_name = item_data.get("display_name", item_name);

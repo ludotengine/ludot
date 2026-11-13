@@ -30,6 +30,8 @@
 
 #include "editor_settings_dialog.h"
 
+#include "modules/ludot/editor_theme_tools.h"
+
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
 #include "core/input/input_map.h"
@@ -1065,6 +1067,8 @@ EditorSettingsDialog::EditorSettingsDialog() {
 	mc->add_child(shortcuts);
 
 	SET_DRAG_FORWARDING_GCD(shortcuts, EditorSettingsDialog);
+
+	tabs->add_child(memnew(LudotThemeTools));
 
 	// Adding event dialog
 	shortcut_editor = memnew(InputEventConfigurationDialog);

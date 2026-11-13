@@ -30,6 +30,9 @@
 
 #include "script_text_editor.h"
 
+#include "modules/ludot/luau_formatter.h"
+#include "modules/ludot/luau_editor_assist.h"
+
 #include "core/config/project_settings.h"
 #include "core/input/input.h"
 #include "core/io/dir_access.h"
@@ -393,6 +396,18 @@ bool ScriptTextEditor::_warning_clicked(const Variant &p_line) {
 
 		CodeEdit *text_editor = code_editor->get_text_editor();
 		String prev_line = line > 0 ? text_editor->get_line(line - 1) : "";
+		Ref<Script> script = edited_res;
+		if (script->get_language()->get_name() == "Luau") {
+			String indent = text_editor->get_line(line);
+			indent = indent.substr(0, indent.length() - indent.lstrip(" \t").length());
+			if (prev_line.strip_edges().begins_with("-- selene: allow(") && prev_line.contains(")")) {
+				text_editor->insert_text(", " + code, line - 1, prev_line.find_char(')'));
+			} else {
+				text_editor->insert_line_at(line, indent + "-- selene: allow(" + code + ")");
+			}
+			_validate_script();
+			return true;
+		}
 		if (prev_line.contains("@warning_ignore")) {
 			const int closing_bracket_idx = prev_line.find_char(')');
 			const String text_to_insert = ", " + code.quote(quote_style);
@@ -1388,7 +1403,7 @@ void ScriptTextEditor::_show_symbol_tooltip(const String &p_symbol, int p_row, i
 				native_class = ClassDB::get_parent_class(native_class);
 			}
 		}
-		doc_symbol = "function|" + String(function_help.get("declaring_class", "")) + "|" + String(function_help.get("native_member", p_symbol)) + "|" + JSON::stringify(function_help);
+		doc_symbol = String(function_help.get("kind", "function")) + "|" + String(function_help.get("declaring_class", "")) + "|" + String(function_help.get("native_member", p_symbol)) + "|" + JSON::stringify(function_help);
 	} else {
 		lc_error = script->get_language()->lookup_code(code_text, p_symbol, script->get_path(), base, result);
 	}
@@ -1722,6 +1737,10 @@ bool ScriptTextEditor::_edit_option(int p_op) {
 		} break;
 		case EDIT_COMPLETE: {
 			tx->request_code_completion(true);
+		} break;
+		case EDIT_FORMAT_DOCUMENT:
+		case EDIT_FORMAT_SELECTION: {
+			LuauFormatter::format(this, p_op == EDIT_FORMAT_SELECTION);
 		} break;
 		case EDIT_AUTO_INDENT: {
 			String text = tx->get_text();
@@ -2463,6 +2482,11 @@ void ScriptTextEditor::_text_edit_gui_input(const Ref<InputEvent> &p_ev) {
 	bool create_menu = false;
 
 	CodeEdit *tx = code_editor->get_text_editor();
+	Ref<Script> script = edited_res;
+	if (k.is_valid() && k->is_pressed() && k->is_action("ui_text_newline", true) && script.is_valid() && script->get_language()->get_name() == "Luau" && ludot_complete_block(tx)) {
+		tx->accept_event();
+		return;
+	}
 	if (mb.is_valid() && mb->get_button_index() == MouseButton::RIGHT && mb->is_pressed()) {
 		local_pos = mb->get_global_position() - tx->get_global_position();
 		create_menu = true;
@@ -2617,6 +2641,12 @@ void ScriptTextEditor::_color_changed(const Color &p_color) {
 
 void ScriptTextEditor::_make_context_menu(bool p_selection, bool p_color, bool p_foldable, bool p_open_docs, bool p_goto_definition, const Vector2 &p_position) {
 	TextEditorBase::_make_context_menu(p_selection, p_foldable, p_position, false);
+	Ref<Script> script = edited_res;
+	if (script.is_valid() && script->get_language()->get_name() == "Luau" && LuauFormatter::enabled()) {
+		context_menu->add_item(TTR("Format Document"), EDIT_FORMAT_DOCUMENT);
+		context_menu->add_item(TTR("Format Selection"), EDIT_FORMAT_SELECTION);
+		context_menu->set_item_disabled(context_menu->get_item_index(EDIT_FORMAT_SELECTION), !p_selection);
+	}
 	context_menu->add_shortcut(ED_GET_SHORTCUT("script_text_editor/toggle_comment"), EDIT_TOGGLE_COMMENT);
 	_popup_move_item(EDIT_UNINDENT, context_menu);
 

@@ -28,6 +28,11 @@ with tempfile.TemporaryDirectory(prefix='ludot-editor-tests-') as directory:
     (cache / 'script_editor_cache.cfg').write_text('[res://Player.luau]\nstate={"syntax_highlighter": "Plain Text"}\n')
     command = [str(args.engine.resolve()), '--editor', '--path', str(project)]
     env = os.environ.copy()
+    # Editor regressions may change and save themes. Keep user settings untouched.
+    for variable, folder in [('XDG_CONFIG_HOME', 'config'), ('XDG_DATA_HOME', 'data'), ('XDG_CACHE_HOME', 'cache'), ('APPDATA', 'appdata'), ('LOCALAPPDATA', 'localappdata')]:
+        isolated = project / ".test-settings" / folder
+        isolated.mkdir(parents=True)
+        env[variable] = str(isolated)
     if args.screenshots:
         args.screenshots.mkdir(parents=True, exist_ok=True)
         env['LUDOT_HOVER_SCREENSHOTS'] = str(args.screenshots.resolve())
