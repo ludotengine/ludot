@@ -31,7 +31,10 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   checks cover flight, the planet camera, riding along with a moving world, ground
   clearance, pause, and orbit visibility. A 54-second Forward+ capture covers the tour.
 - Vendored Godot 4.7.2-stable and Luau 0.743 source with pinned provenance.
-- Engine version 4.7.2-lu.1, set by the `status` field in `engine/version.py`.
+- Engine version 4.7.2-lu.2, set by the `status` field in `engine/version.py`.
+- `onready` properties whose initializers can use `self`, such as
+  `self:getNode("A/Child/Node")`, and run before `_ready`, base classes first.
+  Unannotated onready properties take their initializer's type.
 - Native parser support for brace classes, implicit `self`, per-instance defaults,
   exported fields, private field checking, and export range metadata.
 - Named, renamed, namespace, side-effect, generic, and erased type imports. Legacy

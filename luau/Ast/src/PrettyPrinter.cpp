@@ -1381,6 +1381,11 @@ struct Printer
                     overloaded{
                         [&](const AstClassProperty& prop)
                         {
+                            if (prop.onreadyLocation)
+                            {
+                                writer.advance(prop.onreadyLocation->begin);
+                                writer.keyword("onready");
+                            }
                             writer.advance(prop.qualifierLocation.begin);
                             writer.keyword("public");
                             writer.advance(prop.nameLocation.begin);

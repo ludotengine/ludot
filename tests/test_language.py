@@ -174,5 +174,47 @@ c:increment("wrong")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('TypeError', result.stderr)
         self.assertNotIn('SyntaxError', result.stderr)
+    def test_onready_initializers(self):
+        result = self.run_luau('''
+local offset = 10
+class Thing = {
+    public Plain: number = 1
+    onready public Ready = self:make() + offset
+    onready private Twice = self.Ready * 2
+    function make(): number return self.Plain + 4 end
+    function twice(): number return self.Twice end
+}
+local thing = Thing()
+assert(thing.Ready == nil)
+thing:__onready()
+assert(thing.Ready == 15)
+assert(thing:twice() == 30)
+''')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for source, message in (
+            ('class T = { onready export X = 1 }', 'Exported properties cannot be onready'),
+            ('class T = { onready public X }', 'needs an initializer'),
+            ('class T = { onready function f() end }', "Expected 'public' or 'private'"),
+            ('class T\n    onready public X = 1\nend', 'only allowed in classes declared with braces'),
+        ):
+            result = self.run_luau(source)
+            self.assertNotEqual(result.returncode, 0, source)
+            self.assertIn(message, result.stderr, source)
+    def test_onready_property_types(self):
+        source = '''--!strict
+class Thing = {
+    onready public Ready = self:make()
+    onready private Twice = self.Ready * 2
+    onready public Annotated: number = self.Twice + 1
+    function make(): number return 4 end
+    function total(): number return self.Ready + self.Annotated end
+}
+return Thing
+'''
+        result = self.run_luau(source, 'luau-analyze')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = self.run_luau(source.replace('function total(): number', 'function total(): string'), 'luau-analyze')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('TypeError', result.stderr)
 
 if __name__ == '__main__': unittest.main()

@@ -270,7 +270,7 @@ class Server:
             if declaration is None:
                 raise ProtocolError(-32602, 'This symbol cannot be renamed')
             name = params['newName']
-            keywords = {'and', 'break', 'continue', 'do', 'else', 'elseif', 'end', 'false', 'for', 'function', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 'return', 'then', 'true', 'until', 'while', 'const', 'class', 'import', 'export', 'private', 'public'}
+            keywords = {'and', 'break', 'continue', 'do', 'else', 'elseif', 'end', 'false', 'for', 'function', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 'return', 'then', 'true', 'until', 'while', 'const', 'class', 'import', 'export', 'onready', 'private', 'public'}
             if re.fullmatch(r'[A-Za-z_][A-Za-z_0-9]*', name) is None or name in keywords:
                 raise ProtocolError(-32602, 'The new name must be a Luau identifier')
             if name in result['renameConflicts']:

@@ -2642,6 +2642,11 @@ ControlFlow ConstraintGenerator::visit(const ScopePtr& scope, AstStatClass* stat
                     if (!is<BlockedType>(blockedTy))
                         return;
 
+                    // An unannotated onready property takes the type of its
+                    // initializer, which is checked inside __onready below.
+                    if (classProp.isOnready && !classProp.ty && classProp.defaultValue)
+                        return;
+
                     auto target = classProp.ty ? resolveType(scope, classProp.ty, false) : builtinTypes->anyType;
                     emplaceType<BoundType>(asMutable(blockedTy), target);
                 },
@@ -2754,6 +2759,21 @@ ControlFlow ConstraintGenerator::visit(const ScopePtr& scope, AstStatClass* stat
             },
             member
         );
+    }
+
+    for (const auto& member : statClass->members)
+    {
+        const AstClassProperty* classProp = get_if<AstClassProperty>(&member);
+        if (!classProp || !classProp->isOnready || classProp->ty || !classProp->defaultValue)
+            continue;
+        TypeId* entry = classDeclRecord->memberTypes.find(classProp->name);
+        if (!entry || !is<BlockedType>(follow(*entry)))
+            continue;
+        TypeId propertyTy = follow(*entry);
+        TypeId* initializerTy = module->astTypes.find(classProp->defaultValue);
+        // An initializer that reads its own property cannot supply its type.
+        bool usable = initializerTy && follow(*initializerTy) != propertyTy;
+        emplaceType<BoundType>(asMutable(propertyTy), usable ? *initializerTy : builtinTypes->anyType);
     }
 
     if (statClass->super)

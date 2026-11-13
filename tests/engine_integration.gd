@@ -53,6 +53,46 @@ func _init() -> void:
     if child is Node and child != parent:
         child.free()
     parent.free()
+    var onready_script = ClassDB.instantiate("LuauScript")
+    onready_script.set_source_code("""class OnreadyNodes extends Node = {
+    onready public Head = self:getNode("Head") :: Node3D
+    onready public Deep = self:getNode("A/Child/Node")
+    public SeenInReady: boolean = false
+    function _ready()
+        self.SeenInReady = self.Head ~= nil and self.Deep:getName() == "Node"
+    end
+}""")
+    check(onready_script.get_diagnostics().is_empty(), "Onready getNode initializers type-check")
+    check(onready_script.reload() == OK, "Onready script compiles")
+    var onready_holder := Node.new()
+    var onready_head := Node3D.new()
+    onready_head.name = "Head"
+    onready_holder.add_child(onready_head)
+    var onready_deep := Node3D.new()
+    onready_deep.name = "Node"
+    var onready_middle := Node.new()
+    onready_middle.name = "Child"
+    onready_middle.add_child(onready_deep)
+    var onready_outer := Node.new()
+    onready_outer.name = "A"
+    onready_outer.add_child(onready_middle)
+    onready_holder.add_child(onready_outer)
+    onready_holder.set_script(onready_script)
+    check(onready_holder.get("Head") == null, "Onready properties stay unset until ready")
+    onready_holder.call("_ready")
+    check(onready_holder.get("Head") == onready_head, "Onready getNode finds a direct child")
+    check(onready_holder.get("Deep") == onready_deep, "Onready getNode follows a nested node path")
+    check(onready_holder.get("SeenInReady") == true, "Onready properties are set before the _ready body runs")
+    check(not onready_holder.has_method("__onready"), "The generated onready initializer is not a script method")
+    var without_ready = ClassDB.instantiate("LuauScript")
+    without_ready.set_source_code("""class OnreadyWithoutReady extends Node = {
+    onready public Head = self:getNode("Head")
+}""")
+    check(without_ready.reload() == OK, "Onready script without _ready compiles")
+    onready_holder.set_script(without_ready)
+    onready_holder.call("_ready")
+    check(onready_holder.get("Head") == onready_head, "Onready properties initialize when the class has no _ready")
+    onready_holder.free()
     var script = load("res://Player.luau")
     check(script != null and script.can_instantiate(), "Luau script loads")
     script.set_source_code(script.get_source_code().replace("private Values", 'private Identity: {any} = {}\n    function identityStable(): boolean if self.Identity[1] == nil then self.Identity[1] = self end return self.Identity[1] == self end\n    private Values'))
@@ -134,6 +174,14 @@ func _init() -> void:
         check(base.reload(true) == OK, "A base script reloads with live derived instances")
         check(actor.call("baseValue") == 11.0, "Base edits propagate to derived scripts")
         check(actor.get("Armor") == 2.0, "Derived fields survive a base reload")
+        base.set_source_code(base.get_source_code().replace("export Life: number = 10", "export Life: number = 10\n    onready public BaseReady = self.Life * 3"))
+        check(base.reload(true) == OK, "A base script with an onready property reloads")
+        derived.set_source_code(derived.get_source_code().replace("export Armor: number = 2", "export Armor: number = 2\n    onready public DerivedReady = self.BaseReady + 1\n    function _ready() self.Armor = self.DerivedReady end"))
+        check(derived.reload(true) == OK, "A derived script with an onready property reloads")
+        actor.call("_ready")
+        check(actor.get("BaseReady") == 30.0, "Base onready initializers run for derived instances")
+        check(actor.get("DerivedReady") == 31.0, "Base onready initializers run before derived ones")
+        check(actor.get("Armor") == 31.0, "Derived _ready sees inherited and own onready values")
     actor.free()
     var shader = load("res://tint.lushader")
     check(shader != null, "Luau shader loads as an engine resource")

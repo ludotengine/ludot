@@ -138,7 +138,7 @@ struct Adapter : Luau::AstVisitor {
 		protect(end - 1, end, "end ");
 		for (const auto &member : node->members) {
 			if (const auto *property = Luau::get_if<Luau::AstClassProperty>(&member)) {
-				size_t start = offset(property->qualifierLocation.begin);
+				size_t start = offset((property->onreadyLocation ? *property->onreadyLocation : property->qualifierLocation).begin);
 				size_t finish = offset(property->nameLocation.end);
 				if (property->ty) {
 					finish = offset(property->ty->location.end);

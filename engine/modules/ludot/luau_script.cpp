@@ -1627,6 +1627,7 @@ Error LuauScript::reload(bool p_keep_state) {
     base_type = new_base;
     base_script = new_base_script;
 	methods.clear();
+	has_onready = false;
 	properties.clear();
 	defaults.clear();
 	property_types.clear();
@@ -1672,6 +1673,11 @@ Error LuauScript::reload(bool p_keep_state) {
             property_types.insert(info.name, annotation_key(property->ty));
 			defaults.insert(info.name, default_value);
 		} else if (const auto method = Luau::get_if<Luau::AstClassMethod>(&member)) {
+            // The parser generates __onready; it is not a callable script method.
+            if (method->functionName == "__onready") {
+                has_onready = true;
+                continue;
+            }
             MethodInfo info(String::utf8(method->functionName.value));
             for (size_t i = 1; i < method->function->args.size; ++i) {
                 auto arg = method->function->args.data[i];
@@ -1801,11 +1807,36 @@ Variant::Type LuauScriptInstance::get_property_type(const StringName &p_name, bo
 }
 Variant LuauScriptInstance::callp(const StringName &p_method, const Variant **p_args, int p_count, Callable::CallError &r_error) {
     r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
-    if (!has_method(p_method) || object_ref == LUA_NOREF) return {};
+    if (object_ref == LUA_NOREF) return {};
     auto language = LuauLanguage::get_singleton();
     MutexLock lock(language->mutex);
     lua_State *L = language->state;
     const int top = lua_gettop(L);
+    static const StringName ready_method = "_ready";
+    bool ran_onready = false;
+    if (p_method == ready_method) {
+        // Like GDScript's @onready, base class initializers run first, then the
+        // derived ones, all before any _ready body.
+        Vector<LuauScript *> chain;
+        for (LuauScript *level = script.ptr(); level != nullptr; level = level->base_script.ptr()) chain.push_back(level);
+        for (int i = chain.size() - 1; i >= 0; --i) {
+            if (!chain[i]->has_onready || chain[i]->class_ref == LUA_NOREF) continue;
+            ran_onready = true;
+            lua_getref(L, chain[i]->class_ref);
+            lua_getfield(L, -1, "__onready");
+            lua_getref(L, object_ref);
+            if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
+                language->last_error = String::utf8(lua_tostring(L, -1));
+                ERR_PRINT(chain[i]->get_path() + ": " + language->last_error);
+            }
+            lua_settop(L, top);
+        }
+    }
+    if (!has_method(p_method)) {
+        // Onready initializers count as the class's ready handler when it has no _ready.
+        if (ran_onready) r_error.error = Callable::CallError::CALL_OK;
+        return {};
+    }
     const String method = script->resolve_method_name(p_method);
     lua_getref(L, object_ref);
     lua_getfield(L, -1, method.utf8().get_data());
@@ -1860,7 +1891,7 @@ String LuauLanguage::get_global_class_name(const String &p_path, String *r_base_
 }
 
 Vector<String> LuauLanguage::get_reserved_words() const {
-	return { "and", "break", "continue", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "const", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "class", "extends", "export", "private", "public", "import", "type", "from", "as", "to", "step", "enum", "match", "with", "case", "otherwise" };
+	return { "and", "break", "continue", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "const", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "class", "extends", "export", "onready", "private", "public", "import", "type", "from", "as", "to", "step", "enum", "match", "with", "case", "otherwise" };
 }
 bool LuauLanguage::validate(const String &p_script, const String &p_path, List<String> *r_functions, List<ScriptError> *r_errors, List<Warning> *r_warnings, HashSet<int> *r_safe_lines) const {
     const CharString text = p_script.utf8();

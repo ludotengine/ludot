@@ -27,6 +27,43 @@ initializers do not share a table between instances. Constructor arguments use
 the `__init` signature. Classes use the fork's native class bytecode and VM objects.
 The original experimental `class ... end` syntax remains available internally.
 
+### Onready properties
+
+`onready` delays a property's initializer until the node is ready, like
+GDScript's `@onready`. The initializer can use `self`, so it can look up nodes
+that do not exist yet when the instance is constructed:
+
+```lua
+class Player extends CharacterBody3D = {
+    onready public Head = self:getNode("Head") :: Node3D
+    onready public Camera = self.Head:getNode("Camera") :: Camera3D
+    onready private Muzzle = self:getNode("Arm/Hand/Muzzle")
+
+    function _ready()
+        self.Camera.Fov = 70
+    end
+}
+```
+
+`getNode` accepts Godot node paths, so `"Arm/Hand/Muzzle"` reaches a
+great-grandchild. Onready initializers run in declaration order immediately
+before `_ready`, so a later initializer can read an earlier one and `_ready`
+sees every value. Base class initializers run before those of a derived class.
+They also run when the class defines no `_ready` method. Until then the
+properties are `nil`.
+
+An onready property without a type annotation takes its initializer's type. A
+`::` assertion, such as `:: Node3D` above, narrows `getNode`'s `Node` result.
+When the editor knows the attached scene, `getNode` with a literal path already
+returns the node's type. An annotation, such as `onready public Head: Node3D =
+...`, must match the initializer's type.
+
+`onready` comes before `public` or `private` and requires an initializer. It is
+only allowed in brace classes. Exported properties cannot be onready, since the
+initializer would replace the value set in the inspector. Hot reload keeps the
+current values of onready properties; their initializers run again only when
+the node is next ready.
+
 Construct native nodes, resources, value types, and Luau classes with `.new()`:
 
 ```lua
@@ -49,7 +86,7 @@ supported.
 from the inspector, and the checker rejects accesses outside the declaring class.
 Privacy is a type-checking rule, not a sandbox against reflective engine access or
 unchecked bytecode. Editor range hints are permitted only on exported properties.
-No new decorators are introduced.
+No decorators are introduced; `onready` is a property keyword.
 
 An attached engine script extends a native engine class, such as `Node`,
 `CharacterBody2D`, or `Resource`, or another Luau script class imported from its

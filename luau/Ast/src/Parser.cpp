@@ -1725,12 +1725,22 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
     // slightly more performant here (e.g.: a "scratch" set).
     DenseHashSet<AstName> classMemberNamespace;
 
+    // Each onready initializer is parsed with a temporary `self`, replaced by
+    // the generated __onready method's parameter once the class body ends.
+    std::vector<std::pair<size_t, AstLocal*>> onreadySelves;
+
     while (lexer.current().type != (braces ? Lexeme::Type('}') : Lexeme::ReservedEnd) && lexer.current().type != Lexeme::Eof)
     {
         if (lexer.current().type == ';' || lexer.current().type == ',')
         {
             nextLexeme();
             continue;
+        }
+        std::optional<Location> onreadyLocation;
+        if (lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "onready")
+        {
+            onreadyLocation = lexer.current().location;
+            nextLexeme();
         }
         bool exportedProperty = lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "export";
         bool privateProperty = lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "private";
@@ -1739,6 +1749,19 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
         {
             qualifierLocation = lexer.current().location;
             nextLexeme();
+        }
+        if (onreadyLocation)
+        {
+            if (!qualifierLocation || lexer.current().type == Lexeme::ReservedFunction)
+            {
+                report(*onreadyLocation, "Expected 'public' or 'private' and a property after 'onready'");
+                if (!qualifierLocation)
+                    continue;
+            }
+            else if (exportedProperty)
+                report(*onreadyLocation, "Exported properties cannot be onready: the editor value would be replaced when the node is ready");
+            else if (!braces)
+                report(*onreadyLocation, "Onready properties are only allowed in classes declared with braces");
         }
 
         // If we saw a qualifier _and_ the current token is not `function`,
@@ -1763,11 +1786,22 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
             AstExpr* rangeMin = nullptr;
             AstExpr* rangeMax = nullptr;
             AstExpr* rangeStep = nullptr;
+            AstLocal* onreadySelf = nullptr;
             if (lexer.current().type == '=')
             {
                 nextLexeme();
-                defaultValue = parseExpr();
+                if (onreadyLocation)
+                {
+                    auto localsBeforeSelf = saveLocals();
+                    onreadySelf = pushLocal(Binding(Name(nameSelf, propName->location), nullptr));
+                    defaultValue = parseExpr();
+                    restoreLocals(localsBeforeSelf);
+                }
+                else
+                    defaultValue = parseExpr();
             }
+            else if (onreadyLocation)
+                report(propName->location, "Onready property '%s' needs an initializer", propName->name.value);
             if (lexer.current().type == Lexeme::ReservedIn)
             {
                 if (!exportedProperty)
@@ -1798,6 +1832,8 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
 
                 // Either both of these are present or neither are.
                 LUAU_ASSERT((bool)propType == (bool)typeColonLocation);
+                if (onreadySelf)
+                    onreadySelves.emplace_back(declarations.size(), onreadySelf);
                 declarations.push_back(
                     AstClassProperty{
                         *qualifierLocation,
@@ -1811,6 +1847,8 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
                         rangeMin,
                         rangeMax,
                         rangeStep,
+                        onreadySelf != nullptr,
+                        onreadySelf ? onreadyLocation : std::nullopt,
                     }
                 );
             }
@@ -1934,7 +1972,7 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
             initializers.push_back(allocator.alloc<AstStatExpr>(start, call));
         }
         for (auto& member : declarations)
-            if (auto prop = get_if<AstClassProperty>(&member); prop && prop->defaultValue)
+            if (auto prop = get_if<AstClassProperty>(&member); prop && prop->defaultValue && !prop->isOnready)
             {
                 AstExpr* self = allocator.alloc<AstExprLocal>(prop->nameLocation, constructor->args.data[0], false);
                 AstExpr* target = allocator.alloc<AstExprIndexName>(prop->nameLocation, self, prop->name,
@@ -1954,6 +1992,50 @@ LUAU_NOINLINE AstStat* Parser::parseClassStat(const Location& start, bool export
             }
         initializers.insert(initializers.end(), constructor->body->body.begin(), constructor->body->body.end());
         constructor->body->body = copy(initializers.data(), initializers.size());
+
+        // Onready initializers run in declaration order when the engine calls __onready.
+        if (!onreadySelves.empty())
+        {
+            AstName onreadyName = nameTable.getOrAdd("__onready");
+            auto self = allocator.alloc<AstLocal>(nameSelf, start, nullptr, functionStack.size(), 0, nullptr);
+            std::vector<AstStat*> assignments;
+            for (auto [index, placeholder] : onreadySelves)
+            {
+                auto prop = const_cast<AstClassProperty*>(get_if<AstClassProperty>(&declarations[index]));
+                struct BindOnreadySelf : AstVisitor
+                {
+                    AstLocal* placeholder;
+                    AstLocal* self;
+                    size_t depth;
+                    BindOnreadySelf(AstLocal* placeholder, AstLocal* self, size_t depth)
+                        : placeholder(placeholder)
+                        , self(self)
+                        , depth(depth)
+                    {
+                    }
+                    bool visit(AstExprLocal* expr) override
+                    {
+                        if (expr->local == placeholder)
+                            expr->local = self;
+                        else if (expr->local->functionDepth < depth)
+                            expr->upvalue = true;
+                        return false;
+                    }
+                } bind(placeholder, self, functionStack.size());
+                prop->defaultValue->visit(&bind);
+                // A group keeps one value and records its type for property inference.
+                if (!prop->defaultValue->is<AstExprGroup>())
+                    prop->defaultValue = allocator.alloc<AstExprGroup>(prop->defaultValue->location, prop->defaultValue);
+                AstExpr* target = allocator.alloc<AstExprIndexName>(prop->nameLocation,
+                    allocator.alloc<AstExprLocal>(prop->nameLocation, self, false), prop->name, prop->nameLocation,
+                    prop->nameLocation.begin, '.');
+                assignments.push_back(allocator.alloc<AstStatAssign>(prop->nameLocation, copy(&target, 1), copy(&prop->defaultValue, 1)));
+            }
+            auto body = allocator.alloc<AstStatBlock>(start, copy(assignments.data(), assignments.size()));
+            auto onready = allocator.alloc<AstExprFunction>(start, AstArray<AstAttr*>{}, AstArray<AstGenericType*>{},
+                AstArray<AstGenericTypePack*>{}, nullptr, copy(&self, 1), false, start, body, functionStack.size(), onreadyName, nullptr);
+            declarations.push_back(AstClassMethod{std::nullopt, start, onreadyName, start, onready});
+        }
     }
     Location location{start, end};
 

@@ -19,6 +19,8 @@ class LuauScript : public Script {
     Ref<LuauScript> base_script;
     bool valid = false;
     int class_ref = LUA_NOREF;
+    // This class declares onready properties, so its own __onready runs before _ready.
+    bool has_onready = false;
     List<PropertyInfo> properties;
     HashMap<StringName, Variant> defaults;
     HashMap<StringName, String> property_types;

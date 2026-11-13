@@ -1213,6 +1213,9 @@ struct AstClassProperty
     AstExpr* rangeMin = nullptr;
     AstExpr* rangeMax = nullptr;
     AstExpr* rangeStep = nullptr;
+    // Assigned by the generated __onready method, which the engine runs before _ready.
+    bool isOnready = false;
+    std::optional<Location> onreadyLocation = std::nullopt;
 };
 
 struct AstClassMethod

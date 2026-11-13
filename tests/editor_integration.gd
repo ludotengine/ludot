@@ -34,7 +34,7 @@ func run() -> void:
         get_tree().quit(1)
         return
     # Exercise the actual context-menu action, including AST dialect protection.
-    var formatter_source = 'import "@helpers/setup"\nclass FormatTest extends Node = {\n\texport Speed: number = 1 in 0 to 2 step 0.1\n\tfunction _ready()\n\t\tconst value={a=1,b="café class import"}\n\t\t-- stylua: ignore\n\t\tconst ignored={x=1}\n\t\tprint(value)\n\tend\n}\n'
+    var formatter_source = 'import "@helpers/setup"\nclass FormatTest extends Node = {\n\texport Speed: number = 1 in 0 to 2 step 0.1\n\tonready private Head = self:getNode("A/Child/Node")\n\tfunction _ready()\n\t\tconst value={a=1,b="café class import"}\n\t\t-- stylua: ignore\n\t\tconst ignored={x=1}\n\t\tprint(value)\n\tend\n}\n'
     code.text = formatter_source
     var click = InputEventMouseButton.new()
     click.button_index = MOUSE_BUTTON_RIGHT
@@ -53,6 +53,7 @@ func run() -> void:
         format_menu.id_pressed.emit(format_id)
         check(code.text.contains('const value = { a = 1, b = "café class import" }'), "StyLua formats const, Unicode, and table expressions")
         check(code.text.contains('export Speed: number = 1 in 0 to 2 step 0.1'), "Formatting preserves export range declarations")
+        check(code.text.contains('onready private Head = self:getNode("A/Child/Node")'), "Formatting preserves onready properties")
         check(code.text.contains('import "@helpers/setup"'), "Formatting preserves Ludot imports")
         check(code.text.contains("const ignored={x=1}"), "StyLua ignore comments preserve the following statement")
         var formatted_once = code.text
