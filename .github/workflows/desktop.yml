@@ -120,9 +120,12 @@ jobs:
           key: scons-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: |
             scons-${{ matrix.platform }}-
+      # SCons creates only the last cache directory level, not its parents.
       - name: Store cache timestamp
         shell: bash
-        run: echo "CACHE_TIMESTAMP=$(date +%s)" >> "$GITHUB_ENV"
+        run: |
+          mkdir -p "$CACHE_DIRECTORY"
+          echo "CACHE_TIMESTAMP=$(date +%s)" >> "$GITHUB_ENV"
       # Prebuilt SDKs that the Windows and macOS builds link against, as in upstream Godot CI.
       # Each one is optional, so a failed download builds without that feature.
       - name: Engine SDK dependencies
