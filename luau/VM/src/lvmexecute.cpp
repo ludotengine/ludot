@@ -2526,6 +2526,11 @@ reentry:
                 double limit = nvalue(ra + 0);
                 double step = nvalue(ra + 1);
                 double idx = nvalue(ra + 2);
+                if (step == 0)
+                {
+                    VM_PROTECT_PC();
+                    luaG_runerror(L, "numeric for step must not be zero");
+                }
 
                 // Note: make sure the loop condition is exactly the same between this and LOP_FORNLOOP so that we handle NaN/etc. consistently
                 pc += (step > 0 ? idx <= limit : limit <= idx) ? 0 : LUAU_INSN_D(insn);

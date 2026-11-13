@@ -30,6 +30,11 @@ struct Lexeme
         SkinnyArrow,
         DoubleColon,
         FloorDiv,
+        NilCoalesce,
+        NilAssign,
+        OptionalDot,
+        OptionalColon,
+        Pipeline,
 
         InterpStringBegin,
         InterpStringMid,
@@ -178,6 +183,8 @@ public:
     void nextline();
 
     Lexeme lookahead();
+    // Split an expression operator back into optional-type suffix tokens.
+    void splitTypeOptional();
 
     const Lexeme& current() const
     {

@@ -4,6 +4,8 @@
 #include "Luau/Type.h"
 #include "Luau/TypeArena.h"
 #include "Luau/LudotNaming.h"
+#include "Luau/LudotClasses.h"
+#include "Luau/LudotEnums.h"
 #include <sstream>
 #include <unordered_map>
 
@@ -14,7 +16,8 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
     std::string line;
     if (!std::getline(stream, line)) return false;
     if (!line.empty() && line.back() == '\r') line.pop_back();
-    if (line != "LUDOT_API_1" && line != "LUDOT_API_2") return false;
+    if (line != "LUDOT_API_1" && line != "LUDOT_API_2" && line != "LUDOT_API_3")
+        return false;
     std::vector<std::vector<std::string>> rows;
     while (std::getline(stream, line))
     {
@@ -52,6 +55,60 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
         scope->exportedTypeBindings[row[1]] = TypeFun{{}, {}, instance};
         bind(row[1], cls);
     }
+    std::unordered_map<std::string, EnumTypes> enums;
+    for (const auto& row : rows)
+    {
+        if (row[0] != "G" || row.size() < 3 || (row.size() - 3) % 2)
+            continue;
+        auto info = std::make_shared<EnumTypeInfo>();
+        info->name = row[1];
+        for (size_t i = 3; i + 1 < row.size(); i += 2)
+            info->members.push_back({row[i], std::stod(row[i + 1]), {}, {}});
+        auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
+        enums[info->name] = enumeration;
+        const auto dot = row[1].find('.');
+        if (dot == std::string::npos)
+        {
+            scope->exportedTypeBindings[row[1]] = TypeFun{{}, {}, enumeration.value};
+            bind(row[1], enumeration.names);
+        }
+        else
+        {
+            std::string owner = row[1].substr(0, dot), name = row[1].substr(dot + 1);
+            scope->importedTypeBindings[owner][name] = TypeFun{{}, {}, enumeration.value};
+            auto symbol = frontend.globals.globalNames.names->getOrAdd(owner.c_str());
+            auto found = scope->bindings.find(symbol);
+            if (found == scope->bindings.end())
+                bind(owner, arena.addType(TableType{{}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed}));
+            getMutable<TableType>(scope->bindings.at(symbol).typeId)->props[name] = Property::readonly(enumeration.names);
+        }
+    }
+    for (const auto& row : rows)
+    {
+        if (row[0] != "E" || row.size() < 4 || (row.size() - 4) % 2 || !classes.count(row[1]))
+            continue;
+        auto info = std::make_shared<EnumTypeInfo>();
+        info->name = row[1] + "." + row[2];
+        for (size_t i = 4; i + 1 < row.size(); i += 2)
+            info->members.push_back({row[i], std::stod(row[i + 1]), {}, {}});
+        auto enumeration = makeEnumTypes(arena, *builtins, info, "ludot", {});
+        enums[info->name] = enumeration;
+        scope->importedTypeBindings[row[1]][row[2]] = TypeFun{{}, {}, enumeration.value};
+        auto table = get<TableType>(get<MetatableType>(enumeration.names)->table);
+        for (auto target : {getMutable<ExternType>(classes.at(row[1])), getMutable<ExternType>(instances.at(row[1]))})
+        {
+            if (!target->props.count("Enums"))
+                target->props["Enums"] = Property::readonly(arena.addType(TableType{{}, std::nullopt, TypeLevel{}, scope.get(), TableState::Sealed}));
+            getMutable<TableType>(*target->props.at("Enums").readTy)->props[row[2]] = Property::readonly(enumeration.names);
+            for (const auto& member : info->members)
+            {
+                auto legacy = table->props.at(member.name);
+                legacy.tags.push_back("LudotHiddenAlias");
+                target->props[engineApiName(member.name, ApiCase::Pascal)] = legacy;
+                target->props[member.name] = table->props.at(member.name);
+            }
+        }
+    }
     auto type = [&](auto&& resolve, std::string name) -> TypeId {
         if (!name.empty() && name.back() == '?')
         {
@@ -62,7 +119,13 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
         if (name == "bool") return builtins->booleanType;
         if (name == "String" || name == "StringName" || name == "NodePath") return builtins->stringType;
         if (name == "Nil") return builtins->nilType;
-        if (name.rfind("enum::", 0) == 0 || name.rfind("bitfield::", 0) == 0) return builtins->numberType;
+        if (name.rfind("enum::", 0) == 0)
+        {
+            auto found = enums.find(name.substr(6));
+            return found == enums.end() ? builtins->numberType : found->second.value;
+        }
+        if (name.rfind("bitfield::", 0) == 0)
+            return builtins->numberType;
         if (name.rfind("typedarray::", 0) == 0) name = "Array";
         auto it = instances.find(name);
         return it == instances.end() ? builtins->anyType : it->second;
@@ -125,5 +188,7 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
             (isStatic ? cls : instance)->props[engineApiName(row[2], methodCase)] = Property::readonly(fn);
         }
     }
+    if (instances.count("Object"))
+        addLudotIsA(arena, *builtins, instances.at("Object"), methodCase);
     return true;
 }

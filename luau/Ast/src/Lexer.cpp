@@ -67,6 +67,18 @@ std::string Lexeme::toString() const
     {
     case Eof:
         return "<eof>";
+    case NilCoalesce:
+        return "'?"
+               "?'";
+    case NilAssign:
+        return "'?"
+               "?='";
+    case OptionalDot:
+        return "'?.'";
+    case OptionalColon:
+        return "'?:'";
+    case Pipeline:
+        return "'|>'";
 
     case Equal:
         return "'=='";
@@ -396,6 +408,15 @@ void Lexer::nextline()
         consume();
 
     next();
+}
+
+void Lexer::splitTypeOptional()
+{
+    LUAU_ASSERT(lexeme.type == Lexeme::NilCoalesce || lexeme.type == Lexeme::NilAssign);
+    unsigned remaining = lexeme.location.end.column - lexeme.location.begin.column - 1;
+    offset -= remaining;
+    lexeme.type = Lexeme::Type('?');
+    lexeme.location.end = Position(lexeme.location.begin.line, lexeme.location.begin.column + 1);
 }
 
 Lexeme Lexer::lookahead()
@@ -978,14 +999,47 @@ Lexeme Lexer::readNext()
     case ';':
     case ',':
     case '#':
-    case '?':
     case '&':
-    case '|':
     {
         char ch = peekch();
         consume();
 
         return Lexeme(Location(start, 1), ch);
+    }
+    case '?':
+    {
+        consume();
+        if (peekch() == '?')
+        {
+            consume();
+            if (peekch() == '=')
+            {
+                consume();
+                return Lexeme(Location(start, 3), Lexeme::NilAssign);
+            }
+            return Lexeme(Location(start, 2), Lexeme::NilCoalesce);
+        }
+        if (peekch() == '.')
+        {
+            consume();
+            return Lexeme(Location(start, 2), Lexeme::OptionalDot);
+        }
+        if (peekch() == ':')
+        {
+            consume();
+            return Lexeme(Location(start, 2), Lexeme::OptionalColon);
+        }
+        return Lexeme(Location(start, 1), '?');
+    }
+    case '|':
+    {
+        consume();
+        if (peekch() == '>')
+        {
+            consume();
+            return Lexeme(Location(start, 2), Lexeme::Pipeline);
+        }
+        return Lexeme(Location(start, 1), '|');
     }
     case '@':
     {

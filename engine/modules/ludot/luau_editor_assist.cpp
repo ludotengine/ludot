@@ -32,13 +32,15 @@ bool ludot_complete_block(CodeEdit *editor) {
 	Luau::AstNameTable names(allocator);
 	Luau::Lexer lexer(bytes.get_data(), bytes.length(), names);
 	Luau::Lexeme::Type last = Luau::Lexeme::Eof;
-	bool function = false, branch = false;
+	bool function = false, branch = false, match_with = false;
 	int parentheses = 0;
 	while (lexer.next().type != Luau::Lexeme::Eof) {
 		if (lexer.current().location.begin.line != unsigned(line)) {
 			continue;
 		}
 		last = lexer.current().type;
+		match_with = last == Luau::Lexeme::Name && String(lexer.current().name) == "with";
+		branch |= last == Luau::Lexeme::Name && (String(lexer.current().name) == "case" || String(lexer.current().name) == "otherwise");
 		if (last == '(') {
 			++parentheses;
 		}
@@ -48,7 +50,7 @@ bool ludot_complete_block(CodeEdit *editor) {
 		function |= last == Luau::Lexeme::ReservedFunction;
 		branch |= last == Luau::Lexeme::ReservedElse || last == Luau::Lexeme::ReservedElseif;
 	}
-	if (last != Luau::Lexeme::ReservedThen && last != Luau::Lexeme::ReservedDo && last != Luau::Lexeme::ReservedElse && !(function && parentheses == 0 && last != Luau::Lexeme::ReservedEnd)) {
+	if (!match_with && !(last == Luau::Lexeme::Name && current.substr(0, column).strip_edges() == "otherwise") && last != Luau::Lexeme::ReservedThen && last != Luau::Lexeme::ReservedDo && last != Luau::Lexeme::ReservedElse && !(function && parentheses == 0 && last != Luau::Lexeme::ReservedEnd)) {
 		return false;
 	}
 	int indentation = 0;

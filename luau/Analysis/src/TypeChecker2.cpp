@@ -1,5 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/TypeChecker2.h"
+#include "Luau/LudotMatches.h"
+#include "Luau/LudotEnums.h"
 
 #include "Luau/Ast.h"
 #include "Luau/AstUtils.h"
@@ -729,6 +731,10 @@ void TypeChecker2::visit(AstStat* stat)
 
 void TypeChecker2::visit(AstStatBlock* block)
 {
+    if (block->matchInfo)
+        for (const auto& diagnostic : checkLudotMatch(*block->matchInfo, *module))
+            if (!diagnostic.warning)
+                reportError(GenericError{diagnostic.message}, diagnostic.location);
     auto StackPusher = pushStack(block);
 
     for (AstStat* statement : block->body)
@@ -860,6 +866,8 @@ void TypeChecker2::visit(AstStatExpr* expr)
 
 void TypeChecker2::visit(AstStatLocal* local)
 {
+    if (local->enumInfo)
+        return;
     size_t count = std::max(local->values.size, local->vars.size);
     for (size_t i = 0; i < count; ++i)
     {
@@ -2419,6 +2427,27 @@ void TypeChecker2::visitCall(AstExprCall* call)
 
 void TypeChecker2::visit(AstExprCall* call)
 {
+    if (call->syntax == LudotSyntax::Pipeline)
+    {
+        auto function = call->func->as<AstExprFunction>();
+        auto result = function->body->body.data[0]->as<AstStatReturn>()->list.data[0];
+        visit(call->args.data[0], ValueContext::RValue);
+        visit(result, ValueContext::RValue);
+        return;
+    }
+    if (call->syntax == LudotSyntax::Coalesce)
+    {
+        auto function = call->func->as<AstExprFunction>();
+        auto conditional = function->body->body.data[0]->as<AstStatReturn>()->list.data[0]->as<AstExprIfElse>();
+        visit(call->args.data[0], ValueContext::RValue);
+        visit(conditional->falseExpr, ValueContext::RValue);
+        return;
+    }
+
+    if (call->matchInfo)
+        for (const auto& diagnostic : checkLudotMatch(*call->matchInfo, *module))
+            if (!diagnostic.warning)
+                reportError(GenericError{diagnostic.message}, diagnostic.location);
     if (call->isClassBaseInit) return;
     std::optional<InConditionalContext> flipper;
 
@@ -2930,6 +2959,8 @@ TypeId TypeChecker2::visit(AstExprBinary* expr, AstNode* overrideKey)
     TypeId leftType = follow(lookupType(expr->left));
     TypeId rightType = follow(lookupType(expr->right));
     TypeId expectedResult = follow(lookupType(expr));
+    if (isEquality && enumPrimitiveEquality(leftType, rightType))
+        return builtinTypes->booleanType;
 
     if (get<TypeFunctionInstanceType>(expectedResult))
     {

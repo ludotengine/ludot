@@ -148,7 +148,7 @@ class Server:
                         continue
                     start = {'line': error['line'], 'character': utf16_column(document['text'], error['line'], error['column'])}
                     end = {'line': error['endLine'], 'character': utf16_column(document['text'], error['endLine'], error['endColumn'])}
-                    diagnostics.append({'range': {'start': start, 'end': end}, 'severity': 1, 'source': 'ludot', 'message': error['message']})
+                    diagnostics.append({'range': {'start': start, 'end': end}, 'severity': error.get('severity', 1), 'source': 'ludot', 'message': error['message']})
             with self.lock:
                 if self.documents.get(uri) != document:
                     return

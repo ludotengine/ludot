@@ -1,6 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 
 #include "AutocompleteCore.h"
+#include "Luau/LudotClasses.h"
 
 #include "Luau/Ast.h"
 #include "Luau/AstQuery.h"
@@ -32,8 +33,9 @@ LUAU_FASTFLAGVARIABLE(LuauUseExplicitTypeArgsInGenerics)
 LUAU_FASTFLAG(LuauExperimentalIfLocalSyntax)
 LUAU_FASTFLAG(LuauRefactorAutocompleteAncestry)
 
-static constexpr std::array<std::string_view, 13> kStatementStartingKeywords =
-    {"while", "if", "local", "repeat", "function", "do", "for", "return", "break", "continue", "type", "export", "const"};
+static constexpr std::array<std::string_view, 20> kStatementStartingKeywords = {"while",  "if",    "local",     "repeat", "function", "do",    "for",
+                                                                                "return", "break", "continue",  "type",   "export",   "const", "enum",
+                                                                                "match",  "case",  "otherwise", "with",   "to",       "step"};
 
 static constexpr std::array<std::string_view, 6> kHotComments = {"nolint", "nocheck", "nonstrict", "strict", "optimize", "native"};
 
@@ -528,7 +530,7 @@ static void autocompleteProps(
         {
             // We are walking up the class hierarchy, so if we encounter a property that we have
             // already populated, it takes precedence over the property we found just now.
-            if (result.count(name) == 0 && name != kParseNameError)
+            if (result.count(name) == 0 && name != kParseNameError && !hasTag(prop, "LudotHiddenAlias"))
             {
                 Luau::TypeId type;
                 if (auto ty = prop.readTy)
@@ -1505,6 +1507,8 @@ static AutocompleteEntryMap autocompleteStatement(
                 continue;
 
             std::string n = toString(name);
+            if ((name.local && name.local->isSynthetic) || (!name.local && (n == "__ludot_enum" || n == "__ludot_match_eq")))
+                continue;
             if (!result.count(n))
             {
                 result[n] = {
@@ -1708,6 +1712,7 @@ static AutocompleteContext autocompleteExpression(
                     continue;
 
                 std::string n = toString(name);
+                if ((name.local && name.local->isSynthetic) || (!name.local && (n == "__ludot_enum" || n == "__ludot_match_eq"))) continue;
                 if (!result.count(n))
                 {
                     TypeCorrectKind typeCorrect = checkTypeCorrectKind(module, typeArena, builtinTypes, node, position, binding.typeId);
@@ -1927,7 +1932,16 @@ static std::optional<AutocompleteEntryMap> autocompleteStringParams(
             {
                 return convertRequireSuggestionsToAutocompleteEntryMap(fileResolver->getRequireSuggestions(module->name, candidateString));
             }
-            if (std::optional<AutocompleteEntryMap> ret = callback(tag, getMethodContainingExternType(module, candidate->func), candidateString))
+            if (tag == "LudotClassName")
+            {
+                AutocompleteEntryMap entries;
+                if (auto scope = findScopeAtPosition(*module, position))
+                    for (const auto& name : ludotClassNames(*scope))
+                        entries[name] = AutocompleteEntry{AutocompleteEntryKind::String};
+                return entries;
+            }
+            if (std::optional<AutocompleteEntryMap> ret =
+                    callback ? callback(tag, getMethodContainingExternType(module, candidate->func), candidateString) : std::nullopt)
             {
                 return ret;
             }

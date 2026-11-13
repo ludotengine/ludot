@@ -6,6 +6,7 @@
 #include "Luau/TimeTrace.h"
 
 #include <algorithm>
+#include <cmath>
 #include <unordered_set>
 
 #include <errno.h>
@@ -449,6 +450,15 @@ AstStatBlock* Parser::parseBlockNoScope()
 // laststat ::= return [explist] | break
 AstStat* Parser::parseStat()
 {
+    if (ludotMatchStart())
+        return static_cast<AstStat*>(parseMatch(false));
+    if (lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "enum" &&
+        (lexer.lookahead().type == Lexeme::Name || lexer.lookahead().type == Lexeme::Eof))
+    {
+        Location start = lexer.current().location;
+        nextLexeme();
+        return parseEnum(start, false);
+    }
     if (lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "import")
     {
         Location start = lexer.current().location;
@@ -494,6 +504,9 @@ AstStat* Parser::parseStat()
     if (expr->is<AstExprCall>())
         return allocator.alloc<AstStatExpr>(expr->location, expr);
 
+    if (lexer.current().type == Lexeme::NilAssign)
+        return parseNilAssign(expr);
+
     // if the next token is , or =, it's an assignment (, means it's an assignment with multiple variables)
     if (lexer.current().type == ',' || lexer.current().type == '=')
         return parseAssignment(expr);
@@ -524,6 +537,11 @@ AstStat* Parser::parseStat()
 
     if (ident == "export")
     {
+        if (lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "enum")
+        {
+            nextLexeme();
+            return parseEnum(start, true);
+        }
         if (FFlag::LuauExportValueSyntax)
         {
             Lexeme current = lexer.current();
@@ -652,6 +670,7 @@ AstStat* Parser::parseImport(const Location& start)
     }
     AstLocal* ns = pushLocal(Binding(namespaceName, nullptr, {0, 0}, true));
     ns->isTypeImport = typeOnly;
+    ns->isSynthetic = !namespaceImport;
     auto nsStat = allocator.alloc<AstStatLocal>(Location(start, path->location), copy(&ns, 1), copy(&call, 1), std::nullopt, true);
     nsStat->isTypeImport = typeOnly;
     std::vector<AstStat*> stats{nsStat};
@@ -1007,6 +1026,31 @@ AstStat* Parser::parseFor()
         TempVector<AstExpr*> values(scratchExpr);
         TempVector<Position> valuesCommaPositions(scratchPosition);
         parseExprList(values, options.storeCstData ? &valuesCommaPositions : nullptr);
+
+        if (names.size() == 1 && values.size() == 1 && lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "to")
+        {
+            nextLexeme();
+            AstExpr* limit = parseExpr();
+            AstExpr* step = nullptr;
+            if (lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "step")
+            {
+                nextLexeme();
+                step = parseExpr();
+            }
+            Lexeme matchDo = lexer.current();
+            bool hasDo = expectAndConsume(Lexeme::ReservedDo, "range loop");
+            unsigned int localsBegin = saveLocals();
+            ++functionStack.back().loopDepth;
+            AstLocal* variable = pushLocal(varname);
+            AstStatBlock* body = parseBlock();
+            --functionStack.back().loopDepth;
+            restoreLocals(localsBegin);
+            Location end = lexer.current().location;
+            body->hasEnd = expectMatchEndAndConsume(Lexeme::ReservedEnd, matchDo);
+            auto loop = allocator.alloc<AstStatFor>(Location(start, end), variable, values[0], limit, step, body, hasDo, matchDo.location);
+            loop->syntax = LudotSyntax::Range;
+            return loop;
+        }
 
         Lexeme matchDo = lexer.current();
         bool hasDo = expectAndConsume(Lexeme::ReservedDo, "for loop");
@@ -3372,6 +3416,8 @@ AstType* Parser::parseTypeSuffix(AstType* type, const Location& begin)
 
     while (true)
     {
+        if (lexer.current().type == Lexeme::NilCoalesce || lexer.current().type == Lexeme::NilAssign)
+            lexer.splitTypeOptional();
         Lexeme::Type c = lexer.current().type;
         Position separatorPosition = lexer.current().location.begin;
         if (c == '|')
@@ -3861,27 +3907,588 @@ std::optional<AstExprBinary::Op> Parser::checkBinaryConfusables(const BinaryOpPr
     return std::nullopt;
 }
 
+// Expression sugar is lowered into real scoped AST, never source rewriting.
+// Captures are marked explicitly because the source operands were parsed in the
+// enclosing scope before being moved beneath the synthetic closure.
+static AstExpr* copyLudotReference(Allocator& allocator, AstExpr* expression)
+{
+    if (auto local = expression->as<AstExprLocal>())
+        return allocator.alloc<AstExprLocal>(local->location, local->local, local->upvalue);
+    if (auto global = expression->as<AstExprGlobal>())
+        return allocator.alloc<AstExprGlobal>(global->location, global->name);
+    if (auto index = expression->as<AstExprIndexName>())
+        return allocator.alloc<AstExprIndexName>(
+            index->location, copyLudotReference(allocator, index->expr), index->index, index->indexLocation, index->opPosition, index->op
+        );
+    if (auto index = expression->as<AstExprIndexExpr>())
+        return allocator.alloc<AstExprIndexExpr>(
+            index->location, copyLudotReference(allocator, index->expr), copyLudotReference(allocator, index->index)
+        );
+    return expression;
+}
+
+static bool ludotWord(const Lexeme& token, const char* word)
+{
+    return token.type == Lexeme::Name && AstName(token.name) == word;
+}
+
+bool Parser::ludotMatchStart()
+{
+    if (!ludotWord(lexer.current(), "match"))
+        return false;
+    Lexer probe = lexer;
+    const Lexeme next = probe.next();
+    auto followsWith = [&]()
+    {
+        if (!ludotWord(probe.next(), "with"))
+            return false;
+        // An ordinary call may be followed by a statement using a variable named with.
+        auto following = probe.next().type;
+        return following != '=' && following != '(' && following != '.' && following != ':' && following != '[';
+    };
+    if (next.type == Lexeme::Name || next.type == Lexeme::Number || next.type == Lexeme::ReservedNil || next.type == Lexeme::ReservedTrue ||
+        next.type == Lexeme::ReservedFalse || next.type == '-' || next.type == '#' || next.type == Lexeme::ReservedNot ||
+        next.type == Lexeme::ReservedFunction)
+        return true;
+    if (next.type == Lexeme::QuotedString || next.type == Lexeme::RawString)
+        return followsWith();
+    // Keep all existing parenthesized/string/table calls to a function named match.
+    if (next.type == '(' || next.type == '{')
+    {
+        const auto open = next.type;
+        const auto close = open == '(' ? Lexeme::Type(')') : Lexeme::Type('}');
+        int depth = 1;
+        while (probe.next().type != Lexeme::Eof)
+        {
+            if (probe.current().type == open)
+                ++depth;
+            if (probe.current().type == close && --depth == 0)
+                return followsWith();
+        }
+    }
+    return false;
+}
+
+AstStatBlock* Parser::parseMatchArmBody()
+{
+    Position begin = lexer.current().location.begin;
+    unsigned int localsBegin = saveLocals();
+    std::vector<AstStat*> body;
+    while (!blockFollow(lexer.current()) && !ludotWord(lexer.current(), "case") && !ludotWord(lexer.current(), "otherwise"))
+    {
+        AstStat* statement = parseStat();
+        body.push_back(statement);
+        if (lexer.current().type == ';')
+        {
+            statement->hasSemicolon = true;
+            nextLexeme();
+        }
+        if (isStatLast(statement))
+            break;
+    }
+    restoreLocals(localsBegin);
+    return allocator.alloc<AstStatBlock>(Location(begin, lexer.current().location.begin), copy(body.data(), body.size()));
+}
+
+AstNode* Parser::parseMatch(bool expression)
+{
+    Lexeme start = lexer.current();
+    nextLexeme();
+    AstExpr* subject = parseExpr();
+    if (ludotWord(lexer.current(), "with"))
+        nextLexeme();
+    else
+        report(lexer.current().location, "Expected 'with' after match subject");
+    AstLocal* temporary = ludotTemporary(subject->location);
+    if (!expression)
+        temporary->functionDepth = functionStack.size() - 1;
+    std::vector<AstMatchArm> arms;
+    bool otherwise = false;
+    while (lexer.current().type != Lexeme::ReservedEnd && lexer.current().type != Lexeme::Eof)
+    {
+        AstMatchArm arm;
+        Location caseLocation = lexer.current().location;
+        if (ludotWord(lexer.current(), "otherwise"))
+        {
+            if (otherwise)
+                report(caseLocation, "Duplicate otherwise arm");
+            otherwise = true;
+            arm.otherwise = true;
+            nextLexeme();
+            if (lexer.current().type == Lexeme::ReservedThen)
+            {
+                report(lexer.current().location, "Otherwise does not use 'then'");
+                nextLexeme();
+            }
+        }
+        else if (ludotWord(lexer.current(), "case"))
+        {
+            if (otherwise)
+                report(caseLocation, "Unreachable case after otherwise");
+            nextLexeme();
+            if (lexer.current().type == Lexeme::ReservedIf)
+            {
+                arm.guard = true;
+                nextLexeme();
+            }
+            arm.pattern = parseExpr();
+            AstExpr* pattern = arm.pattern;
+            while (auto group = pattern->as<AstExprGroup>())
+                pattern = group->expr;
+            if (!arm.guard && !pattern->is<AstExprConstantNil>() && !pattern->is<AstExprConstantBool>() && !pattern->is<AstExprConstantString>() &&
+                !pattern->is<AstExprConstantNumber>() && !pattern->is<AstExprConstantInteger>() && !pattern->is<AstExprIndexName>() &&
+                !(pattern->is<AstExprUnary>() && pattern->as<AstExprUnary>()->op == AstExprUnary::Op::Minus))
+                report(pattern->location, "Match cases require a literal or enum member; use 'case if' for guards");
+            expectAndConsume(Lexeme::ReservedThen, "match case");
+        }
+        else
+        {
+            report(lexer.current().location, "Expected 'case', 'otherwise', or 'end' in match");
+            nextLexeme();
+            continue;
+        }
+        if (expression)
+        {
+            arm.value = parseExpr();
+            AstExpr* single = allocator.alloc<AstExprGroup>(arm.value->location, arm.value);
+            AstStat* ret = allocator.alloc<AstStatReturn>(arm.value->location, copy(&single, 1));
+            arm.body = allocator.alloc<AstStatBlock>(arm.value->location, copy(&ret, 1));
+        }
+        else
+            arm.body = parseMatchArmBody();
+        arm.location = Location(caseLocation, arm.body->location);
+        arms.push_back(arm);
+    }
+    Location end = lexer.current().location;
+    expectMatchEndAndConsume(Lexeme::ReservedEnd, start);
+    Location location(start.location, end);
+    AstStat* tail = nullptr;
+    if (expression)
+    {
+        AstExpr* message = allocator.alloc<AstExprConstantString>(
+            location,
+            copy("Non-exhaustive match at runtime", strlen("Non-exhaustive match at runtime")),
+            AstExprConstantString::QuoteStyle::QuotedSimple
+        );
+        AstExpr* error = allocator.alloc<AstExprGlobal>(location, nameTable.getOrAdd("error"));
+        AstExpr* call = allocator.alloc<AstExprCall>(location, error, copy(&message, 1), false, false, AstArray<AstTypeOrPack>{}, location);
+        AstStat* ret = allocator.alloc<AstStatReturn>(location, copy(&call, 1));
+        tail = allocator.alloc<AstStatBlock>(location, copy(&ret, 1));
+    }
+    bool hasGuards = std::any_of(
+        arms.begin(),
+        arms.end(),
+        [](const AstMatchArm& arm)
+        {
+            return arm.guard;
+        }
+    );
+    auto originalLocal = subject->as<AstExprLocal>();
+    bool refineOriginal = originalLocal && (originalLocal->local->isConst || !hasGuards);
+    for (auto arm = arms.rbegin(); arm != arms.rend(); ++arm)
+    {
+        if (arm->otherwise)
+        {
+            tail = arm->body;
+            continue;
+        }
+        AstExpr* test = arm->pattern;
+        if (!arm->guard)
+        {
+            std::vector<AstExpr*> arguments{allocator.alloc<AstExprLocal>(subject->location, temporary, false), arm->pattern};
+            if (refineOriginal)
+            {
+                auto alias = copyLudotReference(allocator, subject);
+                alias->location = arm->pattern->location;
+                arguments.push_back(alias);
+            }
+            auto compare = allocator.alloc<AstExprGlobal>(arm->pattern->location, nameTable.getOrAdd("__ludot_match_eq"));
+            test = allocator.alloc<AstExprCall>(
+                arm->pattern->location,
+                compare,
+                copy(arguments.data(), arguments.size()),
+                false,
+                false,
+                AstArray<AstTypeOrPack>{},
+                arm->pattern->location
+            );
+        }
+        tail = allocator.alloc<AstStatIf>(arm->location, test, arm->body, tail, std::nullopt, std::nullopt);
+    }
+    std::vector<AstStat*> body;
+    if (!expression)
+        body.push_back(allocator.alloc<AstStatLocal>(subject->location, copy(&temporary, 1), copy(&subject, 1), std::nullopt, true));
+    if (tail)
+        body.push_back(tail);
+    auto block = allocator.alloc<AstStatBlock>(location, copy(body.data(), body.size()));
+    auto info = allocator.alloc<AstMatchInfo>();
+    info->subject = subject;
+    info->arms = copy(arms.data(), arms.size());
+    info->location = location;
+    info->expression = expression;
+    if (expression)
+    {
+        auto call = ludotClosure(subject, temporary, block, LudotSyntax::MatchExpression)->as<AstExprCall>();
+        call->location = location;
+        call->matchInfo = info;
+        return call;
+    }
+    block->syntax = LudotSyntax::MatchStatement;
+    block->matchInfo = info;
+    return block;
+}
+
+AstStat* Parser::parseEnum(const Location& start, bool exported)
+{
+    Name name = parseName("enum name");
+    expectAndConsume('=', "enum declaration");
+    Lexeme brace = lexer.current();
+    expectAndConsume('{', "enum members");
+    std::vector<AstEnumMember> members;
+    std::vector<AstExprTable::Item> names, values;
+    std::unordered_set<std::string> used;
+    bool stringEnum = false, numericEnum = false;
+    double nextValue = 1;
+    while (lexer.current().type != '}' && lexer.current().type != Lexeme::Eof)
+    {
+        size_t before = lexer.current().location.begin.line;
+        Name member = parseName("enum member");
+        if (!used.insert(member.name.value).second)
+            report(member.location, "Duplicate enum member '%s'", member.name.value);
+        if (member.name == "from")
+            report(member.location, "Enum member 'from' is reserved for checked conversion");
+        AstExpr* value = nullptr;
+        if (lexer.current().type == '=')
+        {
+            nextLexeme();
+            value = parseExpr();
+            if (value->is<AstExprConstantString>())
+            {
+                stringEnum = true;
+                if (numericEnum)
+                    report(value->location, "An enum cannot mix string and numeric members");
+            }
+            else
+            {
+                double number = 0;
+                AstExpr* literal = value;
+                bool negative = false;
+                if (auto unary = value->as<AstExprUnary>(); unary && unary->op == AstExprUnary::Op::Minus)
+                {
+                    negative = true;
+                    literal = unary->expr;
+                }
+                if (auto constant = literal->as<AstExprConstantNumber>())
+                    number = constant->value;
+                else if (auto constant = literal->as<AstExprConstantInteger>())
+                    number = double(constant->value);
+                else
+                    report(value->location, "Enum values must be integer or string literals");
+                if (negative)
+                    number = -number;
+                if (!std::isfinite(number) || std::floor(number) != number || std::abs(number) > 9007199254740991.0)
+                    report(value->location, "Enum integer value must be exactly representable within the safe integer range");
+                if (stringEnum)
+                    report(value->location, "An enum cannot mix string and numeric members");
+                numericEnum = true;
+                nextValue = number + 1;
+                value = allocator.alloc<AstExprConstantNumber>(value->location, number);
+            }
+        }
+        else
+        {
+            if (stringEnum)
+                report(member.location, "Every string enum member requires an explicit string value");
+            if (std::abs(nextValue) > 9007199254740991.0)
+                report(member.location, "Implicit enum value exceeds the safe integer range");
+            value = allocator.alloc<AstExprConstantNumber>(member.location, nextValue++);
+            numericEnum = true;
+        }
+        members.push_back({member.name, member.location, value});
+        AstExpr* key = allocator.alloc<AstExprConstantString>(
+            member.location, copy(member.name.value, strlen(member.name.value)), AstExprConstantString::QuoteStyle::QuotedSimple
+        );
+        names.push_back({AstExprTable::Item::Kind::List, nullptr, key});
+        values.push_back({AstExprTable::Item::Kind::List, nullptr, value});
+        if (lexer.current().type == ',' || lexer.current().type == ';')
+            nextLexeme();
+        else if (lexer.current().type != '}')
+        {
+            report(lexer.current().location, "Expected ',' or '}' after enum member");
+            if (lexer.current().type != Lexeme::Name || lexer.current().location.begin.line == before)
+                nextLexeme();
+        }
+    }
+    Location end = lexer.current().location;
+    expectMatchAndConsume('}', brace);
+    Location location(start, end);
+    AstExpr* args[] = {
+        allocator.alloc<AstExprTable>(location, copy(names.data(), names.size())),
+        allocator.alloc<AstExprTable>(location, copy(values.data(), values.size()))
+    };
+    AstExpr* factory = allocator.alloc<AstExprGlobal>(start, nameTable.getOrAdd("__ludot_enum"));
+    AstExpr* init = allocator.alloc<AstExprCall>(location, factory, copy(args, 2), false, false, AstArray<AstTypeOrPack>{}, location);
+    AstLocal* variable = pushLocal(Binding(name, nullptr, {0, 0}, true));
+    variable->isExported = exported;
+    auto stat = allocator.alloc<AstStatLocal>(location, copy(&variable, 1), copy(&init, 1), std::nullopt, true);
+    stat->isExported = exported;
+    stat->syntax = LudotSyntax::Enum;
+    auto info = allocator.alloc<AstEnumInfo>();
+    info->name = name.name;
+    info->location = location;
+    info->members = copy(members.data(), members.size());
+    info->exported = exported;
+    stat->enumInfo = info;
+    if (exported)
+    {
+        if (functionStack.size() != 1 || recursionCounter != 1)
+            report(start, "Exported enums must be top-level declarations");
+        if (declaredExportBindings.find(name.name))
+            report(name.location, "Duplicate exported identifier '%s'", name.name.value);
+        declaredExportBindings[name.name] = name.location;
+    }
+    return stat;
+}
+
+AstLocal* Parser::ludotTemporary(const Location& location)
+{
+    AstName name = nameTable.getOrAdd(format("__ludot_value_%u", ++ludotTemporaryId).c_str());
+    auto local = allocator.alloc<AstLocal>(name, location, nullptr, functionStack.size(), 0, nullptr, true);
+    local->isSynthetic = true;
+    return local;
+}
+
+AstExpr* Parser::ludotClosure(AstExpr* input, AstLocal* parameter, AstStatBlock* body, LudotSyntax syntax)
+{
+    struct Definitions : AstVisitor
+    {
+        std::unordered_set<AstLocal*> locals;
+        bool visit(AstStatLocal* node) override
+        {
+            for (auto local : node->vars)
+                locals.insert(local);
+            return true;
+        }
+        bool visit(AstStatLocalFunction* node) override
+        {
+            locals.insert(node->name);
+            return true;
+        }
+        bool visit(AstExprFunction* node) override
+        {
+            if (node->self)
+                locals.insert(node->self);
+            for (auto local : node->args)
+                locals.insert(local);
+            ++node->functionDepth;
+            return true;
+        }
+        bool visit(AstStatFor* node) override
+        {
+            locals.insert(node->var);
+            return true;
+        }
+        bool visit(AstStatForIn* node) override
+        {
+            for (auto local : node->vars)
+                locals.insert(local);
+            return true;
+        }
+    } definitions;
+    body->visit(&definitions);
+    for (auto local : definitions.locals)
+        ++local->functionDepth;
+    definitions.locals.insert(parameter);
+    struct Captures : AstVisitor
+    {
+        const std::unordered_set<AstLocal*>& locals;
+        Captures(const std::unordered_set<AstLocal*>& locals)
+            : locals(locals)
+        {
+        }
+        bool visit(AstExprLocal* node) override
+        {
+            if (!locals.count(node->local))
+                node->upvalue = true;
+            return true;
+        }
+    } captures(definitions.locals);
+    body->visit(&captures);
+    struct Varargs : AstVisitor
+    {
+        bool used = false;
+        bool visit(AstExprFunction*) override
+        {
+            return false;
+        }
+        bool visit(AstExprVarargs*) override
+        {
+            used = true;
+            return false;
+        }
+    } varargs;
+    body->visit(&varargs);
+    body->syntax = syntax;
+    auto fn = allocator.alloc<AstExprFunction>(
+        body->location,
+        AstArray<AstAttr*>{},
+        AstArray<AstGenericType*>{},
+        AstArray<AstGenericTypePack*>{},
+        nullptr,
+        copy(&parameter, 1),
+        varargs.used,
+        Location(),
+        body,
+        functionStack.size(),
+        AstName(),
+        nullptr
+    );
+    AstExpr* argument = allocator.alloc<AstExprGroup>(input->location, input);
+    std::vector<AstExpr*> arguments{argument};
+    if (varargs.used)
+        arguments.push_back(allocator.alloc<AstExprVarargs>(body->location));
+    auto result = allocator.alloc<AstExprCall>(
+        Location(input->location.begin, body->location.end),
+        fn,
+        copy(arguments.data(), arguments.size()),
+        false,
+        false,
+        AstArray<AstTypeOrPack>{},
+        input->location
+    );
+    result->syntax = syntax;
+    return result;
+}
+
+AstExpr* Parser::ludotCoalesce(AstExpr* left, AstExpr* right)
+{
+    Location location(left->location, right->location);
+    AstLocal* parameter = ludotTemporary(location);
+    AstExpr* value = allocator.alloc<AstExprLocal>(left->location, parameter, false);
+    AstExpr* test = allocator.alloc<AstExprBinary>(
+        left->location, AstExprBinary::CompareNe, copyLudotReference(allocator, value), allocator.alloc<AstExprConstantNil>(left->location)
+    );
+    AstExpr* result = allocator.alloc<AstExprIfElse>(location, test, true, value, true, right);
+    AstStat* ret = allocator.alloc<AstStatReturn>(location, copy(&result, 1));
+    auto body = allocator.alloc<AstStatBlock>(location, copy(&ret, 1));
+    return ludotClosure(left, parameter, body, LudotSyntax::Coalesce);
+}
+
+AstExpr* Parser::ludotPipeline(AstExpr* left, AstExpr* right)
+{
+    Location location(left->location, right->location);
+    AstLocal* parameter = ludotTemporary(location);
+    AstExpr* value = allocator.alloc<AstExprLocal>(left->location, parameter, false);
+    while (auto group = right->as<AstExprGroup>())
+        right = group->expr;
+    AstExpr* function = right;
+    AstArray<AstTypeOrPack> typeArguments;
+    std::vector<AstExpr*> arguments{value};
+    if (auto call = right->as<AstExprCall>())
+    {
+        if (call->self || call->syntax != LudotSyntax::None)
+            report(right->location, "Pipeline stages must be ordinary function references or calls, not method calls");
+        function = call->func;
+        typeArguments = call->typeArguments;
+        for (auto arg : call->args)
+            arguments.push_back(arg);
+    }
+    else if (
+        !right->is<AstExprLocal>() && !right->is<AstExprGlobal>() && !right->is<AstExprIndexName>() && !right->is<AstExprIndexExpr>() &&
+        !right->is<AstExprFunction>() && !right->is<AstExprInstantiate>()
+    )
+    {
+        report(right->location, "Unsupported pipeline stage: expected a function reference or ordinary call");
+    }
+    AstExpr* call =
+        allocator.alloc<AstExprCall>(location, function, copy(arguments.data(), arguments.size()), false, false, typeArguments, right->location);
+    AstExpr* single = allocator.alloc<AstExprGroup>(location, call);
+    AstStat* ret = allocator.alloc<AstStatReturn>(location, copy(&single, 1));
+    return ludotClosure(left, parameter, allocator.alloc<AstStatBlock>(location, copy(&ret, 1)), LudotSyntax::Pipeline);
+}
+
+AstStat* Parser::parseNilAssign(AstExpr* target)
+{
+    Location start = target->location;
+    if (!isExprLValue(target))
+        reportLValueError(target);
+    nextLexeme();
+    AstExpr* right = parseExpr();
+    Location location(start, right->location);
+    std::vector<AstStat*> statements;
+    auto once = [&](AstExpr* expression) -> AstExpr*
+    {
+        auto local = ludotTemporary(expression->location);
+        // These are block locals, not synthetic closure parameters.
+        local->functionDepth = functionStack.size() - 1;
+        statements.push_back(allocator.alloc<AstStatLocal>(expression->location, copy(&local, 1), copy(&expression, 1), std::nullopt, true));
+        return allocator.alloc<AstExprLocal>(expression->location, local, false);
+    };
+    AstExpr* destination = target;
+    if (auto index = target->as<AstExprIndexName>())
+    {
+        destination =
+            allocator.alloc<AstExprIndexName>(target->location, once(index->expr), index->index, index->indexLocation, index->opPosition, index->op);
+    }
+    else if (auto index = target->as<AstExprIndexExpr>())
+    {
+        AstExpr* receiver = once(index->expr);
+        AstExpr* key = once(index->index);
+        destination = allocator.alloc<AstExprIndexExpr>(target->location, receiver, key);
+    }
+    else if (!target->is<AstExprLocal>() && !target->is<AstExprGlobal>())
+    {
+        report(
+            target->location,
+            "Invalid target for ?"
+            "?= assignment"
+        );
+    }
+    AstExpr* condition = allocator.alloc<AstExprBinary>(
+        target->location, AstExprBinary::CompareEq, copyLudotReference(allocator, destination), allocator.alloc<AstExprConstantNil>(target->location)
+    );
+    AstStat* assignment = allocator.alloc<AstStatAssign>(location, copy(&destination, 1), copy(&right, 1));
+    auto branch = allocator.alloc<AstStatBlock>(location, copy(&assignment, 1));
+    statements.push_back(allocator.alloc<AstStatIf>(location, condition, branch, nullptr, std::nullopt, std::nullopt));
+    auto result = allocator.alloc<AstStatBlock>(location, copy(statements.data(), statements.size()));
+    result->syntax = LudotSyntax::CoalesceAssign;
+    auto stableReceiver = [](AstExpr* expression)
+    {
+        auto local = expression->as<AstExprLocal>();
+        return local && local->local->isConst;
+    };
+    bool stable = target->is<AstExprLocal>() || target->is<AstExprGlobal>();
+    if (auto index = target->as<AstExprIndexName>())
+        stable = stableReceiver(index->expr);
+    if (auto index = target->as<AstExprIndexExpr>())
+        stable = stableReceiver(index->expr) &&
+                 (index->index->is<AstExprConstantString>() || index->index->is<AstExprConstantNumber>() || stableReceiver(index->index));
+    if (stable)
+        result->nilAssignmentResult = copyLudotReference(allocator, target);
+    return result;
+}
+
 // subexpr -> (asexp | unop subexpr) { binop subexpr }
 // where `binop' is any binary operator with a priority higher than `limit'
 AstExpr* Parser::parseExpr(unsigned int limit)
 {
     static const BinaryOpPriority binaryPriority[] = {
-        {6, 6},  // '+'
-        {6, 6},  // '-'
-        {7, 7},  // '*'
-        {7, 7},  // '/'
-        {7, 7},  // '//'
-        {7, 7},  // `%'
-        {10, 9}, // power (right associative)
-        {5, 4},  // concat (right associative)
-        {3, 3},  // inequality
-        {3, 3},  // equality
-        {3, 3},  // '<'
-        {3, 3},  // '<='
-        {3, 3},  // '>'
-        {3, 3},  // '>='
-        {2, 2},  // logical and
-        {1, 1}   // logical or
+        {7, 7},   // '+'
+        {7, 7},   // '-'
+        {8, 8},   // '*'
+        {8, 8},   // '/'
+        {8, 8},   // '//'
+        {8, 8},   // `%'
+        {11, 10}, // power (right associative)
+        {6, 5},   // concat (right associative)
+        {4, 4},   // inequality
+        {4, 4},   // equality
+        {4, 4},   // '<'
+        {4, 4},   // '<='
+        {4, 4},   // '>'
+        {4, 4},   // '>='
+        {3, 3},   // logical and
+        {2, 2}    // logical or
     };
 
     static_assert(sizeof(binaryPriority) / sizeof(binaryPriority[0]) == size_t(AstExprBinary::Op__Count), "binaryPriority needs an entry per op");
@@ -3891,7 +4498,7 @@ AstExpr* Parser::parseExpr(unsigned int limit)
     // this handles recursive calls to parseSubExpr/parseExpr
     incrementRecursionCounter("expression");
 
-    const unsigned int unaryPriority = 8;
+    const unsigned int unaryPriority = 9;
 
     Location start = lexer.current().location;
 
@@ -3924,16 +4531,23 @@ AstExpr* Parser::parseExpr(unsigned int limit)
     if (!op)
         op = checkBinaryConfusables(binaryPriority, limit);
 
-    while (op && binaryPriority[*op].left > limit)
+    while ((op && binaryPriority[*op].left > limit) ||
+           ((lexer.current().type == Lexeme::NilCoalesce || lexer.current().type == Lexeme::Pipeline) && limit < 1))
     {
         Position opPosition = lexer.current().location.begin;
+        Lexeme::Type syntax = lexer.current().type;
         nextLexeme();
 
-        // read sub-expression with higher priority
-        AstExpr* next = parseExpr(binaryPriority[*op].right);
-
-        expr = allocator.alloc<AstExprBinary>(Location(start, next->location), *op, expr, next);
-        if (options.storeCstData)
+        // Existing operators bind more tightly; |> and ?? share tier 1 and
+        // use the same right binding power, giving strict left associativity.
+        AstExpr* next = parseExpr(op ? binaryPriority[*op].right : 1);
+        if (syntax == Lexeme::NilCoalesce)
+            expr = ludotCoalesce(expr, next);
+        else if (syntax == Lexeme::Pipeline)
+            expr = ludotPipeline(expr, next);
+        else
+            expr = allocator.alloc<AstExprBinary>(Location(start, next->location), *op, expr, next);
+        if (options.storeCstData && op)
             cstNodeMap[expr] = allocator.alloc<CstExprOp>(opPosition);
         op = parseBinaryOp(lexer.current());
 
@@ -4024,12 +4638,37 @@ AstExpr* Parser::parsePrimaryExpr(bool asStatement)
     Position start = lexer.current().location.begin;
 
     AstExpr* expr = parsePrefixExpr();
+    AstExpr* optionalInput = nullptr;
+    AstLocal* optionalParameter = nullptr;
+    std::vector<AstStat*> optionalBody;
 
     unsigned int oldRecursionCount = recursionCounter;
 
     while (true)
     {
-        if (lexer.current().type == '.')
+        if (lexer.current().type == Lexeme::OptionalDot || lexer.current().type == Lexeme::OptionalColon)
+        {
+            if (!optionalInput)
+            {
+                optionalInput = expr;
+                optionalParameter = ludotTemporary(expr->location);
+                expr = allocator.alloc<AstExprLocal>(expr->location, optionalParameter, false);
+            }
+            else
+            {
+                AstLocal* once = ludotTemporary(expr->location);
+                optionalBody.push_back(allocator.alloc<AstStatLocal>(expr->location, copy(&once, 1), copy(&expr, 1), std::nullopt, true));
+                expr = allocator.alloc<AstExprLocal>(expr->location, once, false);
+            }
+            AstExpr* condition = allocator.alloc<AstExprBinary>(
+                expr->location, AstExprBinary::CompareEq, copyLudotReference(allocator, expr), allocator.alloc<AstExprConstantNil>(expr->location)
+            );
+            AstExpr* nil = allocator.alloc<AstExprConstantNil>(expr->location);
+            AstStat* ret = allocator.alloc<AstStatReturn>(expr->location, copy(&nil, 1));
+            auto empty = allocator.alloc<AstStatBlock>(expr->location, copy(&ret, 1));
+            optionalBody.push_back(allocator.alloc<AstStatIf>(expr->location, condition, empty, nullptr, std::nullopt, std::nullopt));
+        }
+        if (lexer.current().type == '.' || lexer.current().type == Lexeme::OptionalDot)
         {
             Position opPosition = lexer.current().location.begin;
             nextLexeme();
@@ -4042,7 +4681,7 @@ AstExpr* Parser::parsePrimaryExpr(bool asStatement)
         {
             expr = parseIndexExpr(start, expr);
         }
-        else if (lexer.current().type == ':')
+        else if (lexer.current().type == ':' || lexer.current().type == Lexeme::OptionalColon)
         {
             expr = parseMethodCall(start, expr);
         }
@@ -4075,7 +4714,13 @@ AstExpr* Parser::parsePrimaryExpr(bool asStatement)
     }
 
     recursionCounter = oldRecursionCount;
-
+    if (optionalInput)
+    {
+        AstExpr* single = allocator.alloc<AstExprGroup>(expr->location, expr);
+        optionalBody.push_back(allocator.alloc<AstStatReturn>(expr->location, copy(&single, 1)));
+        auto body = allocator.alloc<AstStatBlock>(Location(optionalInput->location, expr->location), copy(optionalBody.data(), optionalBody.size()));
+        expr = ludotClosure(optionalInput, optionalParameter, body, LudotSyntax::OptionalChain);
+    }
     return expr;
 }
 
@@ -4295,6 +4940,8 @@ LUAU_NOINLINE AstExpr* Parser::parseAttributedFunction(const Location& start)
 // simpleexp -> NUMBER | STRING | NIL | true | false | ... | constructor | [attributes] FUNCTION body | primaryexp
 AstExpr* Parser::parseSimpleExpr()
 {
+    if (ludotMatchStart())
+        return static_cast<AstExpr*>(parseMatch(true));
     Location start = lexer.current().location;
 
     if (lexer.current().type == Lexeme::Attribute || lexer.current().type == Lexeme::AttributeOpen)

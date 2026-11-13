@@ -219,4 +219,76 @@ class LspTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr.decode())
         self.assertIn(b'Ludot LSP', result.stdout)
         self.assertIn(b'"id": 2', result.stdout)
+    def test_extensions_unsaved_enum_exhaustiveness_and_utf16(self):
+        text = '--!strict\nenum Action = { Join, Chat, Leave }\nconst value: Action = Action.Join\nconst emoji = "😀"; const result = match value with case Action.Join then 1 end\nreturn { emoji, result }'
+        uri = self.open(text)
+        self.server.publish(uri)
+        errors = self.messages[-1]['params']['diagnostics']
+        missing = next(error for error in errors if 'Non-exhaustive match' in error['message'])
+        self.assertIn('Action.Chat', missing['message'])
+        self.assertIn('Action.Leave', missing['message'])
+        self.assertEqual(missing['range']['start'], {'line': 3, 'character': 35})
+        self.server.documents[uri] = {'version': 2, 'text': text.replace('then 1 end', 'then 1 otherwise 0 end')}
+        checked, _ = self.server.analyze(uri)
+        self.assertEqual(checked['diagnostics'], [])
+
+    def test_is_a_resource_refinement_and_class_string_completion(self):
+        self.server.api = ROOT / 'types/engine.api'
+        text = '--!strict\nconst function mouse(event: InputEvent): Vector2?\n\tif event:IsA("InputEventMouseMotion") then\n\t\treturn event.Relative\n\tend\n\treturn nil\nend\nreturn mouse'
+        uri = self.open(text)
+        checked, _ = self.server.analyze(uri)
+        self.assertEqual(checked['diagnostics'], [])
+        result = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 2, 'character': 24}}})
+        self.assertIn('InputEventMouseMotion', [entry['label'] for entry in result])
+        hover = self.server.request({'method': 'textDocument/hover', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 3, 'character': 18}}})
+        self.assertIn('Vector2', str(hover))
+        self.server.documents[uri] = {'version': 2, 'text': '--!strict\nconst event = InputEventMouseMotion.new()\nevent.'}
+        completions = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 2, 'character': 6}}})
+        labels = [entry['label'] for entry in completions]
+        self.assertIn('isA', labels)
+        self.assertNotIn('IsA', labels)
+
+    def test_native_enum_constants_and_checked_conversion(self):
+        self.server.api = ROOT / 'types/engine.api'
+        uri = self.open('--!strict\nconst mode: Input.MouseMode = Input.MOUSE_MODE_CAPTURED\nInput.MouseMode = mode\nreturn mode')
+        checked, _ = self.server.analyze(uri)
+        self.assertEqual(checked['diagnostics'], [])
+        self.server.documents[uri] = {'version': 2, 'text': '--!strict\nreturn Input.'}
+        completions = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 13}}})
+        labels = [entry['label'] for entry in completions]
+        self.assertIn('MOUSE_MODE_CAPTURED', labels)
+        self.assertNotIn('MouseModeCaptured', labels)
+
+    def test_match_warning_severity_and_selene_ignores(self):
+        text = '--!strict\nenum Action = { Join, Chat }\nconst action: Action = Action.Join\nmatch action with case Action.Join then print(1) end'
+        uri = self.open(text)
+        self.server.publish(uri)
+        warning = next(d for d in self.messages[-1]['params']['diagnostics'] if 'Non-exhaustive match' in d['message'])
+        self.assertEqual(warning['severity'], 2)
+        for ignored in (
+            '--# selene: allow(match_exhaustiveness)\n' + text,
+            text.replace('match action with', '-- selene: allow(match_exhaustiveness)\nmatch action with'),
+        ):
+            self.server.documents[uri] = {'version': 2, 'text': ignored}
+            checked, _ = self.server.analyze(uri)
+            self.assertEqual(checked['diagnostics'], [])
+        literal = text.replace('const action:', 'const ignoredText = "--# selene: allow(match_exhaustiveness)"\nconst action:')
+        self.server.documents[uri] = {'version': 3, 'text': literal}
+        checked, _ = self.server.analyze(uri)
+        self.assertTrue(any('Non-exhaustive match' in d['message'] for d in checked['diagnostics']))
+
+    def test_completion_recovers_inside_unfinished_match_and_class_name(self):
+        self.server.api = ROOT / 'types/engine.api'
+        text = 'enum Action = { Join, Chat }\nconst function read(action: Action)\n\tconst result = match action with\n\t\tcase Action.'
+        uri = self.open(text)
+        line = text.splitlines()[-1]
+        completions = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 3, 'character': len(line)}}})
+        labels = [entry['label'] for entry in completions]
+        self.assertIn('Join', labels)
+        self.assertIn('Chat', labels)
+        text = 'const function read(event: InputEvent)\n\tevent:IsA("InputEventMo'
+        self.server.documents[uri] = {'version': 2, 'text': text}
+        completions = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': len(text.splitlines()[-1])}}})
+        self.assertIn('InputEventMouseMotion', [entry['label'] for entry in completions])
+
 if __name__ == '__main__': unittest.main()

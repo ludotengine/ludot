@@ -85,7 +85,19 @@ struct Adapter : Luau::AstVisitor {
 	}
 	bool visit(Luau::AstStatBlock *node) override {
 		for (auto *statement : node->body) {
+			struct DialectSyntax : Luau::AstVisitor {
+				bool found = false;
+				bool visit(Luau::AstNode *node) override {
+					found = found || node->syntax != Luau::LudotSyntax::None;
+					return !found;
+				}
+			} syntax;
+			statement->visit(&syntax);
 			size_t start = offset(statement->location.begin);
+			if (syntax.found) {
+				protect(start, offset(statement->location.end));
+				continue;
+			}
 			if (source.compare(start, 6, "import") != 0 || (start + 6 < source.size() && (std::isalnum(static_cast<unsigned char>(source[start + 6])) || source[start + 6] == '_'))) {
 				statement->visit(this);
 				continue;
@@ -210,7 +222,7 @@ String selene_source(const String &source) {
 			PackedStringArray rules = comment.substr(start, finish - start).split(","), kept;
 			bool removed = false;
 			for (const String &rule : rules) {
-				if (rule.strip_edges() == "naming_convention") {
+				if (rule.strip_edges() == "naming_convention" || rule.strip_edges() == "match_exhaustiveness") {
 					removed = true;
 				} else {
 					kept.push_back(rule.strip_edges());

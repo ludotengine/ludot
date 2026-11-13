@@ -1,5 +1,6 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/Type.h"
+#include "Luau/LudotEnums.h"
 
 #include "Luau/BuiltinDefinitions.h"
 #include "Luau/BuiltinTypeFunctions.h"
@@ -1069,6 +1070,8 @@ const Property* lookupExternTypeProp(const ExternType* cls, const Name& name)
 
 bool isSubclass(const ExternType* cls, const ExternType* parent)
 {
+    if (cls->enumInfo && cls->enumInfo == parent->enumInfo)
+        return !parent->enumMember || cls->enumMember == parent->enumMember;
     while (cls)
     {
         if (cls == parent)

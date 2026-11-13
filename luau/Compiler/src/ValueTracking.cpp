@@ -20,6 +20,7 @@ struct ValueVisitor : AstVisitor
     DenseHashSet<AstLocal*>* exportedFunctions = nullptr;
     std::vector<AstLocal*>* exportedVariables = nullptr;
     SmallVector<AstStatBlock*, 4> blockOwnerStack;
+    unsigned loweredDepth = 0;
 
     // with LuauOptimizeExportTable, remove this constructor
     ValueVisitor(DenseHashMap<AstName, Global>& globals, DenseHashMap<AstLocal*, Variable>& variables)
@@ -50,10 +51,10 @@ struct ValueVisitor : AstVisitor
                 Variable& variable = variables[lv->local];
 
                 variable.written = true;
-                LUAU_ASSERT(!variable.lastUsed || lv->location.end >= variable.lastUsed->location.end);
+                LUAU_ASSERT(loweredDepth || variable.nonLexicalUse || !variable.lastUsed || lv->location.end >= variable.lastUsed->location.end);
                 variable.lastUsed = lv;
 
-                if (lv->upvalue || lv->local->isExported)
+                if (lv->upvalue || lv->local->isExported || lv->local->isSynthetic || loweredDepth)
                     variable.nonLexicalUse = true;
             }
             else
@@ -78,10 +79,10 @@ struct ValueVisitor : AstVisitor
         {
             Variable& variable = variables[node->local];
 
-            LUAU_ASSERT(!variable.lastUsed || node->location.end >= variable.lastUsed->location.end);
+            LUAU_ASSERT(loweredDepth || variable.nonLexicalUse || !variable.lastUsed || node->location.end >= variable.lastUsed->location.end);
             variable.lastUsed = node;
 
-            if (node->upvalue || node->local->isExported)
+            if (node->upvalue || node->local->isExported || node->local->isSynthetic || loweredDepth)
                 variable.nonLexicalUse = true;
 
             return false;
@@ -202,23 +203,51 @@ struct ValueVisitor : AstVisitor
         for (AstLocal* arg : node->args)
             variables[arg].init = nullptr;
 
+        if (loweredDepth && node->body->syntax == LudotSyntax::None)
+        {
+            // User function bodies retain lexical order even when their literal
+            // is a pipeline stage. Keep ordinary register reuse inside them.
+            unsigned outerDepth = loweredDepth;
+            loweredDepth = 0;
+            for (AstLocal* arg : node->args)
+                if (arg->annotation)
+                    arg->annotation->visit(this);
+            if (node->varargAnnotation)
+                node->varargAnnotation->visit(this);
+            if (node->returnAnnotation)
+                node->returnAnnotation->visit(this);
+            node->body->visit(this);
+            loweredDepth = outerDepth;
+            return false;
+        }
         return true;
+    }
+
+    bool visit(AstExprCall* call) override
+    {
+        if (call->syntax == LudotSyntax::None)
+            return true;
+        ++loweredDepth;
+        call->func->visit(this);
+        for (auto argument : call->args)
+            argument->visit(this);
+        --loweredDepth;
+        return false;
     }
 
     bool visit(AstStatBlock* block) override
     {
+        if (block->syntax != LudotSyntax::None)
+            ++loweredDepth;
         if (FFlag::LuauCompileReuseLocalRegs)
-        {
             blockOwnerStack.push_back(block);
-            for (AstStat* stat : block->body)
-                stat->visit(this);
+        for (AstStat* stat : block->body)
+            stat->visit(this);
+        if (FFlag::LuauCompileReuseLocalRegs)
             blockOwnerStack.pop_back();
-            return false;
-        }
-        else
-        {
-            return true;
-        }
+        if (block->syntax != LudotSyntax::None)
+            --loweredDepth;
+        return false;
     }
 };
 

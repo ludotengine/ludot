@@ -14,6 +14,11 @@ cmake --build build --target Luau.Repl.CLI Luau.Analyze.CLI Luau.Compile.CLI lud
 ctest --test-dir build --output-on-failure
 ```
 
+CTest includes `tests/test_extensions.py`, which exercises the combined dialect
+fixture, intentional errors, enum iteration and nominal types, lazy evaluation,
+range captures/control flow, pipeline grouping, and typed Godot class checks.
+The LSP suite covers unsaved enum errors and UTF-16 positions as well.
+
 The binaries live in `build/luau/` and `build/ludot-shader`. On Windows, append
 `.exe`. The Luau CLI filenames remain recognizable while the dialect evolves.
 
@@ -81,6 +86,15 @@ For a headless engine integration check, use the editor binary:
 
 ```sh
 python tools/test_engine.py engine/bin/ludot.linuxbsd.editor.x86_64
+```
+
+Keep a running editor build separate by adding `extra_suffix=language-tests` to
+the SCons command. This writes a different executable. For the full headless
+regression set, including enum Inspector/scene serialization and all API casing
+combinations, run:
+
+```sh
+python tools/test_desktop.py engine/bin/ludot.linuxbsd.editor.x86_64.language-tests
 ```
 
 A development build adds `.dev` to the filename. The test intentionally attempts
@@ -241,10 +255,11 @@ references or public API members.
 The pinned Selene source and license are available at
 https://github.com/Kampfkarren/selene/tree/0.32.0.
 
-The API manifest uses `LUDOT_API_2` with raw native method/property/signal names.
+The API manifest uses `LUDOT_API_3` with raw native method/property/signal names
+and native enum groups.
 The native editor and standalone analyzer share the C++ naming conversion in
-`Luau/LudotNaming.h`. The analyzer also accepts version 1 manifests, converting
-those member names to the selected style. Regenerate both the manifest and the
+`Luau/LudotNaming.h`. The analyzer also accepts version 1 and 2 manifests. Version 1 member names
+are converted to the selected style; older manifests lack enum group metadata. Regenerate both the manifest and the
 callback catalog after native API changes. The compact callback catalog retains
 native callback identity in release templates where full ClassDB virtual-method
 metadata is unavailable.

@@ -15,6 +15,9 @@ struct luaL_Reg
 };
 typedef struct luaL_Reg luaL_Reg;
 
+// Ordered immutable enum namespace factory used by compiler-generated AST.
+LUALIB_API int luaL_newenum(lua_State* L);
+
 LUALIB_API void luaL_register(lua_State* L, const char* libname, const luaL_Reg* l);
 LUALIB_API int luaL_getmetafield(lua_State* L, int obj, const char* e);
 LUALIB_API int luaL_callmeta(lua_State* L, int obj, const char* e);

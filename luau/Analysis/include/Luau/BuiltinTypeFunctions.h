@@ -30,6 +30,8 @@ struct BuiltinTypeFunctions
 
     TypeFunction andFunc;
     TypeFunction orFunc;
+    TypeFunction coalesceFunc;
+    TypeFunction literalCaseFunc;
 
     TypeFunction ltFunc;
     TypeFunction leFunc;

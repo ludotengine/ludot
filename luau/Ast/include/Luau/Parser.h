@@ -95,6 +95,16 @@ private:
     Parser(const char* buffer, std::size_t bufferSize, AstNameTable& names, Allocator& allocator, const ParseOptions& options);
 
     bool blockFollow(const Lexeme& l);
+    AstLocal* ludotTemporary(const Location& location);
+    AstExpr* ludotClosure(AstExpr* input, AstLocal* parameter, AstStatBlock* body, LudotSyntax syntax);
+    AstExpr* ludotCoalesce(AstExpr* left, AstExpr* right);
+    AstExpr* ludotPipeline(AstExpr* left, AstExpr* right);
+    AstStat* parseNilAssign(AstExpr* target);
+    AstStat* parseEnum(const Location& start, bool exported);
+    bool ludotMatchStart();
+    AstNode* parseMatch(bool expression);
+    AstStatBlock* parseMatchArmBody();
+    unsigned int ludotTemporaryId = 0;
 
     AstStatBlock* parseChunk();
 

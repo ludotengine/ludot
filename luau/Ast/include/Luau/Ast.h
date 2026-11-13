@@ -78,6 +78,8 @@ struct AstLocal
     // exported is only a property set after construction
     bool isExported = false;
     bool isTypeImport = false;
+    // Lowered temporaries have non-lexical source ranges; keep their registers live for the block.
+    bool isSynthetic = false;
 
     AstType* annotation;
 
@@ -161,6 +163,19 @@ const int AstRtti<T>::value = ++gAstRttiIndex;
         return AstRtti<Class>::value; \
     }
 
+enum class LudotSyntax
+{
+    None,
+    Enum,
+    MatchExpression,
+    MatchStatement,
+    OptionalChain,
+    Coalesce,
+    CoalesceAssign,
+    Range,
+    Pipeline
+};
+
 class AstNode
 {
 public:
@@ -207,6 +222,7 @@ public:
 
     const int classIndex;
     Location location;
+    LudotSyntax syntax = LudotSyntax::None;
 };
 
 class AstAttr : public AstNode
@@ -448,6 +464,23 @@ public:
     void visit(AstVisitor* visitor) override;
 };
 
+struct AstMatchArm
+{
+    AstExpr* pattern = nullptr;
+    AstExpr* value = nullptr;
+    AstStatBlock* body = nullptr;
+    Location location;
+    bool guard = false;
+    bool otherwise = false;
+};
+struct AstMatchInfo
+{
+    AstExpr* subject = nullptr;
+    AstArray<AstMatchArm> arms;
+    Location location;
+    bool expression = false;
+};
+
 class AstExprCall : public AstExpr
 {
 public:
@@ -473,6 +506,7 @@ public:
     AstArray<AstExpr*> args;
     bool self;
     bool tableCall;
+    AstMatchInfo* matchInfo = nullptr;
     bool isClassBaseInit = false;
     Location argLocation;
 };
@@ -733,6 +767,9 @@ class AstStatBlock : public AstStat
 {
 public:
     bool isImportExpansion = false;
+    AstMatchInfo* matchInfo = nullptr;
+    // Analysis-only observation after a nil assignment; never executes a second getter.
+    AstExpr* nilAssignmentResult = nullptr;
     LUAU_RTTI(AstStatBlock)
 
     AstStatBlock(const Location& location, const AstArray<AstStat*>& body, bool hasEnd = true);
@@ -876,6 +913,20 @@ public:
     AstExpr* expr;
 };
 
+struct AstEnumMember
+{
+    AstName name;
+    Location location;
+    AstExpr* value;
+};
+struct AstEnumInfo
+{
+    AstName name;
+    Location location;
+    AstArray<AstEnumMember> members;
+    bool exported = false;
+};
+
 class AstStatLocal : public AstStat
 {
 public:
@@ -894,9 +945,12 @@ public:
     AstArray<AstLocal*> vars;
     AstArray<AstExpr*> values;
 
+    AstEnumInfo* enumInfo = nullptr;
     bool isConst = false;
     bool isExported = false;
     bool isTypeImport = false;
+    // Lowered temporaries have non-lexical source ranges; keep their registers live for the block.
+    bool isSynthetic = false;
 
     // if the StatLocal is being exported, this is the location of `const` or `local`
     std::optional<Location> keywordLocation;
