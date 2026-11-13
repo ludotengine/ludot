@@ -1,5 +1,6 @@
 {
   "policy": "Independent hard forks. No automatic upstream merges or downloads during builds.",
   "godot": {"repository": "https://github.com/godotengine/godot", "tag": "4.7.2-stable", "commit": "ed1daf0bf001b61586d9930840f2f1394092c079", "directory": "engine"},
-  "luau": {"repository": "https://github.com/luau-lang/luau", "tag": "0.743", "commit": "9d7748a4f324213a18cb8283fa2a77c330225fa0", "directory": "luau"}
+  "luau": {"repository": "https://github.com/luau-lang/luau", "tag": "0.743", "commit": "9d7748a4f324213a18cb8283fa2a77c330225fa0", "directory": "luau"},
+  "godot-mcp": {"repository": "https://github.com/hybridindie/godot-mcp", "branch": "stable", "version": "2026.11.04", "commit": "d06145121ed4638aba47fd6b77bc3f25424b0cae", "directory": "mcp"}
 }

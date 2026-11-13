@@ -1,0 +1,54 @@
+"""stdio (and optional Streamable HTTP) entrypoint for the Godot Editor MCP server.
+
+Run with ``uv run godot-editor-mcp`` (or ``python -m mcp_server.main``). Transport
+defaults to stdio; set ``GODOT_MCP_TRANSPORT=http`` (with ``GODOT_MCP_HTTP_HOST`` /
+``GODOT_MCP_HTTP_PORT``) for a long-lived HTTP server. The FastMCP runtime owns
+the event loop — we never call ``asyncio.run`` here
+(see .claude/rules/async-patterns.md).
+"""
+
+from __future__ import annotations
+
+import logging
+import sys
+
+from mcp_server.config import ServerConfig
+from mcp_server.logging_setup import configure_logging
+from mcp_server.server import create_server
+
+logger = logging.getLogger(__name__)
+
+
+def main() -> None:
+    """Run the MCP server, or dispatch a ``config``/``doctor`` subcommand."""
+    argv = sys.argv[1:]
+    if argv and argv[0] in ("config", "doctor"):
+        from mcp_server.cli import main as cli_main
+
+        raise SystemExit(cli_main(argv))
+    config = ServerConfig.from_env()
+    configure_logging(config.log_level)
+    config.validate_http_auth()
+    logger.info("starting godot-mcp", extra={"transport": config.transport})
+
+    server = create_server(config)
+    try:
+        if config.transport == "http":
+            # #636: pass the Host/Origin guard explicitly so the live server does
+            # not depend on the global default having been set in create_server.
+            server.run(
+                transport="http",
+                host=config.host,
+                port=config.port,
+                host_origin_protection=config.http_host_origin_protection,
+            )
+        else:
+            server.run(transport="stdio")
+    except KeyboardInterrupt:
+        # Ctrl-C is the ordinary way to stop a long-lived server; exit quietly rather
+        # than dumping the runtime's shutdown traceback to the console.
+        logger.info("godot-mcp interrupted; shutting down")
+
+
+if __name__ == "__main__":
+    main()

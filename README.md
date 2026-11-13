@@ -24,6 +24,7 @@ canvas, spatial, and particle shaders. A standalone LSP serves other editors. Re
 | `luau/` | Luau-derived parser, checker, compiler, and VM |
 | `language/` | Shared `.lushader` compiler |
 | `tools/` | Standalone LSP, shader CLI, and API type generator |
+| `mcp/` | Editor MCP server and addon, forked from Godot Editor MCP |
 | `examples/` | Class script, aliased module, and canvas shader |
 | `tests/` | Language, shader, LSP, and engine integration regressions |
 

@@ -113,6 +113,13 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   Ludot icon. Original copyright notices remain intact.
 - Deferred documentation-cache loads are cancelled after editor shutdown, so a
   command-line export cannot start a documentation worker on the freed filesystem.
+- `mcp/` holds Ludot's fork of Godot Editor MCP (stable 2026.11.04): a Python MCP
+  server and a GDScript editor addon that lets an AI agent drive a live editor. It
+  finds `ludot` on PATH, and its always-on inspection toolset adds
+  `get_ludot_conventions` (API casing, the user's naming casing per kind, lint,
+  StyLua and indentation preferences, module aliases, and project `.luaurc`,
+  selene and stylua files) and `list_settings` (project settings or editor
+  preferences by prefix, with enum options and credential-like values withheld).
 
 ## Known limits
 
@@ -146,6 +153,10 @@ Local Linux results:
   `template_release` build running the exported pack the way a shipped game does
   (pack beside the executable, scene selected through `override.cfg`).
 - `tools/package_lsp.py` builds the standalone LSP and passes its protocol check.
+- In `mcp/`, the upstream unit and contract tests pass, along with the live-editor
+  inspection test against the Ludot editor, which covers the settings and
+  conventions commands. Upstream's tests of its own CI workflows were removed with
+  those workflows.
 - The optimized Linux SCU editor passes the engine, debugger, exported-pack, and
   native editor suites. The editor suite opens real Luau files, migrates a saved
   Plain Text choice, checks Unicode/interpolated/long-bracket coloring and typed

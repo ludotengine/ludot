@@ -1,0 +1,27 @@
+# Persistent cache for the `hybridindie-godot-mcp-godot` runner scale set.
+#
+# The runner itself is an ARC *scale set* defined in the brix repo
+# (`apps/actions-runner-controller/scale-sets/godot-mcp-godot.yaml`,
+# fedora-only, max 1). Scale-set runners are ephemeral, so this NFS volume is
+# what keeps uv's package/python cache warm between them. The template mounts it
+# at /opt/uv-cache — never at or below /home/runner/_work, which a PVC makes
+# root-owned, so the runner cannot write its work dir.
+#
+# The image (ghcr.io/hybridindie/godot-mcp-runner:4.7) is built by
+# .github/workflows/runner-image.yml FROM the upstream actions-runner image.
+#
+#   kubectl apply -f infra/k8s-runner-godot.yml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hybridindie-godot-mcp-godot-cache
+  namespace: ci
+  labels:
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/name: actions-runner
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 5Gi

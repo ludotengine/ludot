@@ -1,0 +1,155 @@
+# Contributing to Godot Editor MCP
+
+Thanks for your interest in contributing! Godot Editor MCP (repo: `godot-mcp`) is a standalone MCP server that drives a live Godot editor from AI agents. This guide covers setup, workflow, and conventions.
+
+## Prerequisites
+
+- **Python 3.11+** managed with [uv](https://docs.astral.sh/uv/)
+- **Godot 4.4+** (validated on 4.7-stable)
+- **FastMCP 4.1.6** on **mcp 2.3.0** (stable — MCP SDK v2, the 2026-07-28 sessionless protocol)
+
+## Branches and release channels
+
+Two long-lived branches carry the two support channels, side by side:
+
+- **`main`** — the **beta / preview** line. Carries the Godot 4.8-only surface
+  (those tools return `UNSUPPORTED` on 4.4–4.7) and is versioned as a
+  prerelease (e.g. `2026.11.04b2`). Beta tags are cut here.
+- **`stable`** — the **stable** line. Godot 4.4–4.7, no 4.8-only tools, and the
+  branch stable tags are cut from (e.g. `2026.11.04`).
+
+Rules:
+
+- Target the branch matching the change: preview work → `main`, stable fixes →
+  `stable`. Bug fixes land on `main` first and are cherry-picked to `stable` as
+  a backport when the stable line needs them.
+- **Never merge `stable` into `main`** — it would revert preview work. Merge
+  `main` → `stable` only when the preview is ready to become stable (e.g. after
+  Godot 4.8-stable), then cut a new stable CalVer.
+- After cutting a stable release, bump `main` to the next beta CalVer so a later
+  beta cannot sort below the stable.
+
+## Setup
+
+```bash
+git clone https://github.com/hybridindie/godot-mcp.git
+cd godot-mcp
+uv sync
+```
+
+For the knowledge graph (optional, developers only):
+```bash
+cp .env.dev.example .env
+# Adjust OLLAMA_MODEL to a model you have pulled
+set -a; . ./.env; set +a
+```
+
+## Development commands
+
+```bash
+uv run pytest -q                    # full test suite
+uv run pytest tests/unit/test_smoke.py  # single file
+uv run ruff check .                 # lint
+uv run mypy                         # type check
+.claude/hooks/check-no-skipped-tests.sh  # zero-skip suite health gate
+uv run godot-editor-mcp             # start the MCP server (stdio)
+```
+
+## Documentation site
+
+The docs site (https://hybridindie.github.io/godot-mcp/) is a VitePress site in
+`docs/site/` (same tooling and page conventions as the wiki-fabric project).
+It builds via `.github/workflows/deploy-docs.yml` on every push to `main`.
+
+```bash
+cd docs/site
+npm install
+npm run dev                         # live-reload preview at localhost:5173
+npm run build                       # the CI gate — must exit zero
+```
+
+The build also generates **`llms.txt`** (agent-facing page index) and
+**`llms-full.txt`** (the whole site as one markdown document) via
+`docs/site/llms-gen.mjs` — the LLM entry points for the site. Toolset/tool
+counts in prose pages (`reference-toolsets.md` et al.) were generated from
+the live registry — regenerate via the snippet in the PR that added them if
+the surface changes.
+
+## Workflow
+
+Follow the issue-driven pipeline (see `.claude/rules/workflow.md`):
+
+1. **Issue exists** — every merge traces to a GitHub issue
+2. **Failing test** — write a red test that pins the behavior or reproduces the bug
+3. **Green code** — minimum change to pass
+4. **Preflight clean** — `pytest`, `mypy`, `ruff`, zero-skip scan all green
+5. **PR opened** — title `<type>(<scope>): <summary> (closes #N)`, body has acceptance criteria + test plan
+6. **Comments addressed** — the Qodo PR bot auto-runs `/describe` + `/review`; wait for it, then fix or reply to every finding
+7. **Merge** — squash, delete branch
+
+## Grounding rules
+
+The rules live in `.claude/rules/` and are the source of truth for how to build here. [`AGENTS.md`](AGENTS.md#rule-index) indexes them by when to read each one; read the relevant rule before writing code in that area.
+
+## Architecture
+
+Two halves joined by a WebSocket bridge:
+
+```
+AI client ──stdio──> FastMCP server (Python) ──WebSocket──> Godot addon (GDScript) ──> live project
+```
+
+- **MCP server** (`mcp_server/`) — owns all safety/permission logic, Pydantic models, and tool schemas. Never touches Godot directly.
+- **Godot addon** (`godot/addons/godot_mcp/`) — the only layer that touches the Godot Editor API. Routes commands to `cmd_*` handlers.
+
+When adding a capability, implement **both** sides: the GDScript `cmd_*` handler and the FastMCP tool that routes to it.
+
+## Safety classes
+
+Every tool is tagged:
+
+| Class | Meaning | Requirements |
+|-------|---------|-------------|
+| `read_only` | Never mutates | None |
+| `mutating` | Reversible (UndoRedo) | `dry_run: bool = False` |
+| `destructive` | May be irreversible | `dry_run` + `confirm: bool = True` |
+| `runtime` | Controls game execution | — |
+
+## Testing
+
+TDD is mandated (see `.claude/rules/testing.md`):
+
+- **Contract** — envelope shapes and tool schemas (`tests/contract/`)
+- **Integration** — server ↔ fake bridge; precondition and safety paths (`tests/integration/`)
+- **Unit** — isolated logic, models, helpers (`tests/unit/`)
+- **GDScript** — GUT tests for addon behavior (`godot/tests/`, `examples/*/tests/`)
+
+Zero skips are a blocking gate. No `@pytest.mark.skip`, no `xfail`, no bare `pytest.skip()`.
+
+## Skills
+
+Three AI skills ship in `skills/` — copy them into any AI client's skill directory:
+
+```bash
+git clone --depth 1 https://github.com/hybridindie/godot-mcp /tmp/godot-mcp
+cp -r /tmp/godot-mcp/skills/* ~/.config/opencode/skills/   # Claude: ~/.claude/skills/
+```
+
+Copy the whole `godot-expert/` folder — including `references/`. See
+[`skills/README.md`](skills/README.md) for details.
+
+## Versioning
+
+CalVer `YYYY.MM.DD[.N]` (stable, e.g. `2026.09.10`); a dotted `.N` is a same-day revision (e.g. `2026.10.20.1`); prerelease suffixes (`b1`, `rc1`) only when cutting a beta. The version is in `pyproject.toml`, `mcp_server/__init__.py`, `godot/addons/godot_mcp/plugin.cfg`, and the version references in `skills/godot-getting-started/SKILL.md` — all must stay in lockstep (the drift tests enforce it).
+
+## Publishing
+
+Releases are automated via `.github/workflows/publish.yml` — triggered on GitHub release publish. See [the release workflow](infra/README.md) for details.
+
+The addon zip is attached to the GitHub release and must be uploaded to the new
+Godot Asset Store manually for now: its beta v1 API is read-only for releases and
+has no publish endpoint. See [the Asset Store notes](infra/README.md#godot-asset-store).
+
+## Questions?
+
+Open an [issue](https://github.com/hybridindie/godot-mcp/issues) or read [`AGENTS.md`](AGENTS.md) for the full project context.
