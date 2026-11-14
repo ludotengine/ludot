@@ -698,12 +698,14 @@ int main(int argc, char** argv)
                 continue;
             for (const auto& warning : checked->lintResult.warnings)
             {
-                if (warning.code != Luau::LintWarning::Code_MatchExhaustiveness)
+                const char* rule = warning.code == Luau::LintWarning::Code_MatchExhaustiveness ? "match_exhaustiveness"
+                                   : warning.code == Luau::LintWarning::Code_SignalDeclaration ? "signal_declaration"
+                                                                                               : nullptr;
+                if (!rule)
                     continue;
                 auto parsed = frontend.getSourceModule(name);
                 auto code = frontend.fileResolver->readSource(name);
-                if (parsed && code &&
-                    Luau::ludotLintSuppressed(code->source, parsed->root, parsed->commentLocations, warning.location, "match_exhaustiveness"))
+                if (parsed && code && Luau::ludotLintSuppressed(code->source, parsed->root, parsed->commentLocations, warning.location, rule))
                     continue;
                 if (!first)
                     json.writeRaw(',');

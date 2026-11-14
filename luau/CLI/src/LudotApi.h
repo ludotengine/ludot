@@ -17,7 +17,7 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
     std::string line;
     if (!std::getline(stream, line)) return false;
     if (!line.empty() && line.back() == '\r') line.pop_back();
-    if (line != "LUDOT_API_1" && line != "LUDOT_API_2" && line != "LUDOT_API_3")
+    if (line != "LUDOT_API_1" && line != "LUDOT_API_2" && line != "LUDOT_API_3" && line != "LUDOT_API_4")
         return false;
     std::vector<std::vector<std::string>> rows;
     while (std::getline(stream, line))
@@ -59,6 +59,8 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
         scope->exportedTypeBindings[row[1]] = TypeFun{{}, {}, instance};
         bind(row[1], cls);
     }
+    // Ludot's Signal replaces Godot's Signal value type in annotations.
+    const LudotSignalTypes signalTypes = addLudotSignalTypes(frontend.globals, methodCase, propertyCase);
     std::vector<EngineEnumSource> sources;
     for (const auto& row : rows)
     {
@@ -126,6 +128,7 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
         if (name.rfind("bitfield::", 0) == 0)
             return builtins->numberType;
         if (name.rfind("typedarray::", 0) == 0) name = "Array";
+        if (name == "Signal") return signalTypes.instantiate(arena, arena.addTypePack(VariadicTypePack{builtins->anyType}));
         auto it = instances.find(name);
         return it == instances.end() ? builtins->anyType : it->second;
     };
@@ -168,6 +171,12 @@ inline bool loadLudotApi(Luau::Frontend& frontend, const std::string& source, Lu
             }
         }
         else if (row[0] == "P" && row.size() == 4) instance->props[engineApiName(row[2], propertyCase)] = Property::rw(type(type, row[3]));
+        else if (row[0] == "X")
+        {
+            std::vector<TypeId> arguments;
+            for (size_t i = 3; i < row.size(); ++i) arguments.push_back(type(type, row[i]));
+            instance->props[engineApiName(row[2], propertyCase)] = Property::readonly(signalTypes.instantiate(arena, arena.addTypePack(arguments)));
+        }
         else if (row[0] == "K" && row.size() == 4 && !cls->props.count(row[2])) cls->props[row[2]] = Property::readonly(type(type, row[3]));
         else if (row[0] == "F" && row.size() >= 6)
         {

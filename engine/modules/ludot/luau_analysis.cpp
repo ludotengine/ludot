@@ -17,8 +17,10 @@
 #include "core/config/engine.h"
 #include "core/core_constants.h"
 #include "core/io/file_access.h"
+#include "core/config/project_settings.h"
 #include "core/object/class_db.h"
 #include "core/os/thread.h"
+#include "editor/doc/editor_help.h"
 #include "editor/editor_node.h"
 #include "scene/main/node.h"
 
@@ -67,6 +69,8 @@ struct Session {
     std::unordered_map<std::string, Luau::TypeId> instances;
     std::unordered_map<std::string, Luau::TypeId> classes;
 	Luau::EngineEnumTypes engine_enums;
+	Luau::LudotSignalTypes signal_types;
+	Luau::TypeId any_signal = nullptr;
 	String scene_fingerprint;
     ObjectID scene_root;
     ObjectID analysis_owner;
@@ -100,6 +104,9 @@ struct Session {
         }
 		const auto &catalog = ludot_engine_enum_catalog();
 		engine_enums = addEngineEnumTypes(frontend.globals, catalog, LuauLanguage::get_singleton()->method_casing, LuauLanguage::get_singleton()->property_casing);
+		// Ludot's Signal library replaces Godot's Signal value type, for engine signals too.
+		signal_types = addLudotSignalTypes(frontend.globals, LuauLanguage::get_singleton()->method_casing, LuauLanguage::get_singleton()->property_casing);
+		any_signal = signal_types.instantiate(arena, arena.addTypePack(VariadicTypePack{builtins->anyType}));
 		for (const StringName &name : classes) {
             auto object = getMutable<ExternType>(instances.at(utf8(name)));
             const StringName parent = ClassDB::get_parent_class(name);
@@ -139,7 +146,11 @@ struct Session {
 			}
 			List<MethodInfo> signals;
             ClassDB::get_signal_list(name, &signals, true);
-            for (const auto &signal : signals) object->props[utf8(LuauLanguage::api_name(signal.name, true))] = Property::readonly(instances.at("Signal"));
+            for (const auto &signal : signals) {
+                std::vector<TypeId> arguments;
+                for (const PropertyInfo &argument : signal.arguments) arguments.push_back(type(argument));
+                object->props[utf8(LuauLanguage::api_name(signal.name, true))] = Property::readonly(signal_types.instantiate(arena, arena.addTypePack(arguments)));
+            }
         }
         for (int i = ::Variant::VECTOR2; i < ::Variant::VARIANT_MAX; ++i) {
             if (i == ::Variant::OBJECT) continue;
@@ -318,6 +329,7 @@ struct Session {
 			}
 		}
 		switch (info.type) {
+            case ::Variant::SIGNAL: return any_signal;
             case ::Variant::NIL: return (info.usage & PROPERTY_USAGE_NIL_IS_VARIANT) != 0 ? builtin->anyType : builtin->nilType;
             case ::Variant::BOOL: return builtin->booleanType;
             case ::Variant::INT: case ::Variant::FLOAT: return builtin->numberType;
@@ -397,6 +409,7 @@ bool ludot_validate(const String &source, const String &path, List<ScriptLanguag
 	options.runLintChecks = warnings != nullptr;
 	Luau::LintOptions lint;
 	lint.enableWarning(Luau::LintWarning::Code_MatchExhaustiveness);
+	lint.enableWarning(Luau::LintWarning::Code_SignalDeclaration);
 	options.enabledLintWarnings = lint;
 	Luau::CheckResult checked;
     try {
@@ -425,14 +438,15 @@ bool ludot_validate(const String &source, const String &path, List<ScriptLanguag
     }
 	if (warnings != nullptr) {
 		for (const auto &warning : checked.lintResult.warnings) {
-			if (warning.code != Luau::LintWarning::Code_MatchExhaustiveness) {
+			const bool signal = warning.code == Luau::LintWarning::Code_SignalDeclaration;
+			if (warning.code != Luau::LintWarning::Code_MatchExhaustiveness && !signal) {
 				continue;
 			}
 			ScriptLanguage::Warning diagnostic;
 			diagnostic.start_line = warning.location.begin.line + 1;
 			diagnostic.end_line = warning.location.end.line + 1;
-			diagnostic.code = 2001;
-			diagnostic.string_code = "match_exhaustiveness";
+			diagnostic.code = signal ? 2002 : 2001;
+			diagnostic.string_code = signal ? "signal_declaration" : "match_exhaustiveness";
 			diagnostic.message = String::utf8(warning.text.c_str());
 			warnings->push_back(diagnostic);
 		}
@@ -479,7 +493,8 @@ Error ludot_complete(const String &source, const String &path, List<ScriptLangua
             if (function_type(type)) kind = ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION;
             else if (auto external = Luau::get<Luau::ExternType>(type)) {
                 if (external->relation && external->relation->get_if<Luau::Obj>() != nullptr) kind = ScriptLanguage::CODE_COMPLETION_KIND_CLASS;
-                else if (external->name == "Signal") kind = ScriptLanguage::CODE_COMPLETION_KIND_SIGNAL;
+            } else if (auto table = Luau::get<Luau::TableType>(type); table && table->name == "Signal") {
+                kind = ScriptLanguage::CODE_COMPLETION_KIND_SIGNAL;
             }
         }
         ScriptLanguage::CodeCompletionOption option(String::utf8(label.c_str()), kind);
@@ -723,4 +738,403 @@ Dictionary ludot_symbol_help(const String &source, const String &path, const Str
     return info;
 }
 void ludot_clear_analysis() { MutexLock lock(analysis_mutex); session.reset(); }
+
+namespace {
+// Godot documentation BBCode as plain text, with member references in Luau spelling.
+// GDScript and C# code examples are omitted because they would mislead Luau code.
+String clean_doc(const String &p_text) {
+	String text = p_text;
+	for (const char *block : { "codeblocks", "codeblock" }) {
+		const String open = "[" + String(block);
+		const String close = "[/" + String(block) + "]";
+		for (int start = text.find(open); start >= 0; start = text.find(open)) {
+			const int end = text.find(close, start);
+			if (end < 0) break;
+			text = text.substr(0, start) + "(code example omitted)" + text.substr(end + close.length());
+		}
+	}
+	String out;
+	int i = 0;
+	while (i < text.length()) {
+		if (text[i] != '[') {
+			out += text[i++];
+			continue;
+		}
+		const int close = text.find("]", i);
+		if (close < 0) {
+			out += text.substr(i);
+			break;
+		}
+		const String tag = text.substr(i + 1, close - i - 1);
+		i = close + 1;
+		const String kind = tag.get_slice(" ", 0);
+		if (tag == "code" || tag == "/code") out += "`";
+		else if (tag == "br") out += "\n";
+		else if (tag == "lb") out += "[";
+		else if (tag == "rb") out += "]";
+		else if (kind == "method" || kind == "member" || kind == "signal" || kind == "constant" || kind == "param" || kind == "enum" || kind == "theme_item" || kind == "annotation") {
+			const String name = tag.substr(kind.length() + 1);
+			const int dot = name.rfind(".");
+			const String owner = dot >= 0 ? name.substr(0, dot + 1) : String();
+			String member = dot >= 0 ? name.substr(dot + 1) : name;
+			if (kind == "method") member = LuauLanguage::api_name(member);
+			else if (kind == "member" || kind == "signal") member = LuauLanguage::api_name(member, true);
+			out += "`" + owner + member + "`";
+		} else if (tag.begins_with("url") || tag == "/url" || tag.begins_with("color") || tag == "/color" || tag.begins_with("font") || tag == "/font" || tag == "b" || tag == "/b" || tag == "i" || tag == "/i" || tag == "u" || tag == "/u" || tag == "s" || tag == "/s" || tag == "kbd" || tag == "/kbd" || tag == "center" || tag == "/center") {
+			continue;
+		} else if (tag.is_valid_ascii_identifier()) {
+			out += tag;
+		} else {
+			out += "[" + tag + "]";
+		}
+	}
+	// The class reference indents its text with tabs, which mean nothing here.
+	PackedStringArray lines = out.split("\n");
+	for (int line = 0; line < lines.size(); ++line) lines.set(line, lines[line].strip_edges());
+	return String("\n").join(lines).strip_edges();
+}
+
+// Godot's class reference, or nullptr before the editor has loaded it.
+const DocData::ClassDoc *class_doc(const String &p_class) {
+	return EditorHelp::get_doc_data() != nullptr ? EditorHelp::get_doc(p_class) : nullptr;
+}
+
+String first_sentence(const String &p_text) {
+	String text = p_text.get_slice("\n", 0);
+	const int end = text.find(". ");
+	if (end >= 0) text = text.substr(0, end + 1);
+	return text.length() > 240 ? text.substr(0, 237) + "..." : text;
+}
+
+struct DocMember {
+	String luau;
+	String godot;
+	String kind;
+	bool is_static = false;
+	PackedStringArray arguments;
+};
+
+// The members a class declares itself, in Luau spelling.
+Vector<DocMember> class_members(const String &p_class) {
+	Vector<DocMember> members;
+	if (ClassDB::class_exists(p_class)) {
+		List<MethodInfo> methods;
+		ClassDB::get_method_list(p_class, &methods, true);
+		for (const MethodInfo &method : methods) {
+			if (String(method.name).begins_with("_") && (method.flags & METHOD_FLAG_VIRTUAL) == 0) continue;
+			DocMember member{ (method.flags & METHOD_FLAG_VIRTUAL) ? "_" + String(method.name).trim_prefix("_").to_camel_case() : LuauLanguage::api_name(method.name), method.name, (method.flags & METHOD_FLAG_VIRTUAL) ? "callback" : "method", (method.flags & METHOD_FLAG_STATIC) != 0 };
+			for (const PropertyInfo &argument : method.arguments) member.arguments.push_back(argument.name);
+			members.push_back(member);
+		}
+		List<PropertyInfo> properties;
+		ClassDB::get_property_list(p_class, &properties, true);
+		for (const PropertyInfo &property : properties) {
+			if (property.usage & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_CATEGORY) || String(property.name).contains("/")) continue;
+			members.push_back({ LuauLanguage::api_name(property.name, true), property.name, "property" });
+		}
+		List<MethodInfo> signals;
+		ClassDB::get_signal_list(p_class, &signals, true);
+		for (const MethodInfo &signal : signals) {
+			DocMember member{ LuauLanguage::api_name(signal.name, true), signal.name, "signal" };
+			for (const PropertyInfo &argument : signal.arguments) member.arguments.push_back(argument.name);
+			members.push_back(member);
+		}
+		List<String> constants;
+		ClassDB::get_integer_constant_list(p_class, &constants, true);
+		for (const String &constant : constants) members.push_back({ constant, constant, "constant", true });
+		return members;
+	}
+	for (int i = ::Variant::VECTOR2; i < ::Variant::VARIANT_MAX; ++i) {
+		const auto type = ::Variant::Type(i);
+		if (::Variant::get_type_name(type) != p_class) continue;
+		List<StringName> methods;
+		::Variant::get_builtin_method_list(type, &methods);
+		for (const StringName &method : methods) {
+			DocMember member{ LuauLanguage::api_name(method), method, "method", ::Variant::is_builtin_method_static(type, method) };
+			for (int argument = 0; argument < ::Variant::get_builtin_method_argument_count(type, method); ++argument) member.arguments.push_back(::Variant::get_builtin_method_argument_name(type, method, argument));
+			members.push_back(member);
+		}
+		List<StringName> properties;
+		::Variant::get_member_list(type, &properties);
+		for (const StringName &property : properties) members.push_back({ LuauLanguage::api_name(property, true), property, "property" });
+		List<StringName> constants;
+		::Variant::get_constants_for_type(type, &constants);
+		for (const StringName &constant : constants) members.push_back({ LuauLanguage::api_name(constant, true, true), constant, "constant", true });
+	}
+	return members;
+}
+
+String member_description(const DocData::ClassDoc *p_doc, const DocMember &p_member) {
+	if (p_doc == nullptr) return String();
+	auto find = [&](const auto &list) -> String {
+		for (const auto &entry : list) {
+			if (entry.name == p_member.godot) return entry.description;
+		}
+		return String();
+	};
+	if (p_member.kind == "method" || p_member.kind == "callback") return clean_doc(find(p_doc->methods));
+	if (p_member.kind == "property") return clean_doc(find(p_doc->properties));
+	if (p_member.kind == "signal") return clean_doc(find(p_doc->signals));
+	return clean_doc(find(p_doc->constants));
+}
+
+// A library entry: the Ludot globals that have no ClassDB documentation.
+struct LibraryEntry {
+	const char *owner;
+	const char *name;
+	const char *kind;
+	const char *signature;
+	const char *description;
+};
+
+Vector<LibraryEntry> library_entries() {
+	return {
+		{ "task", "", "library", "task", "Schedules threads, modeled on Roblox's task library. Waits use game time and follow pause and Engine.time_scale. Engine callbacks start in resumable threads, so task.wait works in _ready, _process, and signal handlers." },
+		{ "task", "spawn", "function", "task.spawn(fnOrThread: ((...any) -> ...any) | thread, ...any): thread", "Runs the function now in a new thread, or resumes the given thread, and returns the thread." },
+		{ "task", "defer", "function", "task.defer(fnOrThread: ((...any) -> ...any) | thread, ...any): thread", "Runs it after the current engine callback returns, later in the same frame." },
+		{ "task", "delay", "function", "task.delay(seconds: number?, fnOrThread: ((...any) -> ...any) | thread, ...any): thread", "Resumes it after the delay and returns the thread." },
+		{ "task", "wait", "function", "task.wait(seconds: number?): number", "Yields the current thread and returns the time that passed. With no argument, waits one frame. Errors outside a yieldable thread, such as module top-level code." },
+		{ "task", "cancel", "function", "task.cancel(thread: thread)", "Stops a scheduled or suspended thread. It cannot cancel a running thread." },
+		{ "Signal", "", "library", "Signal<T...>", "A Roblox-style signal. Signal is both the constructor table and the type; its type arguments are the fired arguments, as in Signal<number, number>, Signal<>, or Signal<...any>. Engine signals such as node.TreeExiting use the same type. On a class that extends an engine class, a field declared as Signal<...> is also a script signal: the Node dock lists it, scenes save its connections, and GDScript can connect and emit it. There is no emit method." },
+		{ "Signal", "new", "function", "Signal.new(...names: string): Signal<T...>", "Creates a signal. Annotate the result, as in `const Changed: Signal<number> = Signal.new()`. The optional names label the arguments in the Node dock for Signal fields." },
+		{ "Signal", "fire", "method", "signal:fire(...: T...)", "Calls every connected handler with the arguments, in connection order, from a snapshot. Each handler runs in its own resumable thread; a failing handler is reported with its stack trace and the rest still run. On an engine signal it emits the engine signal, so GDScript handlers run too." },
+		{ "Signal", "connect", "method", "signal:connect(handler: (T...) -> ()): Connection", "Runs the handler on every fire and returns its Connection. The same function connected twice runs twice. The connection is dropped when the object whose code connected it is freed." },
+		{ "Signal", "once", "method", "signal:once(handler: (T...) -> ()): Connection", "Runs the handler on the next fire only and returns its Connection." },
+		{ "Signal", "wait", "method", "signal:wait(): T...", "Yields the current thread until the next fire and returns the fired arguments. Errors outside a yieldable thread." },
+		{ "Signal", "disconnect_all", "method", "signal:disconnectAll()", "Disconnects every handler connected through this API. On an engine signal, editor and GDScript connections stay." },
+		{ "Connection", "", "library", "Connection", "Returned by Signal connect and once." },
+		{ "Connection", "disconnect", "method", "connection:disconnect()", "Disconnects the handler. Disconnecting twice does nothing." },
+		{ "Connection", "connected", "property", "connection.Connected: boolean", "Whether the handler is still connected." },
+		{ "Enum", "", "library", "Enum", "Every exposed engine enum, modeled on Roblox's Enum. Items have Name, Value, and EnumType, and engine methods and properties return and accept them, as in Input:setMouseMode(Enum.MouseMode.Captured). Look up an enum's items with its name, such as Enum.MouseMode. User enums declared with `enum` are not part of Enum." },
+		{ "Enum", "get_enums", "method", "Enum:getEnums(): { Enum }", "Lists every engine enum." },
+		{ "Enum", "from_name", "method", "Enum.MouseMode:fromName(name: string): EnumItem?", "The item with this name." },
+		{ "Enum", "from_value", "method", "Enum.MouseMode:fromValue(value: number): EnumItem?", "The item with this value." },
+		{ "Enum", "get_enum_items", "method", "Enum.MouseMode:getEnumItems(): { EnumItem }", "Every item of the enum." },
+	};
+}
+
+Dictionary enum_entry(const Luau::EngineEnum &p_enum, bool p_items) {
+	Dictionary entry;
+	entry["name"] = "Enum." + String::utf8(p_enum.name.c_str());
+	entry["bitfield"] = p_enum.bitfield;
+	PackedStringArray sources;
+	for (const std::string &source : p_enum.sources) sources.push_back(String::utf8(source.c_str()));
+	entry["godot_sources"] = sources;
+	entry["item_count"] = int(p_enum.items.size());
+	if (p_items) {
+		Array items;
+		for (const Luau::EngineEnumItem &item : p_enum.items) {
+			Dictionary value;
+			value["name"] = String::utf8(item.name.c_str());
+			value["value"] = int64_t(item.value);
+			items.push_back(value);
+		}
+		entry["items"] = items;
+	}
+	return entry;
+}
+} // namespace
+
+Array ludot_find_enums(const String &p_query) {
+	const auto &catalog = ludot_engine_enum_catalog();
+	const String query = p_query.trim_prefix("Enum.");
+	Array result;
+	for (const Luau::EngineEnum &enumeration : catalog.enums) {
+		if (String::utf8(enumeration.name.c_str()) == query) {
+			result.push_back(enum_entry(enumeration, true));
+			return result;
+		}
+	}
+	const String lower = query.to_lower();
+	for (const Luau::EngineEnum &enumeration : catalog.enums) {
+		bool matches = String::utf8(enumeration.name.c_str()).to_lower().contains(lower);
+		for (const std::string &source : enumeration.sources) matches = matches || String::utf8(source.c_str()).to_lower().contains(lower);
+		if (!matches) continue;
+		result.push_back(enum_entry(enumeration, enumeration.items.size() <= 40));
+		if (result.size() >= 30) break;
+	}
+	return result;
+}
+
+Dictionary ludot_api_docs(const String &p_symbol) {
+	using namespace Luau;
+	MutexLock lock(analysis_mutex);
+	Dictionary result;
+	const String symbol = p_symbol.strip_edges();
+	result["query"] = symbol;
+	Dictionary casing;
+	casing["method"] = GLOBAL_GET("luau/api/method_casing");
+	casing["property"] = GLOBAL_GET("luau/api/property_casing");
+	result["casing"] = casing;
+	const String head = symbol.get_slice(".", 0);
+	const String rest = symbol.contains(".") ? symbol.substr(head.length() + 1) : String();
+
+	if (head == "Enum" && !rest.is_empty()) {
+		const Array found = ludot_find_enums(rest.get_slice(".", 0));
+		if (found.size() == 1 && String(Dictionary(found[0])["name"]) == "Enum." + rest.get_slice(".", 0)) {
+			Dictionary entry = found[0];
+			result["found"] = true;
+			result["kind"] = "enum";
+			result.merge(entry);
+			if (rest.contains(".")) {
+				const String item = rest.get_slice(".", 1);
+				for (const ::Variant &value : Array(entry["items"])) {
+					if (String(Dictionary(value)["name"]) == item) {
+						result["kind"] = "enum_item";
+						result["name"] = String(entry["name"]) + "." + item;
+						result["value"] = Dictionary(value)["value"];
+						result.erase("items");
+					}
+				}
+			}
+			return result;
+		}
+		result["found"] = false;
+		Array names;
+		for (const ::Variant &value : found) names.push_back(Dictionary(value)["name"]);
+		result["suggestions"] = names;
+		return result;
+	}
+	bool library = false;
+	Array library_members;
+	for (const LibraryEntry &entry : library_entries()) {
+		if (head != entry.owner) continue;
+		library = true;
+		const String name = String(entry.name).is_empty() ? String() : (String(entry.kind) == "property" ? LuauLanguage::api_name(entry.name, true) : String(entry.kind) == "function" ? String(entry.name) : LuauLanguage::api_name(entry.name));
+		const String signature = String(entry.signature).replace("disconnectAll", LuauLanguage::api_name("disconnect_all")).replace(":fire(", ":" + LuauLanguage::api_name("fire") + "(").replace(":connect(", ":" + LuauLanguage::api_name("connect") + "(").replace(":once(", ":" + LuauLanguage::api_name("once") + "(").replace(":wait(", ":" + LuauLanguage::api_name("wait") + "(").replace(":disconnect(", ":" + LuauLanguage::api_name("disconnect") + "(").replace("connection.Connected", "connection." + LuauLanguage::api_name("connected", true)).replace(":getEnums(", ":" + LuauLanguage::api_name("get_enums") + "(").replace(":fromName(", ":" + LuauLanguage::api_name("from_name") + "(").replace(":fromValue(", ":" + LuauLanguage::api_name("from_value") + "(").replace(":getEnumItems(", ":" + LuauLanguage::api_name("get_enum_items") + "(");
+		if (name.is_empty()) {
+			if (rest.is_empty()) {
+				result["found"] = true;
+				result["kind"] = "library";
+				result["name"] = head;
+				result["signature"] = signature;
+				result["description"] = entry.description;
+			}
+			continue;
+		}
+		Dictionary member;
+		member["name"] = name;
+		member["kind"] = entry.kind;
+		member["signature"] = signature;
+		member["summary"] = first_sentence(entry.description);
+		library_members.push_back(member);
+		if (!rest.is_empty() && (rest == name || rest == String(entry.name))) {
+			result["found"] = true;
+			result["kind"] = entry.kind;
+			result["name"] = head + "." + name;
+			result["signature"] = signature;
+			result["description"] = entry.description;
+		}
+	}
+	if (library) {
+		if (rest.is_empty()) {
+			result["members"] = library_members;
+			if (head == "Enum") result["enum_count"] = int(ludot_engine_enum_catalog().enums.size());
+		}
+		if (!result.has("found")) {
+			result["found"] = false;
+			result["suggestions"] = library_members;
+		}
+		return result;
+	}
+
+	auto &analysis = get_session("res://__ludot_api_docs__.luau");
+	const bool known = ClassDB::class_exists(head) || analysis.instances.count(utf8(head));
+	if (!known) {
+		result["found"] = false;
+		Array suggestions;
+		const String lower = head.to_lower();
+		LocalVector<StringName> classes;
+		ClassDB::get_class_list(classes);
+		for (const StringName &name : classes) {
+			if (String(name).to_lower().contains(lower) && suggestions.size() < 15) suggestions.push_back(name);
+		}
+		result["suggestions"] = suggestions;
+		result["hint"] = "Query an engine class (Node), a member (Node.addChild), a builtin type (Vector3), task, Signal, Connection, Enum, or Enum.<Name>. Your own Luau classes are documented by their source.";
+		return result;
+	}
+	// The member's Luau type from the analyzer, which already applies the casing settings.
+	auto type_of = [&](const String &p_class, const DocMember &p_member) -> String {
+		for (auto *table : { &analysis.instances, &analysis.classes }) {
+			const auto found = table->find(utf8(p_class));
+			if (found == table->end()) continue;
+			const auto external = get<ExternType>(follow(found->second));
+			if (external == nullptr) continue;
+			const auto prop = external->props.find(utf8(p_member.luau));
+			if (prop == external->props.end() || !prop->second.readTy) continue;
+			const TypeId type = follow(*prop->second.readTy);
+			if (const auto fn = get<FunctionType>(type)) {
+				const auto [args, tail] = flatten(fn->argTypes);
+				const size_t skip = fn->hasSelf ? 1 : 0;
+				String signature = (p_member.is_static ? p_class + "." : String("object:")) + p_member.luau + "(";
+				for (size_t i = skip; i < args.size(); ++i) {
+					const int index = int(i - skip);
+					const String name = index < p_member.arguments.size() ? p_member.arguments[index] : "arg" + itos(index + 1);
+					signature += (i > skip ? ", " : "") + name + ": " + String::utf8(toString(args[i]).c_str());
+				}
+				if (tail) signature += String(args.size() > skip ? ", " : "") + "...";
+				return signature + "): " + String::utf8(toString(fn->retTypes).c_str());
+			}
+			return String::utf8(toString(type).c_str());
+		}
+		return String();
+	};
+	PackedStringArray chain;
+	for (StringName current = head; current != StringName(); current = ClassDB::get_parent_class(current)) chain.push_back(current);
+	if (rest.is_empty()) {
+		const DocData::ClassDoc *doc = class_doc(head);
+		result["found"] = true;
+		result["kind"] = "class";
+		result["name"] = head;
+		result["inherits"] = chain.slice(1);
+		if (doc != nullptr) {
+			result["brief"] = clean_doc(doc->brief_description);
+			const String description = clean_doc(doc->description);
+			result["description"] = description.length() > 4000 ? description.substr(0, 4000) + "..." : description;
+		} else {
+			result["docs_loaded"] = false;
+		}
+		Array members;
+		for (const DocMember &member : class_members(head)) {
+			Dictionary entry;
+			entry["name"] = member.luau;
+			entry["godot_name"] = member.godot;
+			entry["kind"] = member.kind;
+			entry["type"] = type_of(head, member);
+			if (member.is_static) entry["static"] = true;
+			const String description = member_description(doc, member);
+			if (!description.is_empty()) entry["summary"] = first_sentence(description);
+			members.push_back(entry);
+		}
+		result["members"] = members;
+		result["note"] = "Members declared by this class only. Query a parent in inherits for its members, or Class.member for one member in full.";
+		return result;
+	}
+	const String wanted = rest.get_slice(".", 0);
+	for (const String &owner : chain) {
+		for (const DocMember &member : class_members(owner)) {
+			if (member.luau != wanted && member.godot != wanted) continue;
+			const DocData::ClassDoc *doc = class_doc(owner);
+			result["found"] = true;
+			result["kind"] = member.kind;
+			result["name"] = owner + "." + member.luau;
+			result["godot_name"] = member.godot;
+			result["declaring_class"] = owner;
+			result["type"] = type_of(owner, member);
+			if (member.is_static) result["static"] = true;
+			result["description"] = member_description(doc, member);
+			return result;
+		}
+	}
+	result["found"] = false;
+	Array suggestions;
+	const String lower = wanted.to_lower();
+	for (const String &owner : chain) {
+		for (const DocMember &member : class_members(owner)) {
+			if ((member.luau.to_lower().contains(lower) || member.godot.contains(lower)) && suggestions.size() < 15) suggestions.push_back(owner + "." + member.luau);
+		}
+	}
+	result["suggestions"] = suggestions;
+	return result;
+}
 #endif

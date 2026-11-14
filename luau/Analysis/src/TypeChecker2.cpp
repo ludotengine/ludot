@@ -1291,6 +1291,43 @@ void TypeChecker2::reportErrorsFromAssigningToNever(AstExpr* lhs, TypeId rhsType
     }
 }
 
+namespace
+{
+// The class instance and Signal field an assignment targets, when that field belongs to a
+// class backed by an engine object. Plain Luau classes may reassign their signals.
+bool isGodotBacked(const ExternType* type)
+{
+    for (; type; type = type->parent ? get<ExternType>(follow(*type->parent)) : nullptr)
+        if (type->name == "Object" && type->definitionModuleName == "ludot")
+            return true;
+    return false;
+}
+} // namespace
+
+void TypeChecker2::checkLudotSignalFieldAssignment(AstExpr* target)
+{
+    auto index = target->as<AstExprIndexName>();
+    if (!index)
+        return;
+    TypeId* objectType = module->astTypes.find(index->expr);
+    if (!objectType)
+        return;
+    for (const ExternType* owner = get<ExternType>(follow(*objectType)); owner;
+         owner = owner->parent ? get<ExternType>(follow(*owner->parent)) : nullptr)
+    {
+        auto prop = owner->props.find(index->index.value);
+        if (prop == owner->props.end())
+            continue;
+        bool signalField = std::find(prop->second.tags.begin(), prop->second.tags.end(), "ludot.signalfield") != prop->second.tags.end();
+        if (signalField && isGodotBacked(owner) && ludotConstructors.empty())
+            reportError(
+                GenericError{"Signal field '" + std::string(index->index.value) + "' is read-only after construction; connect to it or fire it instead"},
+                target->location
+            );
+        return;
+    }
+}
+
 void TypeChecker2::visit(AstStatAssign* assign)
 {
     size_t count = std::min(assign->vars.size, assign->values.size);
@@ -1299,6 +1336,7 @@ void TypeChecker2::visit(AstStatAssign* assign)
     {
         AstExpr* lhs = assign->vars.data[i];
         visit(lhs, ValueContext::LValue);
+        checkLudotSignalFieldAssignment(lhs);
         TypeId lhsType = lookupType(lhs);
 
         AstExpr* rhs = assign->values.data[i];
@@ -1607,10 +1645,20 @@ void TypeChecker2::visit(AstStatClass* stat)
         {
             if (prop->ty)
                 visit(prop->ty);
+            auto reference = prop->ty ? prop->ty->as<AstTypeReference>() : nullptr;
+            if (prop->isExported && reference && !reference->prefix && reference->name == "Signal")
+                reportError(
+                    GenericError{"Signal field '" + std::string(prop->name.value) + "' cannot be exported; the engine lists it as a signal instead"},
+                    prop->nameLocation
+                );
         }
         else if (const auto* method = member.get_if<AstClassMethod>())
         {
+            if (method->functionName == "__init")
+                ludotConstructors.push_back(method->function);
             visit(method->function);
+            if (method->functionName == "__init")
+                ludotConstructors.pop_back();
 
             if (method->functionName == "__init")
             {

@@ -33,6 +33,7 @@ const HANDLERS: Array = [
 	preload("./handlers/import_asset.gd"),
 	preload("./handlers/input_map.gd"),
 	preload("./handlers/input_recording.gd"),
+	preload("./handlers/luau.gd"),
 	preload("./handlers/mesh_library.gd"),
 	preload("./handlers/mutation.gd"),
 	preload("./handlers/navigation.gd"),

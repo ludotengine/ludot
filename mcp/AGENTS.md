@@ -13,6 +13,19 @@ Ludot changes from upstream:
   exposed as the read-only `godot_inspection_list_settings` and
   `godot_inspection_get_ludot_conventions` tools. The server instructions tell
   agents to read the conventions before writing Luau.
+- Luau support, through the Ludot editor's own `LuauScript` statics: the script
+  tools read, write, patch, list (`language="luau"`) and check `.luau` files
+  (`get_parse_errors` uses the Luau checker), and `handlers/luau.gd` adds
+  `godot_scripts_luau_diagnose` (checker errors, naming lint, Selene with
+  suppressions, and a StyLua diff), `godot_scripts_luau_format` (StyLua with the
+  user's settings, `dry_run` returns the diff), `godot_scripts_create_luau_script`
+  (Ludot's built-in templates), and the always-on `godot_inspection_luau_api` (the
+  engine API in Luau spelling with Godot's documentation), `luau_enums`,
+  `luau_resolve_module` and `luau_inspect` (hover help and completions at a
+  position). They fail with `PRECONDITION_FAILED: required=ludot_editor` on stock
+  Godot.
+- Addon folders are matched case-insensitively, so a project can keep the addon in
+  `res://Addons/godot_mcp`.
 - Upstream's GitHub workflows, agent harness files and the tests that checked them
   are not copied.
 

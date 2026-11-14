@@ -269,6 +269,23 @@ class LspTests(unittest.TestCase):
         for name in ('spawn', 'defer', 'delay', 'wait', 'cancel'):
             self.assertIn(name, labels)
 
+    def test_signal_completion_and_declaration_warning(self):
+        self.server.api = ROOT / 'types/engine.api'
+        uri = self.open('--!strict\nconst Ping: Signal<number> = Signal.new()\nPing:')
+        completions = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 2, 'character': 5}}})
+        labels = [entry['label'] for entry in completions]
+        for name in ('fire', 'connect', 'once', 'wait', 'disconnectAll'):
+            self.assertIn(name, labels)
+        self.assertNotIn('emit', labels)
+        text = '--!strict\nconst Loose = Signal.new()\nreturn Loose'
+        self.server.documents[uri] = {'version': 2, 'text': text}
+        self.server.publish(uri)
+        warning = next(d for d in self.messages[-1]['params']['diagnostics'] if 'Signal.new() has no type annotation' in d['message'])
+        self.assertEqual(warning['severity'], 2)
+        self.server.documents[uri] = {'version': 3, 'text': text.replace('const Loose', '-- selene: allow(signal_declaration)\nconst Loose')}
+        checked, _ = self.server.analyze(uri)
+        self.assertEqual(checked['diagnostics'], [])
+
     def test_match_warning_severity_and_selene_ignores(self):
         text = '--!strict\nenum Action = { Join, Chat }\nconst action: Action = Action.Join\nmatch action with case Action.Join then print(1) end'
         uri = self.open(text)

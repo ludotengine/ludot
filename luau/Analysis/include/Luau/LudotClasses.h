@@ -12,4 +12,18 @@ void addLudotIsA(TypeArena& arena, const BuiltinTypes& builtins, TypeId object, 
 struct GlobalTypes;
 // Declares the engine's task library: spawn, defer, delay, wait, and cancel.
 void addLudotTaskLibrary(GlobalTypes& globals);
+
+// The Roblox-style Signal library: the `Signal` global with `Signal.new<T...>(...names)`,
+// the `Signal<T...>` type whose pack is the fired arguments, and `Connection`. Engine
+// signals use the same type.
+struct LudotSignalTypes
+{
+    TypeId connection = nullptr;
+    // Builds `Signal<params...>` directly, for engine signals reflected without an annotation.
+    TypeId instantiate(TypeArena& arena, TypePackId params) const;
+
+    const BuiltinTypes* builtins = nullptr;
+    std::string fire, connect, once, wait, disconnectAll;
+};
+LudotSignalTypes addLudotSignalTypes(GlobalTypes& globals, ApiCase methodCase, ApiCase propertyCase);
 } // namespace Luau

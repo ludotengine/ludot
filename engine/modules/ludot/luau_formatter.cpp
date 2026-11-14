@@ -11,6 +11,7 @@
 #include "scene/gui/code_edit.h"
 
 #include <algorithm>
+#include <functional>
 #include <cctype>
 #include <vector>
 
@@ -222,7 +223,7 @@ String selene_source(const String &source) {
 			PackedStringArray rules = comment.substr(start, finish - start).split(","), kept;
 			bool removed = false;
 			for (const String &rule : rules) {
-				if (rule.strip_edges() == "naming_convention" || rule.strip_edges() == "match_exhaustiveness") {
+				if (rule.strip_edges() == "naming_convention" || rule.strip_edges() == "match_exhaustiveness" || rule.strip_edges() == "signal_declaration") {
 					removed = true;
 				} else {
 					kept.push_back(rule.strip_edges());
@@ -241,29 +242,18 @@ String selene_source(const String &source) {
 	return String::utf8(result.c_str());
 }
 
-void format(ScriptTextEditor *editor, bool selection, bool on_save) {
-	Ref<Script> script = editor->get_edited_resource();
-	if (script.is_null() || script->get_language()->get_name() != "Luau" || !enabled()) {
-		return;
-	}
-	if (on_save && !bool(EDITOR_GET(prefix + "format_on_save"))) {
-		return;
-	}
-	CodeEdit *text = editor->get_code_editor()->get_text_editor();
-	if (selection && !text->has_selection()) {
-		return;
-	}
-	String original = text->get_text();
+// Formats source with StyLua and the user's settings. Ludot declarations travel through
+// StyLua as opaque comments and are restored byte for byte. p_range adds StyLua's range
+// arguments for a selection, given the adapter that maps editor offsets.
+static bool run_stylua(const String &original, String &r_result, String &r_error, const std::function<void(const Adapter &, List<String> &)> &p_range = nullptr) {
 	CharString bytes = original.utf8();
 	Adapter adapter(std::string(bytes.get_data(), bytes.length()));
 	Luau::Allocator allocator;
 	Luau::AstNameTable names(allocator);
 	auto parsed = Luau::Parser::parse(adapter.source.data(), adapter.source.size(), names, allocator);
 	if (!parsed.errors.empty()) {
-		if (!on_save) {
-			WARN_PRINT("Cannot format a script with syntax errors.");
-		}
-		return;
+		r_error = "Cannot format a script with syntax errors.";
+		return false;
 	}
 	parsed.root->visit(&adapter);
 	std::string input = adapter.source;
@@ -277,8 +267,8 @@ void format(ScriptTextEditor *editor, bool selection, bool on_save) {
 	Ref<FileAccess> file = FileAccess::create_temp(FileAccess::READ_WRITE, "ludot-stylua", "luau", false, &temp_error);
 	Ref<FileAccess> config = FileAccess::create_temp(FileAccess::WRITE, "ludot-stylua", "toml", false, &temp_error);
 	if (file.is_null() || config.is_null()) {
-		WARN_PRINT("Could not create StyLua temporary files.");
-		return;
+		r_error = "Could not create StyLua temporary files.";
+		return false;
 	}
 	file->store_string(String::utf8(input.c_str()));
 	file->flush();
@@ -295,23 +285,8 @@ void format(ScriptTextEditor *editor, bool selection, bool on_save) {
 	args.push_back(config->get_path_absolute());
 	args.push_back("--no-editorconfig");
 	args.push_back(file->get_path_absolute());
-	if (selection) {
-		auto range_offset = [&](int line, int column) {
-			size_t position = adapter.lines.at(line) + original.get_slice("\n", line).substr(0, column).utf8().length();
-			int64_t mapped = position;
-			for (const auto &edit : adapter.edits) {
-				if (edit.end <= position) {
-					mapped += int64_t(edit.replacement.size()) - int64_t(edit.end - edit.begin);
-				} else if (edit.begin < position) {
-					mapped -= position - edit.begin;
-				}
-			}
-			return mapped;
-		};
-		args.push_front(itos(range_offset(text->get_selection_to_line(), text->get_selection_to_column())));
-		args.push_front("--range-end");
-		args.push_front(itos(range_offset(text->get_selection_from_line(), text->get_selection_from_column())));
-		args.push_front("--range-start");
+	if (p_range) {
+		p_range(adapter, args);
 	}
 	String output;
 	int exit_code = -1;
@@ -327,16 +302,16 @@ void format(ScriptTextEditor *editor, bool selection, bool on_save) {
 	}
 	Error error = OS::get_singleton()->execute(executable, args, &output, &exit_code, true);
 	if (error != OK || exit_code != 0) {
-		WARN_PRINT("StyLua formatting failed. Check the executable in Editor Settings. " + output);
-		return;
+		r_error = "StyLua formatting failed. Check the executable in Editor Settings. " + output;
+		return false;
 	}
 	String result = FileAccess::get_file_as_string(file->get_path_absolute());
 	for (size_t i = 0; i < adapter.edits.size(); ++i) {
 		String id = String::utf8((adapter.marker + std::to_string(i) + "__").c_str());
 		int at = result.find("--" + id);
 		if (at < 0) {
-			WARN_PRINT("StyLua did not preserve a Ludot declaration.");
-			return;
+			r_error = "StyLua did not preserve a Ludot declaration.";
+			return false;
 		}
 		const auto &edit = adapter.edits[i];
 		int start = at;
@@ -352,10 +327,59 @@ void format(ScriptTextEditor *editor, bool selection, bool on_save) {
 	Luau::Allocator check_allocator;
 	Luau::AstNameTable check_names(check_allocator);
 	if (!Luau::Parser::parse(formatted.get_data(), formatted.length(), check_names, check_allocator).errors.empty()) {
-		WARN_PRINT("Formatted script failed Ludot syntax validation. Source was kept unchanged.");
+		r_error = "Formatted script failed Ludot syntax validation. Source was kept unchanged.";
+		return false;
+	}
+	r_result = result;
+	return true;
+}
+
+bool format_source(const String &source, String &r_result, String &r_error) {
+	return run_stylua(source, r_result, r_error);
+}
+
+void format(ScriptTextEditor *editor, bool selection, bool on_save) {
+	Ref<Script> script = editor->get_edited_resource();
+	if (script.is_null() || script->get_language()->get_name() != "Luau" || !enabled()) {
 		return;
 	}
-
+	if (on_save && !bool(EDITOR_GET(prefix + "format_on_save"))) {
+		return;
+	}
+	CodeEdit *text = editor->get_code_editor()->get_text_editor();
+	if (selection && !text->has_selection()) {
+		return;
+	}
+	String original = text->get_text();
+	std::function<void(const Adapter &, List<String> &)> range;
+	if (selection) {
+		range = [&](const Adapter &adapter, List<String> &args) {
+			auto range_offset = [&](int line, int column) {
+				size_t position = adapter.lines.at(line) + original.get_slice("\n", line).substr(0, column).utf8().length();
+				int64_t mapped = position;
+				for (const auto &edit : adapter.edits) {
+					if (edit.end <= position) {
+						mapped += int64_t(edit.replacement.size()) - int64_t(edit.end - edit.begin);
+					} else if (edit.begin < position) {
+						mapped -= position - edit.begin;
+					}
+				}
+				return mapped;
+			};
+			args.push_front(itos(range_offset(text->get_selection_to_line(), text->get_selection_to_column())));
+			args.push_front("--range-end");
+			args.push_front(itos(range_offset(text->get_selection_from_line(), text->get_selection_from_column())));
+			args.push_front("--range-start");
+		};
+	}
+	String result;
+	String error;
+	if (!run_stylua(original, result, error, range)) {
+		if (!on_save || !error.begins_with("Cannot format a script with syntax errors")) {
+			WARN_PRINT(error);
+		}
+		return;
+	}
 	if (result == original) {
 		return;
 	}

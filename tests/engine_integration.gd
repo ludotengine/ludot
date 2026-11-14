@@ -130,11 +130,12 @@ func _init() -> void:
         local timer = Timer()
         local calls = 0
         local function onTimeout() calls += 1 end
-        timer.Timeout:connect(onTimeout)
-        assert(timer.Timeout:isConnected(onTimeout))
-        timer.Timeout:emit()
-        timer.Timeout:disconnect(onTimeout)
-        timer.Timeout:emit()
+        local connection = timer.Timeout:connect(onTimeout)
+        assert(connection.Connected and typeof(connection) == "Connection" and typeof(timer.Timeout) == "Signal")
+        timer.Timeout:fire()
+        connection:disconnect()
+        assert(not connection.Connected)
+        timer.Timeout:fire()
         timer:free()
         assert(calls == 1)
         return true
@@ -309,7 +310,7 @@ end""")
         end
     end
     function fire()
-        self.Source.Timeout:emit()
+        self.Source.Timeout:fire()
     end
     function stored(): number
         return self.Stored()

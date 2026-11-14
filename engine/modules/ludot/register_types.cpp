@@ -46,6 +46,7 @@ void initialize_ludot_module(ModuleInitializationLevel level) {
 #endif
     if (level == MODULE_INITIALIZATION_LEVEL_SERVERS) {
         GDREGISTER_CLASS(LuauScript);
+        GDREGISTER_ABSTRACT_CLASS(LuauValue);
         language = memnew(LuauLanguage);
         ScriptServer::register_language(language);
         script_loader.instantiate(); script_saver.instantiate();

@@ -1,14 +1,14 @@
 ---
 type: index
 title: "Toolsets & tools"
-description: "Every tool in the 203-tool surface, grouped by toolset, with safety classes."
+description: "Every tool in the 210-tool surface, grouped by toolset, with safety classes."
 created: 2026-09-19
 updated: 2026-11-13
 ---
 
 # Toolsets & tools
 
-203 tools across 29 categories. Only `core` + `inspection` are enabled by default; enable the rest with `godot_enable_toolset(category)`, which returns the enabled tools' names and input schemas so a client that never refreshes its registry can still call them. `category` also accepts a bundle (`author` / `playtest` / `ship`) or a comma-separated list, so a whole workflow is one call (#653). Class meanings: [safety classes](reference-safety-classes.md).
+210 tools across 29 categories. Only `core` + `inspection` are enabled by default; enable the rest with `godot_enable_toolset(category)`, which returns the enabled tools' names and input schemas so a client that never refreshes its registry can still call them. `category` also accepts a bundle (`author` / `playtest` / `ship`) or a comma-separated list, so a whole workflow is one call (#653). Class meanings: [safety classes](reference-safety-classes.md).
 
 ## `analysis` — Static analysis: dependencies, signal flow, unused resources, circular deps, scene integrity.
 
@@ -176,7 +176,7 @@ updated: 2026-11-13
 
 ## `inspection` — Read-only project/scene/node inspection.
 
-13 tools.
+17 tools.
 
 | Tool | Class |
 |------|-------|
@@ -192,6 +192,10 @@ updated: 2026-11-13
 | `godot_inspection_get_selected_node` | read_only |
 | `godot_inspection_list_scenes` | read_only |
 | `godot_inspection_list_settings` | read_only |
+| `godot_inspection_luau_api` | read_only |
+| `godot_inspection_luau_enums` | read_only |
+| `godot_inspection_luau_inspect` | read_only |
+| `godot_inspection_luau_resolve_module` | read_only |
 | `godot_inspection_snapshot_subtree` | read_only |
 
 ## `navigation` — NavigationRegion/Agent setup, navmesh baking, navigation layers.
@@ -339,13 +343,16 @@ updated: 2026-11-13
 
 ## `scripts` — Read/write/patch GDScript; parse checks.
 
-6 tools.
+9 tools.
 
 | Tool | Class |
 |------|-------|
+| `godot_scripts_create_luau_script` | mutating |
 | `godot_scripts_get_for_node` | read_only |
 | `godot_scripts_get_parse_errors` | read_only |
 | `godot_scripts_list` | read_only |
+| `godot_scripts_luau_diagnose` | read_only |
+| `godot_scripts_luau_format` | mutating |
 | `godot_scripts_patch` | mutating |
 | `godot_scripts_read` | read_only |
 | `godot_scripts_write` | mutating |

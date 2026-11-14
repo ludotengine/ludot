@@ -27,6 +27,6 @@ if engine.suffix == '.app':
     if not (contents / 'Resources' / metadata['CFBundleIconFile']).is_file():
         parser.error('The macOS bundle is missing its app icon')
     engine = contents / 'MacOS' / metadata['CFBundleExecutable']
-for suite in ('test_engine.py', 'test_debugger.py', 'test_export.py', 'test_editor.py', 'test_api_casing.py', 'test_extensions_engine.py', 'test_tasks_engine.py'):
+for suite in ('test_engine.py', 'test_debugger.py', 'test_export.py', 'test_editor.py', 'test_api_casing.py', 'test_extensions_engine.py', 'test_tasks_engine.py', 'test_signals_engine.py'):
     print(f'Running {suite} with {engine.name}', flush=True)
     subprocess.run([sys.executable, str(root / 'tools' / suite), str(engine.resolve())], check=True)

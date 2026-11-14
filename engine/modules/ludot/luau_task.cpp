@@ -262,6 +262,8 @@ void LuauLanguage::step_tasks() {
 			stale.push_back(entry.key);
 			continue;
 		}
+		// A signal wait resumes when its signal fires, never on a timer.
+		if (task.kind == Task::SIGNAL) continue;
 		if (task.kind != Task::DEFER) {
 			// Like a Timer, a wait stops while its node cannot process, such as during a pause.
 			const Node *node = Object::cast_to<Node>(owner);
@@ -287,9 +289,9 @@ void LuauLanguage::debug_get_tasks(List<String> *r_names, List<Variant> *r_value
 	for (const KeyValue<lua_State *, Task> &entry : tasks) {
 		Dictionary item;
 		const Task &task = entry.value;
-		item["kind"] = task.kind == Task::DEFER ? "defer" : task.kind == Task::WAIT ? "wait" : "delay";
+		item["kind"] = task.kind == Task::DEFER ? "defer" : task.kind == Task::WAIT ? "wait" : task.kind == Task::SIGNAL ? "signal" : "delay";
 		item["location"] = thread_location(entry.key);
-		if (task.kind != Task::DEFER) {
+		if (task.kind == Task::WAIT || task.kind == Task::DELAY) {
 			item["duration"] = task.duration;
 			item["elapsed"] = task.elapsed;
 		}

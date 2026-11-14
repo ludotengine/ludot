@@ -89,6 +89,9 @@ struct TypeChecker2
     std::vector<NotNull<Scope>> stack;
     std::vector<TypeId> functionDeclStack;
     std::vector<const AstStatClass*> ludotClassAccess;
+    // Constructors being checked, where Godot-backed Signal fields may still be assigned.
+    std::vector<const AstExprFunction*> ludotConstructors;
+    void checkLudotSignalFieldAssignment(AstExpr* target);
 
     DenseHashSet<TypeId> seenTypeFunctionInstances;
     TypeFunctionAbsenceCache typeFunctionAbsenceCache;

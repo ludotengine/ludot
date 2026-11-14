@@ -11,6 +11,8 @@
 #ifdef TOOLS_ENABLED
 #include "luau_analysis.h"
 #include "luau_lint.h"
+#include "luau_formatter.h"
+#include "editor/settings/editor_settings.h"
 #endif
 #include "Luau/Compiler.h"
 #include "Luau/ExperimentalFlags.h"
@@ -486,7 +488,7 @@ int native_index(lua_State *L) {
                 return 1;
             }
             case LuauLanguage::NativeMember::SIGNAL:
-                LuauLanguage::push_variant(L, Signal(static_cast<Object *>(self), member->name));
+                ludot_push_engine_signal(L, static_cast<Object *>(self), member->name);
                 return 1;
 			case LuauLanguage::NativeMember::CONSTANT:
 				if (self.get_type() == Variant::OBJECT) {
@@ -523,7 +525,7 @@ int native_index(lua_State *L) {
         object->get_signal_list(&signals);
         for (const auto &signal : signals) {
             if ((ClassDB::has_signal(object->get_class_name(), signal.name) ? LuauLanguage::api_name(signal.name, true) : String(signal.name)) == requested) {
-                LuauLanguage::push_variant(L, Signal(object, signal.name));
+                ludot_push_engine_signal(L, object, signal.name);
                 return 1;
             }
         }
@@ -593,7 +595,7 @@ int native_signal_get(lua_State *L) {
     const Variant owner = variant_at(L, -1);
     Object *object = owner;
     if (object == nullptr) luaL_error(L, "The native object has been freed");
-    LuauLanguage::push_variant(L, Signal(object, String::utf8(lua_tostring(L, lua_upvalueindex(1)))));
+    ludot_push_engine_signal(L, object, String::utf8(lua_tostring(L, lua_upvalueindex(1))));
     return 1;
 }
 int native_property_set(lua_State *L) {
@@ -736,6 +738,50 @@ Variant::Type annotation_type(Luau::AstType *type) {
     if (name == "string") return Variant::STRING;
     for (int i = Variant::VECTOR2; i < Variant::VARIANT_MAX; ++i) if (Variant::get_type_name(Variant::Type(i)) == name) return Variant::Type(i);
     return Variant::OBJECT;
+}
+// A field declared as Signal<...> is a script signal.
+bool signal_annotation(Luau::AstType *type) {
+    const auto ref = type != nullptr ? type->as<Luau::AstTypeReference>() : nullptr;
+    return ref != nullptr && !ref->prefix && String::utf8(ref->name.value) == "Signal";
+}
+// The signal's arguments take their types from the type arguments and their names from
+// the string literals passed to Signal.new, or arg1, arg2, and so on.
+MethodInfo signal_info(const Luau::AstClassProperty *p_property) {
+    MethodInfo info(String::utf8(p_property->name.value));
+    const auto ref = p_property->ty->as<Luau::AstTypeReference>();
+    std::vector<Luau::AstType *> types;
+    if (ref->parameters.size == 1 && ref->parameters.data[0].typePack != nullptr) {
+        if (const auto pack = ref->parameters.data[0].typePack->as<Luau::AstTypePackExplicit>()) {
+            for (Luau::AstType *type : pack->typeList.types) types.push_back(type);
+        }
+    } else {
+        for (const Luau::AstTypeOrPack &parameter : ref->parameters) {
+            if (parameter.type != nullptr) types.push_back(parameter.type);
+        }
+    }
+    PackedStringArray names;
+    Luau::AstExpr *value = p_property->defaultValue;
+    while (const auto group = value != nullptr ? value->as<Luau::AstExprGroup>() : nullptr) value = group->expr;
+    if (const auto call = value != nullptr ? value->as<Luau::AstExprCall>() : nullptr) {
+        for (Luau::AstExpr *argument : call->args) {
+            const auto name = argument->as<Luau::AstExprConstantString>();
+            names.push_back(name != nullptr ? String::utf8(name->value.data, name->value.size) : String());
+        }
+    }
+    for (size_t i = 0; i < types.size(); ++i) {
+        const String name = int(i) < names.size() && !names[i].is_empty() ? names[i] : "arg" + itos(i + 1);
+        const auto type_ref = types[i]->as<Luau::AstTypeReference>();
+        const String type_name = type_ref != nullptr ? String::utf8(type_ref->name.value) : String();
+        Variant::Type type = annotation_type(types[i]);
+        PropertyInfo argument(type, name);
+        if (type_name == "any" || type_name == "unknown" || type_ref == nullptr) {
+            argument.type = Variant::NIL;
+            argument.usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
+        }
+        else if (type == Variant::OBJECT) argument.class_name = type_name;
+        info.arguments.push_back(argument);
+    }
+    return info;
 }
 Variant constant_default(Luau::AstExpr *expr) {
     if (expr == nullptr) return {};
@@ -898,6 +944,16 @@ void LuauLanguage::push_variant(lua_State *L, const Variant &p_value) {
         case Variant::STRING: case Variant::STRING_NAME: case Variant::NODE_PATH: {
             const CharString text = String(p_value).utf8(); lua_pushlstring(L, text.get_data(), text.length()); return;
         }
+        case Variant::SIGNAL: {
+            // Engine signals use the same Signal object as Signal.new().
+            const Signal signal = p_value;
+            if (signal.get_object() == nullptr) { lua_pushnil(L); return; }
+            ludot_push_engine_signal(L, signal.get_object(), signal.get_name());
+            return;
+        }
+        case Variant::OBJECT:
+            if (const LuauValue *value = Object::cast_to<LuauValue>(static_cast<Object *>(p_value))) { value->push(L); return; }
+            break;
         default: break;
     }
     new (lua_newuserdatadtor(L, sizeof(NativeValue), destroy_variant)) NativeValue{p_value, ObjectID()};
@@ -914,6 +970,7 @@ Variant LuauLanguage::to_variant(lua_State *L, int p_index, int p_depth) {
         case LUA_TFUNCTION: return ludot_callable(L, p_index);
         case LUA_TUSERDATA:
             if (const auto *item = static_cast<const EnumItemData *>(lua_touserdatatagged(L, p_index, LUDOT_ENUM_ITEM_TAG))) return int64_t(item->value);
+            if (Variant signal; ludot_signal_variant(L, p_index, signal)) return signal;
             return variant_at(L, p_index);
         case LUA_TOBJECT: {
             lua_getfield(L, p_index, "_native");
@@ -1388,7 +1445,8 @@ void LuauLanguage::init() {
     lua_pushcfunction(state, ludot_require, "require"); lua_setglobal(state, "require");
     ludot_open_task(state);
     for (int i = Variant::VECTOR2; i < Variant::VARIANT_MAX; ++i) {
-        if (i == Variant::OBJECT) continue;
+        // Signal is the Luau library, not Godot's Signal value type.
+        if (i == Variant::OBJECT || i == Variant::SIGNAL) continue;
         const auto type = Variant::Type(i);
         lua_newtable(state);
         List<StringName> constants;
@@ -1446,6 +1504,7 @@ void LuauLanguage::init() {
 	lua_setmetatable(state, -2);
 	lua_setreadonly(state, -1, true);
 	lua_setglobal(state, "Enum");
+	ludot_open_signal(state);
 	List<Engine::Singleton> singletons;
     Engine::get_singleton()->get_singletons(&singletons);
     for (const auto &entry : singletons) { push_variant(state, entry.ptr); lua_setglobal(state, String(entry.name).utf8().get_data()); }
@@ -1662,6 +1721,15 @@ void LuauScript::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_lint_warnings", "code"), &LuauScript::get_lint_warnings);
     ClassDB::bind_method(D_METHOD("get_completions", "code"), &LuauScript::get_completions);
     ClassDB::bind_method(D_METHOD("get_symbol_help", "code", "symbol", "owner"), &LuauScript::get_symbol_help, DEFVAL(Variant()));
+    ClassDB::bind_static_method("LuauScript", D_METHOD("get_api_docs", "symbol"), &LuauScript::get_api_docs);
+    ClassDB::bind_static_method("LuauScript", D_METHOD("check_code", "code", "path"), &LuauScript::check_code);
+    ClassDB::bind_static_method("LuauScript", D_METHOD("lint_code", "code", "path"), &LuauScript::lint_code);
+    ClassDB::bind_static_method("LuauScript", D_METHOD("inspect_code", "code", "path", "line", "column"), &LuauScript::inspect_code);
+    ClassDB::bind_static_method("LuauScript", D_METHOD("find_enums", "query"), &LuauScript::find_enums);
+    ClassDB::bind_static_method("LuauScript", D_METHOD("resolve_module_path", "requested", "from"), &LuauScript::resolve_module_path);
+    ClassDB::bind_static_method("LuauScript", D_METHOD("format_code", "code"), &LuauScript::format_code);
+    ClassDB::bind_static_method("LuauScript", D_METHOD("get_templates", "base_class"), &LuauScript::get_templates);
+    ClassDB::bind_static_method("LuauScript", D_METHOD("create_from_template", "template", "class_name", "base_class"), &LuauScript::create_from_template);
 }
 PackedStringArray LuauScript::get_completions(const String &p_code) const {
     List<ScriptLanguage::CodeCompletionOption> options;
@@ -1673,6 +1741,71 @@ PackedStringArray LuauScript::get_completions(const String &p_code) const {
     labels.sort();
     return labels;
 }
+Dictionary LuauScript::get_api_docs(const String &p_symbol) {
+#ifdef TOOLS_ENABLED
+    return ludot_api_docs(p_symbol);
+#else
+    return {};
+#endif
+}
+Array LuauScript::find_enums(const String &p_query) {
+#ifdef TOOLS_ENABLED
+    return ludot_find_enums(p_query);
+#else
+    return {};
+#endif
+}
+String LuauScript::resolve_module_path(const String &p_requested, const String &p_from) {
+    return LuauLanguage::get_singleton()->resolve_module(p_requested, p_from);
+}
+Dictionary LuauScript::format_code(const String &p_code) {
+    Dictionary result;
+#ifdef TOOLS_ENABLED
+    String formatted;
+    String error = "Formatting needs the editor's settings.";
+    const bool ok = EditorSettings::get_singleton() != nullptr && LuauFormatter::format_source(p_code, formatted, error);
+    result["ok"] = ok;
+    result["formatted"] = ok ? formatted : p_code;
+    result["changed"] = ok && formatted != p_code;
+    if (!ok) result["error"] = error;
+#else
+    result["ok"] = false;
+    result["error"] = "Formatting needs an editor build.";
+#endif
+    return result;
+}
+Array LuauScript::get_templates(const String &p_base_class) {
+    Array result;
+    for (StringName current = p_base_class; current != StringName(); current = ClassDB::get_parent_class(current)) {
+        for (const ScriptLanguage::ScriptTemplate &entry : LuauLanguage::get_singleton()->get_built_in_templates(current)) {
+            Dictionary item;
+            item["name"] = entry.name;
+            item["inherit"] = entry.inherit;
+            item["description"] = entry.description;
+            result.push_back(item);
+        }
+    }
+    return result;
+}
+String LuauScript::create_from_template(const String &p_template, const String &p_class_name, const String &p_base_class) {
+    String content;
+    for (StringName current = p_base_class; current != StringName() && content.is_empty(); current = ClassDB::get_parent_class(current)) {
+        for (const ScriptLanguage::ScriptTemplate &entry : LuauLanguage::get_singleton()->get_built_in_templates(current)) {
+            if (p_template.is_empty() || entry.name == p_template) {
+                content = entry.content;
+                break;
+            }
+        }
+    }
+    String indent = "\t";
+#ifdef TOOLS_ENABLED
+    if (EditorSettings::get_singleton() != nullptr && int(EDITOR_GET("text_editor/behavior/indent/type")) == 1) {
+        indent = String(" ").repeat(int(EDITOR_GET("text_editor/behavior/indent/size")));
+    }
+#endif
+    const Ref<Script> script = LuauLanguage::get_singleton()->make_template(content.replace("_TS_", indent), p_class_name, p_base_class);
+    return script.is_valid() ? script->get_source_code() : String();
+}
 Dictionary LuauScript::get_symbol_help(const String &p_code, const String &p_symbol, Object *p_owner) const {
 #ifdef TOOLS_ENABLED
     return ludot_symbol_help(p_code, get_path(), p_symbol, p_owner);
@@ -1681,6 +1814,9 @@ Dictionary LuauScript::get_symbol_help(const String &p_code, const String &p_sym
 #endif
 }
 Array LuauScript::get_lint_warnings(const String &p_code) const {
+    return lint_code(p_code, get_path());
+}
+Array LuauScript::lint_code(const String &p_code, const String &p_path) {
     Array result;
 #ifdef TOOLS_ENABLED
     const CharString bytes = p_code.utf8();
@@ -1691,7 +1827,7 @@ Array LuauScript::get_lint_warnings(const String &p_code) const {
     const auto parsed = Luau::Parser::parse(bytes.get_data(), bytes.length(), names, allocator, options);
     if (!parsed.errors.empty()) return result;
     List<ScriptLanguage::Warning> warnings;
-	ludot_validate(p_code, get_path(), nullptr, &warnings);
+	ludot_validate(p_code, p_path, nullptr, &warnings);
 	ludot_lint(p_code, parsed, &warnings);
     for (const auto &warning : warnings) {
         Dictionary item;
@@ -1705,8 +1841,47 @@ Array LuauScript::get_lint_warnings(const String &p_code) const {
     return result;
 }
 Array LuauScript::get_diagnostics() const {
+    return check_code(source, get_path());
+}
+Dictionary LuauScript::inspect_code(const String &p_code, const String &p_path, int p_line, int p_column) {
+    Dictionary result;
+#ifdef TOOLS_ENABLED
+    // Lines and columns are 1-based. The cursor sits before the character at p_column.
+    PackedStringArray lines = p_code.split("\n");
+    if (p_line < 1 || p_line > lines.size()) return result;
+    const String line = lines[p_line - 1];
+    const int column = CLAMP(p_column - 1, 0, line.length());
+    int start = column;
+    int end = column;
+    while (start > 0 && (is_ascii_identifier_char(line[start - 1]))) --start;
+    while (end < line.length() && is_ascii_identifier_char(line[end])) ++end;
+    const String symbol = line.substr(start, end - start);
+    lines.set(p_line - 1, line.substr(0, column) + String::chr(0xffff) + line.substr(column));
+    const String marked = String("\n").join(lines);
+    result["symbol"] = symbol;
+    if (!symbol.is_empty()) {
+        PackedStringArray hover_lines = p_code.split("\n");
+        hover_lines.set(p_line - 1, line.substr(0, end) + String::chr(0xffff) + line.substr(end));
+        result["help"] = ludot_symbol_help(String("\n").join(hover_lines), p_path, symbol);
+    }
+    List<ScriptLanguage::CodeCompletionOption> options;
+    bool force = false;
+    String hint;
+    LuauLanguage::get_singleton()->complete_code(marked, p_path, nullptr, &options, force, hint);
+    Array completions;
+    for (const auto &option : options) {
+        Dictionary entry;
+        entry["label"] = option.display;
+        entry["kind"] = int(option.kind);
+        completions.push_back(entry);
+    }
+    result["completions"] = completions;
+#endif
+    return result;
+}
+Array LuauScript::check_code(const String &p_code, const String &p_path) {
     List<ScriptLanguage::ScriptError> errors;
-    LuauLanguage::get_singleton()->validate(source, get_path(), nullptr, &errors, nullptr, nullptr);
+    LuauLanguage::get_singleton()->validate(p_code, p_path, nullptr, &errors, nullptr, nullptr);
     Array result;
     for (const auto &error : errors) {
         Dictionary diagnostic;
@@ -1867,6 +2042,7 @@ Error LuauScript::reload(bool p_keep_state) {
     base_type = new_base;
     base_script = new_base_script;
 	methods.clear();
+	signals.clear();
 	has_onready = false;
 	properties.clear();
 	defaults.clear();
@@ -1874,12 +2050,19 @@ Error LuauScript::reload(bool p_keep_state) {
 	property_enums.clear();
 	if (base_script.is_valid()) {
         methods = base_script->methods;
+        signals = base_script->signals;
         properties = base_script->properties;
         defaults = base_script->defaults;
         property_types = base_script->property_types;
 		property_enums = base_script->property_enums;
 	}
     for (const auto &member : declaration->members) {
+        if (const auto property = Luau::get_if<Luau::AstClassProperty>(&member); property != nullptr && signal_annotation(property->ty)) {
+            // A Signal field is a script signal named after the field. It is not an inspector property.
+            const MethodInfo info = signal_info(property);
+            signals.insert(info.name, info);
+            continue;
+        }
         if (const auto property = Luau::get_if<Luau::AstClassProperty>(&member)) {
             PropertyInfo info(annotation_type(property->ty), String::utf8(property->name.value));
             info.usage = property->isExported ? PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE : PROPERTY_USAGE_SCRIPT_VARIABLE;
@@ -1930,7 +2113,10 @@ Error LuauScript::reload(bool p_keep_state) {
         lua_getref(L, replacement.key->object_ref);
         lua_getref(L, replacement.value);
         lua_migrateobject(L, -2, -1);
-        lua_pop(L, 2);
+        lua_pop(L, 1);
+        // The migrated object holds the new Signal fields. Engine connections stay on the owner.
+        ludot_bind_signal_fields(L, -1, replacement.key->owner, signals);
+        lua_pop(L, 1);
         lua_unref(L, replacement.value);
     }
     evaluation.committed = true;
@@ -2001,6 +2187,7 @@ LuauScriptInstance::LuauScriptInstance(Object *p_owner, const Ref<LuauScript> &p
     // Each object keeps its native owner; engine calls still use the original API.
     push_owner(L, owner);
     lua_setfield(L, -2, "_native");
+    ludot_bind_signal_fields(L, -1, owner, script->signals);
     object_ref = lua_ref(L, -1); lua_pop(L, 1);
     script->instances.insert(this);
 }

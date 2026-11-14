@@ -57,7 +57,7 @@ def register_scripts(mcp: FastMCP, bridge: Bridge, config: ServerConfig, runner:
     @mcp.tool(meta=READ_ONLY, tags=SCRIPTS)
     async def read_script(script_path: ResPath) -> ScriptContent:
         """Read the full text of the script at ``script_path`` (a ``res://`` path,
-        ``.gd`` or ``.cs``)."""
+        ``.gd``, ``.cs``, or Ludot's ``.luau``)."""
         return ScriptContent(**await route(bridge, "cmd_read_script", {"script_path": script_path}))
 
     @mcp.tool(meta=READ_ONLY, tags=SCRIPTS)
@@ -65,11 +65,11 @@ def register_scripts(mcp: FastMCP, bridge: Bridge, config: ServerConfig, runner:
         directory: ResPath = "res://",
         offset: Annotated[int, Field(ge=0)] = 0,
         limit: Annotated[int, Field(ge=1, le=1000)] = DEFAULT_PAGE_LIMIT,
-        language: Literal["gd", "cs"] = "gd",
+        language: Literal["gd", "cs", "luau"] = "gd",
     ) -> ScriptList:
         """List script files under ``directory`` (recursive, ``res://`` path) for a
         backend: ``language="gd"`` (default) lists ``.gd``, ``"cs"`` lists ``.cs``
-        (C# support: issue #207 Phase 1).
+        (C# support: issue #207 Phase 1), ``"luau"`` lists Ludot's ``.luau``.
 
         Paginated: ``scripts`` is a window of ``total`` files starting at ``offset``
         (default page ``limit`` 200). When ``truncated``, pass ``next_offset`` to page on.
@@ -104,8 +104,8 @@ def register_scripts(mcp: FastMCP, bridge: Bridge, config: ServerConfig, runner:
     async def write_script(
         script_path: ResPath, content: str, dry_run: bool = False
     ) -> WriteScriptResult:
-        """Create or overwrite the script at ``script_path`` (``res://``, ``.gd`` or
-        ``.cs``) with ``content``. Reversible via the editor's undo. ``dry_run=True``
+        """Create or overwrite the script at ``script_path`` (``res://``, ``.gd``,
+        ``.cs``, or ``.luau``) with ``content``. Reversible via the editor's undo. ``dry_run=True``
         writes nothing and reports ``would_overwrite`` so the agent knows whether it is
         about to replace an existing script. A real run reports what happened:
         ``created`` on a fresh file, ``overwrote``/``previous_existed`` when an existing
@@ -113,7 +113,8 @@ def register_scripts(mcp: FastMCP, bridge: Bridge, config: ServerConfig, runner:
 
         C# (``.cs``) writes land the bytes but are NOT usable until a build — the
         result carries a ``hint`` saying to validate via a C# build (Phase 2; issue
-        #207). GDScript is validated via ``get_parse_errors``.
+        #207). GDScript is validated via ``get_parse_errors``; Luau via
+        ``godot_scripts_luau_diagnose``.
         """
         params = {"script_path": script_path, "content": content}
         if script_path.endswith(".cs"):
@@ -149,7 +150,7 @@ def register_scripts(mcp: FastMCP, bridge: Bridge, config: ServerConfig, runner:
         script_path: ResPath, find: str, replace: str, dry_run: bool = False
     ) -> PatchScriptResult:
         """Replace every occurrence of ``find`` with ``replace`` in the script
-        (``.gd`` or ``.cs``). Errors if ``find`` isn't present. Reversible via undo;
+        (``.gd``, ``.luau``, or ``.cs``). Errors if ``find`` isn't present. Reversible via undo;
         ``dry_run`` previews. A ``.cs`` patch still needs a C# build to take effect
         (issue #207)."""
         if script_path.endswith(".cs"):
@@ -174,7 +175,16 @@ def register_scripts(mcp: FastMCP, bridge: Bridge, config: ServerConfig, runner:
         For that, run the project: ``godot_runtime_run_and_capture`` reports the
         runtime errors (the recommended full-verification pattern); the shader
         analogue is ``godot_shader_validate``.
+
+        ``.luau`` uses the Ludot analyzer (type errors included).
         """
+        if script_path.endswith(".luau"):
+            body = await route(bridge, "cmd_luau_diagnose", {"script_path": script_path})
+            luau_errors = [
+                {"message": str(error.get("message", "")), "line": int(error.get("line", 0))}
+                for error in body.get("errors", [])
+            ]
+            return ParseCheckResult(script_path=script_path, ok=not luau_errors, errors=luau_errors)
         require_godot_binary(runner.binary)
         if script_path.endswith(".cs"):
             # Phase 1 honesty (#207): C# is compiled, not live — godot --check-only

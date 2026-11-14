@@ -71,7 +71,7 @@ async def test_closed_vocab_uses_an_enum() -> None:
     tools = {godot_tool_name(_original_handler_name(t), t.tags): t for t in await _tools()}
     params = tools["godot_scripts_list"].parameters or {}
     language = params["properties"]["language"]
-    assert language.get("enum") == ["gd", "cs"], language
+    assert language.get("enum") == ["gd", "cs", "luau"], language
 
 
 @pytest.mark.asyncio

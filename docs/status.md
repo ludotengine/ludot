@@ -31,7 +31,7 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   checks cover flight, the planet camera, riding along with a moving world, ground
   clearance, pause, and orbit visibility. A 54-second Forward+ capture covers the tour.
 - Vendored Godot 4.7.2-stable and Luau 0.743 source with pinned provenance.
-- Engine version 4.7.2-lu.3, set by the `status` field in `engine/version.py`.
+- Engine version 4.7.2-lu.4, set by the `status` field in `engine/version.py`.
 - One `Enum` global for every exposed, non-editor engine enum, modeled on Roblox's:
   `Enum.MouseMode.Captured` with `Name`, `Value`, and `EnumType`, plus `fromName`,
   `fromValue`, `getEnumItems`, and `Enum:getEnums()`. Engine methods and properties
@@ -39,6 +39,20 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   checking, the standalone LSP, and Inspector exports use `Enum.<Name>` types. The
   old `Class.Enums` namespaces, global enum tables, and `Class.Enum` annotations are
   gone. Signal arguments and virtual callback arguments still arrive as numbers.
+- A native `Signal` library modeled on Roblox's RBXScriptSignal: `Signal.new()`,
+  `fire`, `connect`, `once`, `wait`, `disconnectAll`, and `Connection` with
+  `disconnect` and `Connected`. `Signal<T...>` checks fired arguments and infers
+  handler parameters; `typeof` returns `"Signal"` and `"Connection"`. Handlers run in
+  resumable threads from a snapshot, a failing handler is reported with its stack
+  trace without stopping the others, and connections of freed objects are dropped.
+  Engine signals use the same object, typed from ClassDB (`Signal<Node>` for
+  `ChildEnteredTree`). On engine-backed classes, `Signal<...>` fields are script
+  signals: the Node dock lists them with the names passed to `Signal.new`, scenes
+  save their connections, and GDScript `connect`/`emit_signal` share handlers with
+  Luau. The checker rejects exporting or reassigning them, and the
+  `signal_declaration` lint flags unannotated `Signal.new()` and mismatched or
+  non-literal parameter names. The old Godot `Signal` methods (`emit`,
+  `isConnected`) are gone.
 - A native `task` library (`spawn`, `defer`, `delay`, `wait`, `cancel`) with one
   scheduler per VM, stepped from SceneTree's process frame. Engine callbacks start in
   resumable threads, so `task.wait` works in `_ready`, `_process`, and signal
@@ -120,6 +134,16 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   StyLua and indentation preferences, module aliases, and project `.luaurc`,
   selene and stylua files) and `list_settings` (project settings or editor
   preferences by prefix, with enum options and credential-like values withheld).
+  It handles Luau through the editor's own `LuauScript` statics: the script tools
+  read, write, patch, list, and check `.luau`; `luau_diagnose` returns checker
+  errors, naming lint, Selene warnings with suppressions applied, and a StyLua diff;
+  `luau_format` applies StyLua with the user's settings (`dry_run` returns the diff);
+  `create_luau_script` uses the built-in templates; and the always-on `luau_api`
+  (the engine API in Luau spelling under the project casing, with Godot's
+  documentation and the `task`, `Signal`, `Connection`, and `Enum` libraries),
+  `luau_enums`, `luau_resolve_module`, and `luau_inspect` (hover help and completions
+  at a position) answer without running anything. The addon also works from an
+  `Addons/` folder.
 
 ## Known limits
 
@@ -132,13 +156,25 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 - Scene-based node inference currently uses the active native editor scene and
   paths rooted at `self`. Dynamic paths, unrelated receiver variables, and standalone
   LSP sessions use the general engine return type.
+- Values fired through an engine signal convert like any engine call. Tables and
+  plain class objects travel as `LuauValue` references; other Luau values become
+  engine values. `disconnectAll` on an engine signal also removes pending `wait`s made
+  through the API, which leaves those threads suspended until their owner is freed.
 - Mobile and web targets inherited from Godot are not supported.
 
 ## Verification
 
 Local Linux results:
 
-- `ctest`: language (13 tests), shader (18), and LSP (16) suites pass.
+- `ctest`: extension (23 tests), language (17), shader (20), and LSP (24) suites
+  pass. The extension suite checks the Signal usage cases, misuse errors, declaration lint, signal field
+  rules, and method casing.
+- `tools/test_signals_engine.py` passes. It runs the Signal usage cases in the engine
+  and covers Luau fires reaching GDScript handlers and GDScript emits reaching Luau
+  handlers, a scene-saved connection, the script signal list's names and types,
+  inheritance, once, wait in a task, disconnect and Connected, disconnectAll keeping
+  GDScript connections, a yielding and a failing handler, freed owners for engine and
+  Luau signals, typed engine signals, and hot reload adding and removing signals.
 - The upstream Luau unit suite passes all 5,573 cases and 35,369 assertions.
 - `tools/test_engine.py` passes with the development editor build. It covers scripts,
   exports, inheritance, native API casing, reloads (including field type changes and
@@ -155,7 +191,10 @@ Local Linux results:
 - `tools/package_lsp.py` builds the standalone LSP and passes its protocol check.
 - In `mcp/`, the upstream unit and contract tests pass, along with the live-editor
   inspection test against the Ludot editor, which covers the settings and
-  conventions commands. Upstream's tests of its own CI workflows were removed with
+  conventions commands, and the live-editor Luau test, which diagnoses a script with
+  a type error, a Selene warning, and bad formatting, formats it, and checks the
+  API, enum, module, hover, and template lookups. Every Luau tool has a contract
+  test. Upstream's tests of its own CI workflows were removed with
   those workflows.
 - The optimized Linux SCU editor passes the engine, debugger, exported-pack, and
   native editor suites. The editor suite opens real Luau files, migrates a saved

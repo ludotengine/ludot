@@ -1,4 +1,4 @@
-LUDOT_API_3
+LUDOT_API_4
 G	Side	0	SIDE_LEFT	0	SIDE_TOP	1	SIDE_RIGHT	2	SIDE_BOTTOM	3
 G	Corner	0	CORNER_TOP_LEFT	0	CORNER_TOP_RIGHT	1	CORNER_BOTTOM_RIGHT	2	CORNER_BOTTOM_LEFT	3
 G	Orientation	0	VERTICAL	1	HORIZONTAL	0
@@ -1323,9 +1323,9 @@ F	AcceptDialog	set_autowrap	void	0	0	bool
 F	AcceptDialog	has_autowrap	bool	0	0
 F	AcceptDialog	set_ok_button_text	void	0	0	String
 F	AcceptDialog	get_ok_button_text	String	0	0
-P	AcceptDialog	confirmed	Signal
-P	AcceptDialog	canceled	Signal
-P	AcceptDialog	custom_action	Signal
+X	AcceptDialog	confirmed
+X	AcceptDialog	canceled
+X	AcceptDialog	custom_action	StringName
 C	AccessibilityServer	Object	0
 F	AccessibilityServer	is_supported	bool	0	0
 F	AccessibilityServer	create_element	RID	0	0	int	enum::AccessibilityServer.AccessibilityRole
@@ -1467,11 +1467,11 @@ F	AnimatedSprite2D	set_frame_and_progress	void	0	0	int	float
 F	AnimatedSprite2D	set_speed_scale	void	0	0	float
 F	AnimatedSprite2D	get_speed_scale	float	0	0
 F	AnimatedSprite2D	get_playing_speed	float	0	0
-P	AnimatedSprite2D	sprite_frames_changed	Signal
-P	AnimatedSprite2D	animation_changed	Signal
-P	AnimatedSprite2D	frame_changed	Signal
-P	AnimatedSprite2D	animation_looped	Signal
-P	AnimatedSprite2D	animation_finished	Signal
+X	AnimatedSprite2D	sprite_frames_changed
+X	AnimatedSprite2D	animation_changed
+X	AnimatedSprite2D	frame_changed
+X	AnimatedSprite2D	animation_looped
+X	AnimatedSprite2D	animation_finished
 C	AnimatedSprite3D	SpriteBase3D	0
 P	AnimatedSprite3D	sprite_frames	SpriteFrames
 P	AnimatedSprite3D	animation	StringName
@@ -1498,11 +1498,11 @@ F	AnimatedSprite3D	set_frame_and_progress	void	0	0	int	float
 F	AnimatedSprite3D	set_speed_scale	void	0	0	float
 F	AnimatedSprite3D	get_speed_scale	float	0	0
 F	AnimatedSprite3D	get_playing_speed	float	0	0
-P	AnimatedSprite3D	sprite_frames_changed	Signal
-P	AnimatedSprite3D	animation_changed	Signal
-P	AnimatedSprite3D	frame_changed	Signal
-P	AnimatedSprite3D	animation_looped	Signal
-P	AnimatedSprite3D	animation_finished	Signal
+X	AnimatedSprite3D	sprite_frames_changed
+X	AnimatedSprite3D	animation_changed
+X	AnimatedSprite3D	frame_changed
+X	AnimatedSprite3D	animation_looped
+X	AnimatedSprite3D	animation_finished
 C	AnimatedTexture	Texture2D	0
 P	AnimatedTexture	frames	int
 P	AnimatedTexture	current_frame	int
@@ -1628,10 +1628,10 @@ F	AnimationLibrary	has_animation	bool	0	0	StringName
 F	AnimationLibrary	get_animation	Animation	0	0	StringName
 F	AnimationLibrary	get_animation_list	typedarray::StringName	0	0
 F	AnimationLibrary	get_animation_list_size	int	0	0
-P	AnimationLibrary	animation_added	Signal
-P	AnimationLibrary	animation_removed	Signal
-P	AnimationLibrary	animation_renamed	Signal
-P	AnimationLibrary	animation_changed	Signal
+X	AnimationLibrary	animation_added	StringName
+X	AnimationLibrary	animation_removed	StringName
+X	AnimationLibrary	animation_renamed	StringName	StringName
+X	AnimationLibrary	animation_changed	StringName
 C	AnimationMixer	Node	0
 P	AnimationMixer	active	bool
 P	AnimationMixer	deterministic	bool
@@ -1687,13 +1687,13 @@ F	AnimationMixer	find_animation_library	StringName	0	0	Animation
 E	AnimationMixer	AnimationCallbackModeProcess	0	ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS	0	ANIMATION_CALLBACK_MODE_PROCESS_IDLE	1	ANIMATION_CALLBACK_MODE_PROCESS_MANUAL	2
 E	AnimationMixer	AnimationCallbackModeMethod	0	ANIMATION_CALLBACK_MODE_METHOD_DEFERRED	0	ANIMATION_CALLBACK_MODE_METHOD_IMMEDIATE	1
 E	AnimationMixer	AnimationCallbackModeDiscrete	0	ANIMATION_CALLBACK_MODE_DISCRETE_DOMINANT	0	ANIMATION_CALLBACK_MODE_DISCRETE_RECESSIVE	1	ANIMATION_CALLBACK_MODE_DISCRETE_FORCE_CONTINUOUS	2
-P	AnimationMixer	animation_list_changed	Signal
-P	AnimationMixer	animation_libraries_updated	Signal
-P	AnimationMixer	animation_finished	Signal
-P	AnimationMixer	animation_started	Signal
-P	AnimationMixer	caches_cleared	Signal
-P	AnimationMixer	mixer_applied	Signal
-P	AnimationMixer	mixer_updated	Signal
+X	AnimationMixer	animation_list_changed
+X	AnimationMixer	animation_libraries_updated
+X	AnimationMixer	animation_finished	StringName
+X	AnimationMixer	animation_started	StringName
+X	AnimationMixer	caches_cleared
+X	AnimationMixer	mixer_applied
+X	AnimationMixer	mixer_updated
 C	AnimationNode	Resource	0
 P	AnimationNode	filter_enabled	bool
 P	AnimationNode	filters	Array
@@ -1723,10 +1723,10 @@ F	AnimationNode	blend_input	float	0	0	int	float	bool	bool	float	enum::AnimationN
 F	AnimationNode	set_parameter	void	0	0	StringName	Variant
 F	AnimationNode	get_parameter	Variant	0	0	StringName
 E	AnimationNode	FilterAction	0	FILTER_IGNORE	0	FILTER_PASS	1	FILTER_STOP	2	FILTER_BLEND	3
-P	AnimationNode	tree_changed	Signal
-P	AnimationNode	node_updated	Signal
-P	AnimationNode	animation_node_renamed	Signal
-P	AnimationNode	animation_node_removed	Signal
+X	AnimationNode	tree_changed
+X	AnimationNode	node_updated	int
+X	AnimationNode	animation_node_renamed	int	String	String
+X	AnimationNode	animation_node_removed	int	String
 C	AnimationNodeAdd2	AnimationNodeSync	0
 C	AnimationNodeAdd3	AnimationNodeSync	0
 C	AnimationNodeAnimation	AnimationRootNode	0
@@ -1844,7 +1844,7 @@ F	AnimationNodeBlendSpace2D	set_cyclic_length	void	0	0	float
 F	AnimationNodeBlendSpace2D	get_cyclic_length	float	0	0
 E	AnimationNodeBlendSpace2D	BlendMode	0	BLEND_MODE_INTERPOLATED	0	BLEND_MODE_DISCRETE	1	BLEND_MODE_DISCRETE_CARRY	2
 E	AnimationNodeBlendSpace2D	SyncMode	0	SYNC_MODE_NONE	0	SYNC_MODE_INDEPENDENT	1	SYNC_MODE_CYCLIC_MUTABLE	2	SYNC_MODE_CYCLIC_CONSTANT	3
-P	AnimationNodeBlendSpace2D	triangles_updated	Signal
+X	AnimationNodeBlendSpace2D	triangles_updated
 C	AnimationNodeBlendTree	AnimationRootNode	0
 P	AnimationNodeBlendTree	graph_offset	Vector2
 F	AnimationNodeBlendTree	add_node	void	0	0	StringName	AnimationNode	Vector2?
@@ -1865,7 +1865,7 @@ K	AnimationNodeBlendTree	CONNECTIONERRORNOINPUTINDEX	int
 K	AnimationNodeBlendTree	CONNECTIONERRORNOOUTPUT	int
 K	AnimationNodeBlendTree	CONNECTIONERRORSAMENODE	int
 K	AnimationNodeBlendTree	CONNECTIONERRORCONNECTIONEXISTS	int
-P	AnimationNodeBlendTree	node_changed	Signal
+X	AnimationNodeBlendTree	node_changed	StringName
 C	AnimationNodeExtension	AnimationNode	0
 F	AnimationNodeExtension	_process_animation_node	PackedFloat32Array	0	0	PackedFloat64Array	bool
 F	AnimationNodeExtension	is_looping	bool	1	0	PackedFloat32Array
@@ -1950,8 +1950,8 @@ F	AnimationNodeStateMachinePlayback	get_fading_from_length	float	0	0
 F	AnimationNodeStateMachinePlayback	get_fading_position	float	0	0
 F	AnimationNodeStateMachinePlayback	get_fading_length	float	0	0
 F	AnimationNodeStateMachinePlayback	get_travel_path	typedarray::StringName	0	0
-P	AnimationNodeStateMachinePlayback	state_started	Signal
-P	AnimationNodeStateMachinePlayback	state_finished	Signal
+X	AnimationNodeStateMachinePlayback	state_started	StringName
+X	AnimationNodeStateMachinePlayback	state_finished	StringName
 C	AnimationNodeStateMachineTransition	Resource	0
 P	AnimationNodeStateMachineTransition	xfade_time	float
 P	AnimationNodeStateMachineTransition	xfade_curve	Curve
@@ -1982,7 +1982,7 @@ F	AnimationNodeStateMachineTransition	set_advance_expression	void	0	0	String
 F	AnimationNodeStateMachineTransition	get_advance_expression	String	0	0
 E	AnimationNodeStateMachineTransition	SwitchMode	0	SWITCH_MODE_IMMEDIATE	0	SWITCH_MODE_SYNC	1	SWITCH_MODE_AT_END	2
 E	AnimationNodeStateMachineTransition	AdvanceMode	0	ADVANCE_MODE_DISABLED	0	ADVANCE_MODE_ENABLED	1	ADVANCE_MODE_AUTO	2
-P	AnimationNodeStateMachineTransition	advance_condition_changed	Signal
+X	AnimationNodeStateMachineTransition	advance_condition_changed
 C	AnimationNodeSub2	AnimationNodeSync	0
 C	AnimationNodeSync	AnimationNode	0
 P	AnimationNodeSync	sync	bool
@@ -2080,8 +2080,8 @@ F	AnimationPlayer	set_root	void	0	0	NodePath
 F	AnimationPlayer	get_root	NodePath	0	0
 E	AnimationPlayer	AnimationProcessCallback	0	ANIMATION_PROCESS_PHYSICS	0	ANIMATION_PROCESS_IDLE	1	ANIMATION_PROCESS_MANUAL	2
 E	AnimationPlayer	AnimationMethodCallMode	0	ANIMATION_METHOD_CALL_DEFERRED	0	ANIMATION_METHOD_CALL_IMMEDIATE	1
-P	AnimationPlayer	current_animation_changed	Signal
-P	AnimationPlayer	animation_changed	Signal
+X	AnimationPlayer	current_animation_changed	StringName
+X	AnimationPlayer	animation_changed	StringName	StringName
 C	AnimationRootNode	AnimationNode	0
 C	AnimationTree	AnimationMixer	0
 P	AnimationTree	tree_root	AnimationRootNode
@@ -2096,7 +2096,7 @@ F	AnimationTree	get_animation_player	NodePath	0	0
 F	AnimationTree	set_process_callback	void	0	0	enum::AnimationTree.AnimationProcessCallback
 F	AnimationTree	get_process_callback	enum::AnimationTree.AnimationProcessCallback	0	0
 E	AnimationTree	AnimationProcessCallback	0	ANIMATION_PROCESS_PHYSICS	0	ANIMATION_PROCESS_IDLE	1	ANIMATION_PROCESS_MANUAL	2
-P	AnimationTree	animation_player_changed	Signal
+X	AnimationTree	animation_player_changed
 C	Area2D	CollisionObject2D	0
 P	Area2D	monitoring	bool
 P	Area2D	monitorable	bool
@@ -2150,14 +2150,14 @@ F	Area2D	get_audio_bus_name	StringName	0	0
 F	Area2D	set_audio_bus_override	void	0	0	bool
 F	Area2D	is_overriding_audio_bus	bool	0	0
 E	Area2D	SpaceOverride	0	SPACE_OVERRIDE_DISABLED	0	SPACE_OVERRIDE_COMBINE	1	SPACE_OVERRIDE_COMBINE_REPLACE	2	SPACE_OVERRIDE_REPLACE	3	SPACE_OVERRIDE_REPLACE_COMBINE	4
-P	Area2D	body_shape_entered	Signal
-P	Area2D	body_shape_exited	Signal
-P	Area2D	body_entered	Signal
-P	Area2D	body_exited	Signal
-P	Area2D	area_shape_entered	Signal
-P	Area2D	area_shape_exited	Signal
-P	Area2D	area_entered	Signal
-P	Area2D	area_exited	Signal
+X	Area2D	body_shape_entered	RID	Node2D	int	int
+X	Area2D	body_shape_exited	RID	Node2D	int	int
+X	Area2D	body_entered	Node2D
+X	Area2D	body_exited	Node2D
+X	Area2D	area_shape_entered	RID	Area2D	int	int
+X	Area2D	area_shape_exited	RID	Area2D	int	int
+X	Area2D	area_entered	Area2D
+X	Area2D	area_exited	Area2D
 C	Area3D	CollisionObject3D	0
 P	Area3D	monitoring	bool
 P	Area3D	monitorable	bool
@@ -2232,14 +2232,14 @@ F	Area3D	get_reverb_amount	float	0	0
 F	Area3D	set_reverb_uniformity	void	0	0	float
 F	Area3D	get_reverb_uniformity	float	0	0
 E	Area3D	SpaceOverride	0	SPACE_OVERRIDE_DISABLED	0	SPACE_OVERRIDE_COMBINE	1	SPACE_OVERRIDE_COMBINE_REPLACE	2	SPACE_OVERRIDE_REPLACE	3	SPACE_OVERRIDE_REPLACE_COMBINE	4
-P	Area3D	body_shape_entered	Signal
-P	Area3D	body_shape_exited	Signal
-P	Area3D	body_entered	Signal
-P	Area3D	body_exited	Signal
-P	Area3D	area_shape_entered	Signal
-P	Area3D	area_shape_exited	Signal
-P	Area3D	area_entered	Signal
-P	Area3D	area_exited	Signal
+X	Area3D	body_shape_entered	RID	Node3D	int	int
+X	Area3D	body_shape_exited	RID	Node3D	int	int
+X	Area3D	body_entered	Node3D
+X	Area3D	body_exited	Node3D
+X	Area3D	area_shape_entered	RID	Area3D	int	int
+X	Area3D	area_shape_exited	RID	Area3D	int	int
+X	Area3D	area_entered	Area3D
+X	Area3D	area_exited	Area3D
 C	AreaLight3D	Light3D	0
 P	AreaLight3D	area_range	float
 P	AreaLight3D	area_attenuation	float
@@ -2655,8 +2655,8 @@ F	AudioServer	is_stream_registered_as_sample	bool	0	0	AudioStream
 F	AudioServer	register_stream_as_sample	void	0	0	AudioStream
 E	AudioServer	SpeakerMode	0	SPEAKER_MODE_STEREO	0	SPEAKER_SURROUND_31	1	SPEAKER_SURROUND_51	2	SPEAKER_SURROUND_71	3
 E	AudioServer	PlaybackType	0	PLAYBACK_TYPE_DEFAULT	0	PLAYBACK_TYPE_STREAM	1	PLAYBACK_TYPE_SAMPLE	2	PLAYBACK_TYPE_MAX	3
-P	AudioServer	bus_layout_changed	Signal
-P	AudioServer	bus_renamed	Signal
+X	AudioServer	bus_layout_changed
+X	AudioServer	bus_renamed	int	StringName	StringName
 C	AudioStream	Resource	0
 F	AudioStream	_instantiate_playback	AudioStreamPlayback	0	0
 F	AudioStream	_get_stream_name	String	0	0
@@ -2674,7 +2674,7 @@ F	AudioStream	instantiate_playback	AudioStreamPlayback	0	0
 F	AudioStream	can_be_sampled	bool	0	0
 F	AudioStream	generate_sample	AudioSample	0	0
 F	AudioStream	is_meta_stream	bool	0	0
-P	AudioStream	parameter_list_changed	Signal
+X	AudioStream	parameter_list_changed
 C	AudioStreamGenerator	AudioStream	0
 P	AudioStreamGenerator	mix_rate_mode	enum::AudioStreamGenerator.AudioStreamGeneratorMixRate
 P	AudioStreamGenerator	mix_rate	float
@@ -2849,7 +2849,7 @@ F	AudioStreamPlayer	get_stream_playback	AudioStreamPlayback	0	0
 F	AudioStreamPlayer	set_playback_type	void	0	0	enum::AudioServer.PlaybackType
 F	AudioStreamPlayer	get_playback_type	enum::AudioServer.PlaybackType	0	0
 E	AudioStreamPlayer	MixTarget	0	MIX_TARGET_STEREO	0	MIX_TARGET_SURROUND	1	MIX_TARGET_CENTER	2
-P	AudioStreamPlayer	finished	Signal
+X	AudioStreamPlayer	finished
 C	AudioStreamPlayer2D	Node2D	0
 P	AudioStreamPlayer2D	stream	AudioStream
 P	AudioStreamPlayer2D	volume_db	float
@@ -2899,7 +2899,7 @@ F	AudioStreamPlayer2D	has_stream_playback	bool	0	0
 F	AudioStreamPlayer2D	get_stream_playback	AudioStreamPlayback	0	0
 F	AudioStreamPlayer2D	set_playback_type	void	0	0	enum::AudioServer.PlaybackType
 F	AudioStreamPlayer2D	get_playback_type	enum::AudioServer.PlaybackType	0	0
-P	AudioStreamPlayer2D	finished	Signal
+X	AudioStreamPlayer2D	finished
 C	AudioStreamPlayer3D	Node3D	0
 P	AudioStreamPlayer3D	stream	AudioStream
 P	AudioStreamPlayer3D	attenuation_model	enum::AudioStreamPlayer3D.AttenuationModel
@@ -2975,7 +2975,7 @@ F	AudioStreamPlayer3D	set_playback_type	void	0	0	enum::AudioServer.PlaybackType
 F	AudioStreamPlayer3D	get_playback_type	enum::AudioServer.PlaybackType	0	0
 E	AudioStreamPlayer3D	AttenuationModel	0	ATTENUATION_INVERSE_DISTANCE	0	ATTENUATION_INVERSE_SQUARE_DISTANCE	1	ATTENUATION_LOGARITHMIC	2	ATTENUATION_DISABLED	3
 E	AudioStreamPlayer3D	DopplerTracking	0	DOPPLER_TRACKING_DISABLED	0	DOPPLER_TRACKING_IDLE_STEP	1	DOPPLER_TRACKING_PHYSICS_STEP	2
-P	AudioStreamPlayer3D	finished	Signal
+X	AudioStreamPlayer3D	finished
 C	AudioStreamPlaylist	AudioStream	0
 P	AudioStreamPlaylist	shuffle	bool
 P	AudioStreamPlaylist	loop	bool
@@ -3172,10 +3172,10 @@ F	BaseButton	set_button_group	void	0	0	ButtonGroup
 F	BaseButton	get_button_group	ButtonGroup	0	0
 E	BaseButton	DrawMode	0	DRAW_NORMAL	0	DRAW_PRESSED	1	DRAW_HOVER	2	DRAW_DISABLED	3	DRAW_HOVER_PRESSED	4
 E	BaseButton	ActionMode	0	ACTION_MODE_BUTTON_PRESS	0	ACTION_MODE_BUTTON_RELEASE	1
-P	BaseButton	pressed	Signal
-P	BaseButton	button_up	Signal
-P	BaseButton	button_down	Signal
-P	BaseButton	toggled	Signal
+X	BaseButton	pressed
+X	BaseButton	button_up
+X	BaseButton	button_down
+X	BaseButton	toggled	bool
 C	BaseMaterial3D	Material	0
 P	BaseMaterial3D	transparency	enum::BaseMaterial3D.Transparency
 P	BaseMaterial3D	alpha_scissor_threshold	float
@@ -3560,8 +3560,8 @@ F	BoneMap	set_profile	void	0	0	SkeletonProfile
 F	BoneMap	get_skeleton_bone_name	StringName	0	0	StringName
 F	BoneMap	set_skeleton_bone_name	void	0	0	StringName	StringName
 F	BoneMap	find_profile_bone_name	StringName	0	0	StringName
-P	BoneMap	bone_map_updated	Signal
-P	BoneMap	profile_updated	Signal
+X	BoneMap	bone_map_updated
+X	BoneMap	profile_updated
 C	BoneTwistDisperser3D	SkeletonModifier3D	0
 P	BoneTwistDisperser3D	mutable_bone_axes	bool
 P	BoneTwistDisperser3D	setting_count	int
@@ -3676,7 +3676,7 @@ F	ButtonGroup	get_pressed_button	BaseButton	0	0
 F	ButtonGroup	get_buttons	typedarray::BaseButton	0	0
 F	ButtonGroup	set_allow_unpress	void	0	0	bool
 F	ButtonGroup	is_allow_unpress	bool	0	0
-P	ButtonGroup	pressed	Signal
+X	ButtonGroup	pressed	BaseButton
 C	CCDIK3D	IterateIK3D	0
 C	CPUParticles2D	Node2D	0
 P	CPUParticles2D	emitting	bool
@@ -3829,7 +3829,7 @@ E	CPUParticles2D	DrawOrder	0	DRAW_ORDER_INDEX	0	DRAW_ORDER_LIFETIME	1
 E	CPUParticles2D	Parameter	0	PARAM_INITIAL_LINEAR_VELOCITY	0	PARAM_ANGULAR_VELOCITY	1	PARAM_ORBIT_VELOCITY	2	PARAM_LINEAR_ACCEL	3	PARAM_RADIAL_ACCEL	4	PARAM_TANGENTIAL_ACCEL	5	PARAM_DAMPING	6	PARAM_ANGLE	7	PARAM_SCALE	8	PARAM_HUE_VARIATION	9	PARAM_ANIM_SPEED	10	PARAM_ANIM_OFFSET	11	PARAM_MAX	12
 E	CPUParticles2D	ParticleFlags	0	PARTICLE_FLAG_ALIGN_Y_TO_VELOCITY	0	PARTICLE_FLAG_ROTATE_Y	1	PARTICLE_FLAG_DISABLE_Z	2	PARTICLE_FLAG_MAX	3
 E	CPUParticles2D	EmissionShape	0	EMISSION_SHAPE_POINT	0	EMISSION_SHAPE_SPHERE	1	EMISSION_SHAPE_SPHERE_SURFACE	2	EMISSION_SHAPE_RECTANGLE	3	EMISSION_SHAPE_POINTS	4	EMISSION_SHAPE_DIRECTED_POINTS	5	EMISSION_SHAPE_RING	6	EMISSION_SHAPE_MAX	7
-P	CPUParticles2D	finished	Signal
+X	CPUParticles2D	finished
 C	CPUParticles3D	GeometryInstance3D	0
 P	CPUParticles3D	emitting	bool
 P	CPUParticles3D	amount	int
@@ -4002,7 +4002,7 @@ E	CPUParticles3D	DrawOrder	0	DRAW_ORDER_INDEX	0	DRAW_ORDER_LIFETIME	1	DRAW_ORDER
 E	CPUParticles3D	Parameter	0	PARAM_INITIAL_LINEAR_VELOCITY	0	PARAM_ANGULAR_VELOCITY	1	PARAM_ORBIT_VELOCITY	2	PARAM_LINEAR_ACCEL	3	PARAM_RADIAL_ACCEL	4	PARAM_TANGENTIAL_ACCEL	5	PARAM_DAMPING	6	PARAM_ANGLE	7	PARAM_SCALE	8	PARAM_HUE_VARIATION	9	PARAM_ANIM_SPEED	10	PARAM_ANIM_OFFSET	11	PARAM_MAX	12
 E	CPUParticles3D	ParticleFlags	0	PARTICLE_FLAG_ALIGN_Y_TO_VELOCITY	0	PARTICLE_FLAG_ROTATE_Y	1	PARTICLE_FLAG_DISABLE_Z	2	PARTICLE_FLAG_MAX	3
 E	CPUParticles3D	EmissionShape	0	EMISSION_SHAPE_POINT	0	EMISSION_SHAPE_SPHERE	1	EMISSION_SHAPE_SPHERE_SURFACE	2	EMISSION_SHAPE_BOX	3	EMISSION_SHAPE_POINTS	4	EMISSION_SHAPE_DIRECTED_POINTS	5	EMISSION_SHAPE_RING	6	EMISSION_SHAPE_MAX	7
-P	CPUParticles3D	finished	Signal
+X	CPUParticles3D	finished
 C	CSGBox3D	CSGPrimitive3D	0
 P	CSGBox3D	size	Vector3
 P	CSGBox3D	material	BaseMaterial3D,ShaderMaterial
@@ -4418,8 +4418,8 @@ F	CameraFeed	get_formats	Array	0	0
 F	CameraFeed	set_format	bool	0	0	int	Dictionary
 E	CameraFeed	FeedDataType	0	FEED_NOIMAGE	0	FEED_RGB	1	FEED_YCBCR	2	FEED_YCBCR_SEP	3	FEED_EXTERNAL	4
 E	CameraFeed	FeedPosition	0	FEED_UNSPECIFIED	0	FEED_FRONT	1	FEED_BACK	2
-P	CameraFeed	frame_changed	Signal
-P	CameraFeed	format_changed	Signal
+X	CameraFeed	frame_changed
+X	CameraFeed	format_changed
 C	CameraServer	Object	0
 P	CameraServer	monitoring_feeds	bool
 F	CameraServer	set_monitoring_feeds	void	0	0	bool
@@ -4430,9 +4430,9 @@ F	CameraServer	feeds	typedarray::CameraFeed	0	0
 F	CameraServer	add_feed	void	0	0	CameraFeed
 F	CameraServer	remove_feed	void	0	0	CameraFeed
 E	CameraServer	FeedImage	0	FEED_RGBA_IMAGE	0	FEED_YCBCR_IMAGE	0	FEED_Y_IMAGE	0	FEED_CBCR_IMAGE	1
-P	CameraServer	camera_feed_added	Signal
-P	CameraServer	camera_feed_removed	Signal
-P	CameraServer	camera_feeds_updated	Signal
+X	CameraServer	camera_feed_added	int
+X	CameraServer	camera_feed_removed	int
+X	CameraServer	camera_feeds_updated
 C	CameraTexture	Texture2D	0
 P	CameraTexture	camera_feed_id	int
 P	CameraTexture	which_feed	enum::CameraServer.FeedImage
@@ -4575,10 +4575,10 @@ E	CanvasItem	TextureFilter	0	TEXTURE_FILTER_PARENT_NODE	0	TEXTURE_FILTER_NEAREST
 E	CanvasItem	TextureRepeat	0	TEXTURE_REPEAT_PARENT_NODE	0	TEXTURE_REPEAT_DISABLED	1	TEXTURE_REPEAT_ENABLED	2	TEXTURE_REPEAT_MIRROR	3	TEXTURE_REPEAT_MAX	4
 E	CanvasItem	ClipChildrenMode	0	CLIP_CHILDREN_DISABLED	0	CLIP_CHILDREN_ONLY	1	CLIP_CHILDREN_AND_DRAW	2	CLIP_CHILDREN_MAX	3
 E	CanvasItem	OversamplingWithScale	0	OVERSAMPLING_WITH_SCALE_PARENT_NODE	0	OVERSAMPLING_WITH_SCALE_DISABLED	1	OVERSAMPLING_WITH_SCALE_ENABLED	2	OVERSAMPLING_WITH_SCALE_MAX	3
-P	CanvasItem	draw	Signal
-P	CanvasItem	visibility_changed	Signal
-P	CanvasItem	hidden	Signal
-P	CanvasItem	item_rect_changed	Signal
+X	CanvasItem	draw
+X	CanvasItem	visibility_changed
+X	CanvasItem	hidden
+X	CanvasItem	item_rect_changed
 C	CanvasItemMaterial	Material	0
 P	CanvasItemMaterial	blend_mode	enum::CanvasItemMaterial.BlendMode
 P	CanvasItemMaterial	light_mode	enum::CanvasItemMaterial.LightMode
@@ -4632,7 +4632,7 @@ F	CanvasLayer	get_follow_viewport_scale	float	0	0
 F	CanvasLayer	set_custom_viewport	void	0	0	Node
 F	CanvasLayer	get_custom_viewport	Node	0	0
 F	CanvasLayer	get_canvas	RID	0	0
-P	CanvasLayer	visibility_changed	Signal
+X	CanvasLayer	visibility_changed
 C	CanvasModulate	Node2D	0
 P	CanvasModulate	color	Color
 F	CanvasModulate	set_color	void	0	0	Color
@@ -5067,11 +5067,11 @@ F	CodeEdit	duplicate_selection	void	0	0
 F	CodeEdit	duplicate_lines	void	0	0
 E	CodeEdit	CodeCompletionKind	0	KIND_CLASS	0	KIND_FUNCTION	1	KIND_SIGNAL	2	KIND_VARIABLE	3	KIND_MEMBER	4	KIND_ENUM	5	KIND_CONSTANT	6	KIND_NODE_PATH	7	KIND_FILE_PATH	8	KIND_PLAIN_TEXT	9	KIND_KEYWORD	10
 E	CodeEdit	CodeCompletionLocation	0	LOCATION_LOCAL	0	LOCATION_PARENT_MASK	256	LOCATION_OTHER_USER_CODE	512	LOCATION_OTHER	1024
-P	CodeEdit	breakpoint_toggled	Signal
-P	CodeEdit	code_completion_requested	Signal
-P	CodeEdit	symbol_lookup	Signal
-P	CodeEdit	symbol_validate	Signal
-P	CodeEdit	symbol_hovered	Signal
+X	CodeEdit	breakpoint_toggled	int
+X	CodeEdit	code_completion_requested
+X	CodeEdit	symbol_lookup	String	int	int
+X	CodeEdit	symbol_validate	String
+X	CodeEdit	symbol_hovered	String	int	int
 C	CodeHighlighter	SyntaxHighlighter	0
 P	CodeHighlighter	number_color	Color
 P	CodeHighlighter	symbol_color	Color
@@ -5156,11 +5156,11 @@ F	CollisionObject2D	shape_owner_remove_shape	void	0	0	int	int
 F	CollisionObject2D	shape_owner_clear_shapes	void	0	0	int
 F	CollisionObject2D	shape_find_owner	int	0	0	int
 E	CollisionObject2D	DisableMode	0	DISABLE_MODE_REMOVE	0	DISABLE_MODE_MAKE_STATIC	1	DISABLE_MODE_KEEP_ACTIVE	2
-P	CollisionObject2D	input_event	Signal
-P	CollisionObject2D	mouse_entered	Signal
-P	CollisionObject2D	mouse_exited	Signal
-P	CollisionObject2D	mouse_shape_entered	Signal
-P	CollisionObject2D	mouse_shape_exited	Signal
+X	CollisionObject2D	input_event	Node	InputEvent	int
+X	CollisionObject2D	mouse_entered
+X	CollisionObject2D	mouse_exited
+X	CollisionObject2D	mouse_shape_entered	int
+X	CollisionObject2D	mouse_shape_exited	int
 C	CollisionObject3D	Node3D	0
 P	CollisionObject3D	disable_mode	enum::CollisionObject3D.DisableMode
 P	CollisionObject3D	collision_layer	int
@@ -5204,9 +5204,9 @@ F	CollisionObject3D	shape_owner_remove_shape	void	0	0	int	int
 F	CollisionObject3D	shape_owner_clear_shapes	void	0	0	int
 F	CollisionObject3D	shape_find_owner	int	0	0	int
 E	CollisionObject3D	DisableMode	0	DISABLE_MODE_REMOVE	0	DISABLE_MODE_MAKE_STATIC	1	DISABLE_MODE_KEEP_ACTIVE	2
-P	CollisionObject3D	input_event	Signal
-P	CollisionObject3D	mouse_entered	Signal
-P	CollisionObject3D	mouse_exited	Signal
+X	CollisionObject3D	input_event	Node	InputEvent	Vector3	Vector3	int
+X	CollisionObject3D	mouse_entered
+X	CollisionObject3D	mouse_exited
 C	CollisionPolygon2D	Node2D	0
 P	CollisionPolygon2D	build_mode	enum::CollisionPolygon2D.BuildMode
 P	CollisionPolygon2D	polygon	PackedVector2Array
@@ -5329,9 +5329,9 @@ F	ColorPicker	set_picker_shape	void	0	0	enum::ColorPicker.PickerShapeType
 F	ColorPicker	get_picker_shape	enum::ColorPicker.PickerShapeType	0	0
 E	ColorPicker	ColorModeType	0	MODE_RGB	0	MODE_HSV	1	MODE_RAW	2	MODE_LINEAR	2	MODE_OKHSL	3
 E	ColorPicker	PickerShapeType	0	SHAPE_HSV_RECTANGLE	0	SHAPE_HSV_WHEEL	1	SHAPE_VHS_CIRCLE	2	SHAPE_OKHSL_CIRCLE	3	SHAPE_NONE	4	SHAPE_OK_HS_RECTANGLE	5	SHAPE_OK_HL_RECTANGLE	6
-P	ColorPicker	color_changed	Signal
-P	ColorPicker	preset_added	Signal
-P	ColorPicker	preset_removed	Signal
+X	ColorPicker	color_changed	Color
+X	ColorPicker	preset_added	Color
+X	ColorPicker	preset_removed	Color
 C	ColorPickerButton	Button	0
 P	ColorPickerButton	color	Color
 P	ColorPickerButton	edit_alpha	bool
@@ -5344,9 +5344,9 @@ F	ColorPickerButton	set_edit_alpha	void	0	0	bool
 F	ColorPickerButton	is_editing_alpha	bool	0	0
 F	ColorPickerButton	set_edit_intensity	void	0	0	bool
 F	ColorPickerButton	is_editing_intensity	bool	0	0
-P	ColorPickerButton	color_changed	Signal
-P	ColorPickerButton	popup_closed	Signal
-P	ColorPickerButton	picker_created	Signal
+X	ColorPickerButton	color_changed	Color
+X	ColorPickerButton	popup_closed
+X	ColorPickerButton	picker_created
 C	ColorRect	Control	0
 P	ColorRect	color	Color
 F	ColorRect	set_color	void	0	0	Color
@@ -5447,8 +5447,8 @@ F	Container	set_accessibility_region	void	0	0	bool
 F	Container	is_accessibility_region	bool	0	0
 K	Container	NOTIFICATIONPRESORTCHILDREN	int
 K	Container	NOTIFICATIONSORTCHILDREN	int
-P	Container	pre_sort_children	Signal
-P	Container	sort_children	Signal
+X	Container	pre_sort_children
+X	Container	sort_children
 C	Control	CanvasItem	0
 P	Control	custom_minimum_size	Vector2
 P	Control	custom_maximum_size	Vector2
@@ -5731,16 +5731,16 @@ E	Control	GrowDirection	0	GROW_DIRECTION_BEGIN	0	GROW_DIRECTION_END	1	GROW_DIREC
 E	Control	Anchor	0	ANCHOR_BEGIN	0	ANCHOR_END	1
 E	Control	LayoutDirection	0	LAYOUT_DIRECTION_INHERITED	0	LAYOUT_DIRECTION_APPLICATION_LOCALE	1	LAYOUT_DIRECTION_LTR	2	LAYOUT_DIRECTION_RTL	3	LAYOUT_DIRECTION_SYSTEM_LOCALE	4	LAYOUT_DIRECTION_MAX	5	LAYOUT_DIRECTION_LOCALE	1
 E	Control	TextDirection	0	TEXT_DIRECTION_INHERITED	3	TEXT_DIRECTION_AUTO	0	TEXT_DIRECTION_LTR	1	TEXT_DIRECTION_RTL	2
-P	Control	resized	Signal
-P	Control	gui_input	Signal
-P	Control	mouse_entered	Signal
-P	Control	mouse_exited	Signal
-P	Control	focus_entered	Signal
-P	Control	focus_exited	Signal
-P	Control	size_flags_changed	Signal
-P	Control	maximum_size_changed	Signal
-P	Control	minimum_size_changed	Signal
-P	Control	theme_changed	Signal
+X	Control	resized
+X	Control	gui_input	InputEvent
+X	Control	mouse_entered
+X	Control	mouse_exited
+X	Control	focus_entered
+X	Control	focus_exited
+X	Control	size_flags_changed
+X	Control	maximum_size_changed
+X	Control	minimum_size_changed
+X	Control	theme_changed
 C	ConvertTransformModifier3D	BoneConstraint3D	0
 P	ConvertTransformModifier3D	setting_count	int
 F	ConvertTransformModifier3D	set_apply_transform_mode	void	0	0	int	enum::ConvertTransformModifier3D.TransformMode
@@ -5865,8 +5865,8 @@ F	Curve	bake	void	0	0
 F	Curve	get_bake_resolution	int	0	0
 F	Curve	set_bake_resolution	void	0	0	int
 E	Curve	TangentMode	0	TANGENT_FREE	0	TANGENT_LINEAR	1	TANGENT_MODE_COUNT	2
-P	Curve	range_changed	Signal
-P	Curve	domain_changed	Signal
+X	Curve	range_changed
+X	Curve	domain_changed
 C	Curve2D	Resource	0
 P	Curve2D	bake_interval	float
 P	Curve2D	point_count	int
@@ -6444,7 +6444,7 @@ E	DisplayServer	WindowResizeEdge	0	WINDOW_EDGE_TOP_LEFT	0	WINDOW_EDGE_TOP	1	WIND
 E	DisplayServer	VSyncMode	0	VSYNC_DISABLED	0	VSYNC_ENABLED	1	VSYNC_ADAPTIVE	2	VSYNC_MAILBOX	3
 E	DisplayServer	HandleType	0	DISPLAY_HANDLE	0	WINDOW_HANDLE	1	WINDOW_VIEW	2	OPENGL_CONTEXT	3	EGL_DISPLAY	4	EGL_CONFIG	5	GLX_VISUALID	6	GLX_FBCONFIG	7
 E	DisplayServer	TTSUtteranceEvent	0	TTS_UTTERANCE_STARTED	0	TTS_UTTERANCE_ENDED	1	TTS_UTTERANCE_CANCELED	2	TTS_UTTERANCE_BOUNDARY	3
-P	DisplayServer	orientation_changed	Signal
+X	DisplayServer	orientation_changed	int
 C	DrawableTexture2D	Texture2D	0
 F	DrawableTexture2D	set_format	void	0	0	enum::DrawableTexture2D.DrawableFormat
 F	DrawableTexture2D	set_use_mipmaps	void	0	0	bool
@@ -6536,10 +6536,10 @@ F	EditorDebuggerSession	is_active	bool	0	0
 F	EditorDebuggerSession	add_session_tab	void	0	0	Control
 F	EditorDebuggerSession	remove_session_tab	void	0	0	Control
 F	EditorDebuggerSession	set_breakpoint	void	0	0	String	int	bool
-P	EditorDebuggerSession	started	Signal
-P	EditorDebuggerSession	stopped	Signal
-P	EditorDebuggerSession	breaked	Signal
-P	EditorDebuggerSession	continued	Signal
+X	EditorDebuggerSession	started
+X	EditorDebuggerSession	stopped
+X	EditorDebuggerSession	breaked	bool
+X	EditorDebuggerSession	continued
 C	EditorDock	MarginContainer	0
 P	EditorDock	title	String
 P	EditorDock	layout_key	String
@@ -6583,8 +6583,8 @@ F	EditorDock	set_default_slot	void	0	0	enum::EditorDock.DockSlot
 F	EditorDock	get_default_slot	enum::EditorDock.DockSlot	0	0
 F	EditorDock	set_available_layouts	void	0	0	bitfield::EditorDock.DockLayout
 F	EditorDock	get_available_layouts	bitfield::EditorDock.DockLayout	0	0
-P	EditorDock	opened	Signal
-P	EditorDock	closed	Signal
+X	EditorDock	opened
+X	EditorDock	closed
 C	EditorExportPlatform	RefCounted	0
 F	EditorExportPlatform	get_os_name	String	0	0
 F	EditorExportPlatform	create_preset	EditorExportPreset	0	0
@@ -6760,12 +6760,12 @@ F	EditorFileSystem	update_file	void	0	0	String
 F	EditorFileSystem	get_filesystem_path	EditorFileSystemDirectory	0	0	String
 F	EditorFileSystem	get_file_type	String	0	0	String
 F	EditorFileSystem	reimport_files	void	0	0	PackedStringArray
-P	EditorFileSystem	filesystem_changed	Signal
-P	EditorFileSystem	script_classes_updated	Signal
-P	EditorFileSystem	sources_changed	Signal
-P	EditorFileSystem	resources_reimporting	Signal
-P	EditorFileSystem	resources_reimported	Signal
-P	EditorFileSystem	resources_reload	Signal
+X	EditorFileSystem	filesystem_changed
+X	EditorFileSystem	script_classes_updated
+X	EditorFileSystem	sources_changed	bool
+X	EditorFileSystem	resources_reimporting	PackedStringArray
+X	EditorFileSystem	resources_reimported	PackedStringArray
+X	EditorFileSystem	resources_reload	PackedStringArray
 C	EditorFileSystemDirectory	Object	0
 F	EditorFileSystemDirectory	get_subdir_count	int	0	0
 F	EditorFileSystemDirectory	get_subdir	EditorFileSystemDirectory	0	0	int
@@ -6810,15 +6810,15 @@ F	EditorInspector	expand_all_folding	void	0	0
 F	EditorInspector	expand_revertable	void	0	0
 F	EditorInspector	instantiate_property_editor	EditorProperty	1	0	Object	enum::Variant.Type	String	enum::PropertyHint	String	int	bool?
 F	EditorInspector	create_default_inspector	EditorInspector	1	0	LineEdit?
-P	EditorInspector	property_selected	Signal
-P	EditorInspector	property_keyed	Signal
-P	EditorInspector	property_deleted	Signal
-P	EditorInspector	resource_selected	Signal
-P	EditorInspector	object_id_selected	Signal
-P	EditorInspector	property_edited	Signal
-P	EditorInspector	property_toggled	Signal
-P	EditorInspector	edited_object_changed	Signal
-P	EditorInspector	restart_requested	Signal
+X	EditorInspector	property_selected	String
+X	EditorInspector	property_keyed	String	Variant	bool
+X	EditorInspector	property_deleted	String
+X	EditorInspector	resource_selected	Resource	String
+X	EditorInspector	object_id_selected	int
+X	EditorInspector	property_edited	String
+X	EditorInspector	property_toggled	String	bool
+X	EditorInspector	edited_object_changed
+X	EditorInspector	restart_requested
 C	EditorInspectorPlugin	RefCounted	0
 F	EditorInspectorPlugin	_can_handle	bool	0	0	Object
 F	EditorInspectorPlugin	_parse_begin	void	0	0	Object
@@ -7038,12 +7038,12 @@ F	EditorPlugin	get_script_create_dialog	ScriptCreateDialog	0	0
 F	EditorPlugin	add_debugger_plugin	void	0	0	EditorDebuggerPlugin
 F	EditorPlugin	remove_debugger_plugin	void	0	0	EditorDebuggerPlugin
 F	EditorPlugin	get_plugin_version	String	0	0
-P	EditorPlugin	scene_changed	Signal
-P	EditorPlugin	scene_closed	Signal
-P	EditorPlugin	main_screen_changed	Signal
-P	EditorPlugin	resource_saved	Signal
-P	EditorPlugin	scene_saved	Signal
-P	EditorPlugin	project_settings_changed	Signal
+X	EditorPlugin	scene_changed	Node
+X	EditorPlugin	scene_closed	String
+X	EditorPlugin	main_screen_changed	String
+X	EditorPlugin	resource_saved	Resource
+X	EditorPlugin	scene_saved	String
+X	EditorPlugin	project_settings_changed
 C	EditorProperty	Container	0
 P	EditorProperty	label	String
 P	EditorProperty	read_only	bool
@@ -7094,19 +7094,19 @@ F	EditorProperty	select	void	0	0	int?
 F	EditorProperty	set_object_and_property	void	0	0	Object	StringName
 F	EditorProperty	set_label_reference	void	0	0	Control
 F	EditorProperty	emit_changed	void	0	0	StringName	Variant	StringName?	bool?
-P	EditorProperty	property_changed	Signal
-P	EditorProperty	multiple_properties_changed	Signal
-P	EditorProperty	property_keyed	Signal
-P	EditorProperty	property_deleted	Signal
-P	EditorProperty	property_keyed_with_value	Signal
-P	EditorProperty	property_checked	Signal
-P	EditorProperty	property_overridden	Signal
-P	EditorProperty	property_favorited	Signal
-P	EditorProperty	property_pinned	Signal
-P	EditorProperty	property_can_revert_changed	Signal
-P	EditorProperty	resource_selected	Signal
-P	EditorProperty	object_id_selected	Signal
-P	EditorProperty	selected	Signal
+X	EditorProperty	property_changed	StringName	Variant	StringName	bool
+X	EditorProperty	multiple_properties_changed	PackedStringArray	Array
+X	EditorProperty	property_keyed	StringName
+X	EditorProperty	property_deleted	StringName
+X	EditorProperty	property_keyed_with_value	StringName	Variant
+X	EditorProperty	property_checked	StringName	bool
+X	EditorProperty	property_overridden
+X	EditorProperty	property_favorited	StringName	bool
+X	EditorProperty	property_pinned	StringName	bool
+X	EditorProperty	property_can_revert_changed	StringName	bool
+X	EditorProperty	resource_selected	String	Resource
+X	EditorProperty	object_id_selected	StringName	int
+X	EditorProperty	selected	String	int
 C	EditorResourceConversionPlugin	RefCounted	0
 F	EditorResourceConversionPlugin	_converts_to	String	0	0
 F	EditorResourceConversionPlugin	_handles	bool	0	0	Resource
@@ -7128,15 +7128,15 @@ F	EditorResourcePicker	is_toggle_mode	bool	0	0
 F	EditorResourcePicker	set_toggle_pressed	void	0	0	bool
 F	EditorResourcePicker	set_editable	void	0	0	bool
 F	EditorResourcePicker	is_editable	bool	0	0
-P	EditorResourcePicker	resource_selected	Signal
-P	EditorResourcePicker	resource_changed	Signal
+X	EditorResourcePicker	resource_selected	Resource	bool
+X	EditorResourcePicker	resource_changed	Resource
 C	EditorResourcePreview	Node	0
 F	EditorResourcePreview	queue_resource_preview	void	0	0	String	Object	StringName	Variant
 F	EditorResourcePreview	queue_edited_resource_preview	void	0	0	Resource	Object	StringName	Variant
 F	EditorResourcePreview	add_preview_generator	void	0	0	EditorResourcePreviewGenerator
 F	EditorResourcePreview	remove_preview_generator	void	0	0	EditorResourcePreviewGenerator
 F	EditorResourcePreview	check_for_invalidation	void	0	0	String
-P	EditorResourcePreview	preview_invalidated	Signal
+X	EditorResourcePreview	preview_invalidated	String
 C	EditorResourcePreviewGenerator	RefCounted	0
 F	EditorResourcePreviewGenerator	_handles	bool	0	0	String
 F	EditorResourcePreviewGenerator	_generate	Texture2D	0	0	Resource	Vector2i	Dictionary
@@ -7190,7 +7190,7 @@ F	EditorSelection	remove_node	void	0	0	Node
 F	EditorSelection	get_selected_nodes	typedarray::Node	0	0
 F	EditorSelection	get_top_selected_nodes	typedarray::Node	0	0
 F	EditorSelection	get_transformable_selected_nodes	typedarray::Node	0	0
-P	EditorSelection	selection_changed	Signal
+X	EditorSelection	selection_changed
 C	EditorSettings	Resource	0
 F	EditorSettings	has_setting	bool	0	0	String
 F	EditorSettings	set_setting	void	0	0	String	Variant
@@ -7215,7 +7215,7 @@ F	EditorSettings	check_changed_settings_in_group	bool	0	0	String
 F	EditorSettings	get_changed_settings	PackedStringArray	0	0
 F	EditorSettings	mark_setting_changed	void	0	0	String
 K	EditorSettings	NOTIFICATIONEDITORSETTINGSCHANGED	int
-P	EditorSettings	settings_changed	Signal
+X	EditorSettings	settings_changed
 C	EditorSpinSlider	Range	0
 P	EditorSpinSlider	label	String
 P	EditorSpinSlider	suffix	String
@@ -7241,11 +7241,11 @@ F	EditorSpinSlider	set_editing_integer	void	0	0	bool
 F	EditorSpinSlider	is_editing_integer	bool	0	0
 F	EditorSpinSlider	set_deferred_drag_mode_enabled	void	0	0	bool?
 F	EditorSpinSlider	is_deferred_drag_mode_enabled	bool	0	0
-P	EditorSpinSlider	grabbed	Signal
-P	EditorSpinSlider	ungrabbed	Signal
-P	EditorSpinSlider	updown_pressed	Signal
-P	EditorSpinSlider	value_focus_entered	Signal
-P	EditorSpinSlider	value_focus_exited	Signal
+X	EditorSpinSlider	grabbed
+X	EditorSpinSlider	ungrabbed
+X	EditorSpinSlider	updown_pressed
+X	EditorSpinSlider	value_focus_entered
+X	EditorSpinSlider	value_focus_exited
 C	EditorSyntaxHighlighter	SyntaxHighlighter	0
 F	EditorSyntaxHighlighter	_get_name	String	0	0
 F	EditorSyntaxHighlighter	_get_supported_languages	PackedStringArray	0	0
@@ -7270,8 +7270,8 @@ F	EditorUndoRedoManager	add_undo_reference	void	0	0	Object
 F	EditorUndoRedoManager	get_object_history_id	int	0	0	Object
 F	EditorUndoRedoManager	get_history_undo_redo	UndoRedo	0	0	int
 F	EditorUndoRedoManager	clear_history	void	0	0	int?	bool?
-P	EditorUndoRedoManager	history_changed	Signal
-P	EditorUndoRedoManager	version_changed	Signal
+X	EditorUndoRedoManager	history_changed
+X	EditorUndoRedoManager	version_changed
 C	EditorVCSInterface	Object	0
 F	EditorVCSInterface	_initialize	bool	0	0	String
 F	EditorVCSInterface	_set_credentials	void	0	0	String	String	String	String	String
@@ -7911,24 +7911,24 @@ E	FileDialog	FileMode	0	FILE_MODE_OPEN_FILE	0	FILE_MODE_OPEN_FILES	1	FILE_MODE_O
 E	FileDialog	Access	0	ACCESS_RESOURCES	0	ACCESS_USERDATA	1	ACCESS_FILESYSTEM	2
 E	FileDialog	DisplayMode	0	DISPLAY_THUMBNAILS	0	DISPLAY_LIST	1
 E	FileDialog	Customization	0	CUSTOMIZATION_HIDDEN_FILES	0	CUSTOMIZATION_CREATE_FOLDER	1	CUSTOMIZATION_FILE_FILTER	2	CUSTOMIZATION_FILE_SORT	3	CUSTOMIZATION_FAVORITES	4	CUSTOMIZATION_RECENT	5	CUSTOMIZATION_LAYOUT	6	CUSTOMIZATION_OVERWRITE_WARNING	7	CUSTOMIZATION_DELETE	8
-P	FileDialog	file_selected	Signal
-P	FileDialog	files_selected	Signal
-P	FileDialog	dir_selected	Signal
-P	FileDialog	filename_filter_changed	Signal
+X	FileDialog	file_selected	String
+X	FileDialog	files_selected	PackedStringArray
+X	FileDialog	dir_selected	String
+X	FileDialog	filename_filter_changed	String
 C	FileSystemDock	EditorDock	0
 F	FileSystemDock	navigate_to_path	void	0	0	String
 F	FileSystemDock	add_resource_tooltip_plugin	void	0	0	EditorResourceTooltipPlugin
 F	FileSystemDock	remove_resource_tooltip_plugin	void	0	0	EditorResourceTooltipPlugin
-P	FileSystemDock	inherit	Signal
-P	FileSystemDock	instantiate	Signal
-P	FileSystemDock	resource_removed	Signal
-P	FileSystemDock	file_removed	Signal
-P	FileSystemDock	folder_removed	Signal
-P	FileSystemDock	files_moved	Signal
-P	FileSystemDock	folder_moved	Signal
-P	FileSystemDock	folder_color_changed	Signal
-P	FileSystemDock	selection_changed	Signal
-P	FileSystemDock	display_mode_changed	Signal
+X	FileSystemDock	inherit	String
+X	FileSystemDock	instantiate	PackedStringArray
+X	FileSystemDock	resource_removed	Resource
+X	FileSystemDock	file_removed	String
+X	FileSystemDock	folder_removed	String
+X	FileSystemDock	files_moved	String	String
+X	FileSystemDock	folder_moved	String	String
+X	FileSystemDock	folder_color_changed
+X	FileSystemDock	selection_changed
+X	FileSystemDock	display_mode_changed
 C	FlowContainer	Container	0
 P	FlowContainer	alignment	enum::FlowContainer.AlignmentMode
 P	FlowContainer	last_wrap_alignment	enum::FlowContainer.LastWrapAlignmentMode
@@ -8004,14 +8004,14 @@ F	FoldableContainer	get_title_position	enum::FoldableContainer.TitlePosition	0	0
 F	FoldableContainer	add_title_bar_control	void	0	0	Control
 F	FoldableContainer	remove_title_bar_control	void	0	0	Control
 E	FoldableContainer	TitlePosition	0	POSITION_TOP	0	POSITION_BOTTOM	1
-P	FoldableContainer	folding_changed	Signal
+X	FoldableContainer	folding_changed	bool
 C	FoldableGroup	Resource	0
 P	FoldableGroup	allow_folding_all	bool
 F	FoldableGroup	get_expanded_container	FoldableContainer	0	0
 F	FoldableGroup	get_containers	typedarray::FoldableContainer	0	0
 F	FoldableGroup	set_allow_folding_all	void	0	0	bool
 F	FoldableGroup	is_allow_folding_all	bool	0	0
-P	FoldableGroup	expanded	Signal
+X	FoldableGroup	expanded	FoldableContainer
 C	Font	Resource	0
 P	Font	fallbacks	typedarray::24/17:Font
 F	Font	set_fallbacks	void	0	0	typedarray::Font
@@ -8227,9 +8227,9 @@ F	GDExtensionManager	is_extension_loaded	bool	0	0	String
 F	GDExtensionManager	get_loaded_extensions	PackedStringArray	0	0
 F	GDExtensionManager	get_extension	GDExtension	0	0	String
 E	GDExtensionManager	LoadStatus	0	LOAD_STATUS_OK	0	LOAD_STATUS_FAILED	1	LOAD_STATUS_ALREADY_LOADED	2	LOAD_STATUS_NOT_LOADED	3	LOAD_STATUS_NEEDS_RESTART	4
-P	GDExtensionManager	extensions_reloaded	Signal
-P	GDExtensionManager	extension_loaded	Signal
-P	GDExtensionManager	extension_unloading	Signal
+X	GDExtensionManager	extensions_reloaded
+X	GDExtensionManager	extension_loaded	GDExtension
+X	GDExtensionManager	extension_unloading	GDExtension
 C	GDScript	Script	0
 F	GDScript	get_symbol_help	Dictionary	0	0	String	String	Object?
 F	GDScript	new	Variant	0	1
@@ -8886,7 +8886,7 @@ F	GPUParticles2D	set_seed	void	0	0	int
 F	GPUParticles2D	get_seed	int	0	0
 E	GPUParticles2D	DrawOrder	0	DRAW_ORDER_INDEX	0	DRAW_ORDER_LIFETIME	1	DRAW_ORDER_REVERSE_LIFETIME	2
 E	GPUParticles2D	EmitFlags	0	EMIT_FLAG_POSITION	1	EMIT_FLAG_ROTATION_SCALE	2	EMIT_FLAG_VELOCITY	4	EMIT_FLAG_COLOR	8	EMIT_FLAG_CUSTOM	16
-P	GPUParticles2D	finished	Signal
+X	GPUParticles2D	finished
 C	GPUParticles3D	GeometryInstance3D	0
 P	GPUParticles3D	emitting	bool
 P	GPUParticles3D	amount	int
@@ -8987,7 +8987,7 @@ K	GPUParticles3D	MAXDRAWPASSES	int
 E	GPUParticles3D	DrawOrder	0	DRAW_ORDER_INDEX	0	DRAW_ORDER_LIFETIME	1	DRAW_ORDER_REVERSE_LIFETIME	2	DRAW_ORDER_VIEW_DEPTH	3
 E	GPUParticles3D	EmitFlags	0	EMIT_FLAG_POSITION	1	EMIT_FLAG_ROTATION_SCALE	2	EMIT_FLAG_VELOCITY	4	EMIT_FLAG_COLOR	8	EMIT_FLAG_CUSTOM	16
 E	GPUParticles3D	TransformAlign	0	TRANSFORM_ALIGN_DISABLED	0	TRANSFORM_ALIGN_Z_BILLBOARD	1	TRANSFORM_ALIGN_Y_TO_VELOCITY	2	TRANSFORM_ALIGN_Z_BILLBOARD_Y_TO_VELOCITY	3	TRANSFORM_ALIGN_LOCAL_BILLBOARD	4
-P	GPUParticles3D	finished	Signal
+X	GPUParticles3D	finished
 C	GPUParticlesAttractor3D	VisualInstance3D	0
 P	GPUParticlesAttractor3D	strength	float
 P	GPUParticlesAttractor3D	attenuation	float
@@ -9354,25 +9354,25 @@ F	GraphEdit	arrange_nodes	void	0	0
 F	GraphEdit	set_selected	void	0	0	Node
 E	GraphEdit	PanningScheme	0	SCROLL_ZOOMS	0	SCROLL_PANS	1
 E	GraphEdit	GridPattern	0	GRID_PATTERN_LINES	0	GRID_PATTERN_DOTS	1
-P	GraphEdit	connection_request	Signal
-P	GraphEdit	disconnection_request	Signal
-P	GraphEdit	connection_to_empty	Signal
-P	GraphEdit	connection_from_empty	Signal
-P	GraphEdit	connection_drag_started	Signal
-P	GraphEdit	connection_drag_ended	Signal
-P	GraphEdit	copy_nodes_request	Signal
-P	GraphEdit	cut_nodes_request	Signal
-P	GraphEdit	paste_nodes_request	Signal
-P	GraphEdit	duplicate_nodes_request	Signal
-P	GraphEdit	delete_nodes_request	Signal
-P	GraphEdit	node_selected	Signal
-P	GraphEdit	node_deselected	Signal
-P	GraphEdit	frame_rect_changed	Signal
-P	GraphEdit	popup_request	Signal
-P	GraphEdit	begin_node_move	Signal
-P	GraphEdit	end_node_move	Signal
-P	GraphEdit	graph_elements_linked_to_frame_request	Signal
-P	GraphEdit	scroll_offset_changed	Signal
+X	GraphEdit	connection_request	StringName	int	StringName	int
+X	GraphEdit	disconnection_request	StringName	int	StringName	int
+X	GraphEdit	connection_to_empty	StringName	int	Vector2
+X	GraphEdit	connection_from_empty	StringName	int	Vector2
+X	GraphEdit	connection_drag_started	StringName	int	bool
+X	GraphEdit	connection_drag_ended
+X	GraphEdit	copy_nodes_request
+X	GraphEdit	cut_nodes_request
+X	GraphEdit	paste_nodes_request
+X	GraphEdit	duplicate_nodes_request
+X	GraphEdit	delete_nodes_request	typedarray::StringName
+X	GraphEdit	node_selected	Node
+X	GraphEdit	node_deselected	Node
+X	GraphEdit	frame_rect_changed	GraphFrame	Rect2
+X	GraphEdit	popup_request	Vector2
+X	GraphEdit	begin_node_move
+X	GraphEdit	end_node_move
+X	GraphEdit	graph_elements_linked_to_frame_request	Array	StringName
+X	GraphEdit	scroll_offset_changed	Vector2
 C	GraphElement	Container	0
 P	GraphElement	position_offset	Vector2
 P	GraphElement	resizable	bool
@@ -9392,14 +9392,14 @@ F	GraphElement	set_scaling_menus	void	0	0	bool
 F	GraphElement	is_scaling_menus	bool	0	0
 F	GraphElement	set_position_offset	void	0	0	Vector2
 F	GraphElement	get_position_offset	Vector2	0	0
-P	GraphElement	node_selected	Signal
-P	GraphElement	node_deselected	Signal
-P	GraphElement	raise_request	Signal
-P	GraphElement	delete_request	Signal
-P	GraphElement	resize_request	Signal
-P	GraphElement	resize_end	Signal
-P	GraphElement	dragged	Signal
-P	GraphElement	position_offset_changed	Signal
+X	GraphElement	node_selected
+X	GraphElement	node_deselected
+X	GraphElement	raise_request
+X	GraphElement	delete_request
+X	GraphElement	resize_request	Vector2
+X	GraphElement	resize_end	Vector2
+X	GraphElement	dragged	Vector2	Vector2
+X	GraphElement	position_offset_changed
 C	GraphFrame	GraphElement	0
 P	GraphFrame	title	String
 P	GraphFrame	autoshrink_enabled	bool
@@ -9420,7 +9420,7 @@ F	GraphFrame	set_tint_color_enabled	void	0	0	bool
 F	GraphFrame	is_tint_color_enabled	bool	0	0
 F	GraphFrame	set_tint_color	void	0	0	Color
 F	GraphFrame	get_tint_color	Color	0	0
-P	GraphFrame	autoshrink_changed	Signal
+X	GraphFrame	autoshrink_changed
 C	GraphNode	GraphElement	0
 P	GraphNode	title	String
 P	GraphNode	ignore_invalid_connection_type	bool
@@ -9468,8 +9468,8 @@ F	GraphNode	get_output_port_position	Vector2	0	0	int
 F	GraphNode	get_output_port_type	int	0	0	int
 F	GraphNode	get_output_port_color	Color	0	0	int
 F	GraphNode	get_output_port_slot	int	0	0	int
-P	GraphNode	slot_updated	Signal
-P	GraphNode	slot_sizes_changed	Signal
+X	GraphNode	slot_updated	int
+X	GraphNode	slot_sizes_changed
 C	GridContainer	Container	0
 P	GridContainer	columns	int
 F	GridContainer	set_columns	void	0	0	int
@@ -9546,8 +9546,8 @@ F	GridMap	clear_baked_meshes	void	0	0
 F	GridMap	make_baked_meshes	void	0	0	bool?	float?
 K	GridMap	INVALIDCELLITEM	int
 E	GridMap	DebugVisibilityMode	0	DEBUG_VISIBILITY_MODE_DEFAULT	0	DEBUG_VISIBILITY_MODE_FORCE_SHOW	1	DEBUG_VISIBILITY_MODE_FORCE_HIDE	2
-P	GridMap	cell_size_changed	Signal
-P	GridMap	changed	Signal
+X	GridMap	cell_size_changed	Vector3
+X	GridMap	changed
 C	GridMapEditorPlugin	EditorPlugin	0
 F	GridMapEditorPlugin	get_current_grid_map	GridMap	0	0
 F	GridMapEditorPlugin	set_selection	void	0	0	Vector3i	Vector3i
@@ -9635,7 +9635,7 @@ F	HTTPRequest	get_download_chunk_size	int	0	0
 F	HTTPRequest	set_http_proxy	void	0	0	String	int
 F	HTTPRequest	set_https_proxy	void	0	0	String	int
 E	HTTPRequest	Result	0	RESULT_SUCCESS	0	RESULT_CHUNKED_BODY_SIZE_MISMATCH	1	RESULT_CANT_CONNECT	2	RESULT_CANT_RESOLVE	3	RESULT_CONNECTION_ERROR	4	RESULT_TLS_HANDSHAKE_ERROR	5	RESULT_NO_RESPONSE	6	RESULT_BODY_SIZE_LIMIT_EXCEEDED	7	RESULT_BODY_DECOMPRESS_FAILED	8	RESULT_REQUEST_FAILED	9	RESULT_DOWNLOAD_FILE_CANT_OPEN	10	RESULT_DOWNLOAD_FILE_WRITE_ERROR	11	RESULT_REDIRECT_LIMIT_REACHED	12	RESULT_TIMEOUT	13
-P	HTTPRequest	request_completed	Signal
+X	HTTPRequest	request_completed	int	int	PackedStringArray	PackedByteArray
 C	HashingContext	RefCounted	0
 F	HashingContext	start	enum::Error	0	0	enum::HashingContext.HashType
 F	HashingContext	update	enum::Error	0	0	PackedByteArray
@@ -9943,7 +9943,7 @@ F	Input	set_emulate_touch_from_mouse	void	0	0	bool
 F	Input	is_emulating_touch_from_mouse	bool	0	0
 E	Input	MouseMode	0	MOUSE_MODE_VISIBLE	0	MOUSE_MODE_HIDDEN	1	MOUSE_MODE_CAPTURED	2	MOUSE_MODE_CONFINED	3	MOUSE_MODE_CONFINED_HIDDEN	4	MOUSE_MODE_MAX	5
 E	Input	CursorShape	0	CURSOR_ARROW	0	CURSOR_IBEAM	1	CURSOR_POINTING_HAND	2	CURSOR_CROSS	3	CURSOR_WAIT	4	CURSOR_BUSY	5	CURSOR_DRAG	6	CURSOR_CAN_DROP	7	CURSOR_FORBIDDEN	8	CURSOR_VSIZE	9	CURSOR_HSIZE	10	CURSOR_BDIAGSIZE	11	CURSOR_FDIAGSIZE	12	CURSOR_MOVE	13	CURSOR_VSPLIT	14	CURSOR_HSPLIT	15	CURSOR_HELP	16
-P	Input	joy_connection_changed	Signal
+X	Input	joy_connection_changed	int	bool
 C	InputEvent	Resource	0
 P	InputEvent	device	int
 F	InputEvent	set_device	void	0	0	int
@@ -10185,7 +10185,7 @@ F	InputMap	action_erase_events	void	0	0	StringName
 F	InputMap	action_get_events	typedarray::InputEvent	0	0	StringName
 F	InputMap	event_is_action	bool	0	0	InputEvent	StringName	bool?
 F	InputMap	load_from_project_settings	void	0	0
-P	InputMap	project_settings_loaded	Signal
+X	InputMap	project_settings_loaded
 C	InstancePlaceholder	Node	0
 F	InstancePlaceholder	get_stored_values	Dictionary	0	0	bool?
 F	InstancePlaceholder	create_instance	Node	0	0	bool?	PackedScene?
@@ -10298,11 +10298,11 @@ F	ItemList	force_update_list_size	void	0	0
 E	ItemList	IconMode	0	ICON_MODE_TOP	0	ICON_MODE_LEFT	1
 E	ItemList	SelectMode	0	SELECT_SINGLE	0	SELECT_MULTI	1	SELECT_TOGGLE	2
 E	ItemList	ScrollHintMode	0	SCROLL_HINT_MODE_DISABLED	0	SCROLL_HINT_MODE_BOTH	1	SCROLL_HINT_MODE_TOP	2	SCROLL_HINT_MODE_BOTTOM	3
-P	ItemList	item_selected	Signal
-P	ItemList	empty_clicked	Signal
-P	ItemList	item_clicked	Signal
-P	ItemList	multi_selected	Signal
-P	ItemList	item_activated	Signal
+X	ItemList	item_selected	int
+X	ItemList	empty_clicked	Vector2	int
+X	ItemList	item_clicked	int	Vector2	int
+X	ItemList	multi_selected	int	bool
+X	ItemList	item_activated	int
 C	IterateIK3D	ChainIK3D	0
 P	IterateIK3D	max_iterations	int
 P	IterateIK3D	min_distance	float
@@ -10379,7 +10379,7 @@ F	JavaScriptBridge	download_buffer	void	0	0	PackedByteArray	String	String?
 F	JavaScriptBridge	pwa_needs_update	bool	0	0
 F	JavaScriptBridge	pwa_update	enum::Error	0	0
 F	JavaScriptBridge	force_fs_sync	void	0	0
-P	JavaScriptBridge	pwa_update_available	Signal
+X	JavaScriptBridge	pwa_update_available
 C	JavaScriptObject	RefCounted	0
 C	Joint2D	Node2D	0
 P	Joint2D	node_a	NodePath
@@ -11091,10 +11091,10 @@ F	LineEdit	is_select_all_on_focus	bool	0	0
 E	LineEdit	MenuItems	0	MENU_CUT	0	MENU_COPY	1	MENU_PASTE	2	MENU_CLEAR	3	MENU_SELECT_ALL	4	MENU_UNDO	5	MENU_REDO	6	MENU_SUBMENU_TEXT_DIR	7	MENU_DIR_INHERITED	8	MENU_DIR_AUTO	9	MENU_DIR_LTR	10	MENU_DIR_RTL	11	MENU_DISPLAY_UCC	12	MENU_SUBMENU_INSERT_UCC	13	MENU_INSERT_LRM	14	MENU_INSERT_RLM	15	MENU_INSERT_LRE	16	MENU_INSERT_RLE	17	MENU_INSERT_LRO	18	MENU_INSERT_RLO	19	MENU_INSERT_PDF	20	MENU_INSERT_ALM	21	MENU_INSERT_LRI	22	MENU_INSERT_RLI	23	MENU_INSERT_FSI	24	MENU_INSERT_PDI	25	MENU_INSERT_ZWJ	26	MENU_INSERT_ZWNJ	27	MENU_INSERT_WJ	28	MENU_INSERT_SHY	29	MENU_EMOJI_AND_SYMBOL	30	MENU_MAX	31
 E	LineEdit	VirtualKeyboardType	0	KEYBOARD_TYPE_DEFAULT	0	KEYBOARD_TYPE_MULTILINE	1	KEYBOARD_TYPE_NUMBER	2	KEYBOARD_TYPE_NUMBER_DECIMAL	3	KEYBOARD_TYPE_PHONE	4	KEYBOARD_TYPE_EMAIL_ADDRESS	5	KEYBOARD_TYPE_PASSWORD	6	KEYBOARD_TYPE_URL	7
 E	LineEdit	ExpandMode	0	EXPAND_MODE_ORIGINAL_SIZE	0	EXPAND_MODE_FIT_TO_TEXT	1	EXPAND_MODE_FIT_TO_LINE_EDIT	2
-P	LineEdit	text_changed	Signal
-P	LineEdit	text_change_rejected	Signal
-P	LineEdit	text_submitted	Signal
-P	LineEdit	editing_toggled	Signal
+X	LineEdit	text_changed	String
+X	LineEdit	text_change_rejected	String
+X	LineEdit	text_submitted	String
+X	LineEdit	editing_toggled	bool
 C	LinkButton	BaseButton	0
 P	LinkButton	text	String
 P	LinkButton	underline	enum::LinkButton.UnderlineMode
@@ -11254,7 +11254,7 @@ K	MainLoop	NOTIFICATIONAPPLICATIONFOCUSOUT	int
 K	MainLoop	NOTIFICATIONTEXTSERVERCHANGED	int
 K	MainLoop	NOTIFICATIONAPPLICATIONPIPMODEENTERED	int
 K	MainLoop	NOTIFICATIONAPPLICATIONPIPMODEEXITED	int
-P	MainLoop	on_request_permissions_result	Signal
+X	MainLoop	on_request_permissions_result	String	bool
 C	MarginContainer	Container	0
 C	Marker2D	Node2D	0
 P	Marker2D	gizmo_extents	float
@@ -11327,7 +11327,7 @@ F	MenuButton	is_switch_on_hover	bool	0	0
 F	MenuButton	set_disable_shortcuts	void	0	0	bool
 F	MenuButton	set_item_count	void	0	0	int
 F	MenuButton	get_item_count	int	0	0
-P	MenuButton	about_to_popup	Signal
+X	MenuButton	about_to_popup
 C	Mesh	Resource	0
 P	Mesh	lightmap_size_hint	Vector2i
 F	Mesh	_get_surface_count	int	0	0
@@ -11450,7 +11450,7 @@ F	MeshInstance2D	set_mesh	void	0	0	Mesh
 F	MeshInstance2D	get_mesh	Mesh	0	0
 F	MeshInstance2D	set_texture	void	0	0	Texture2D
 F	MeshInstance2D	get_texture	Texture2D	0	0
-P	MeshInstance2D	texture_changed	Signal
+X	MeshInstance2D	texture_changed
 C	MeshInstance3D	GeometryInstance3D	0
 P	MeshInstance3D	mesh	Mesh
 P	MeshInstance3D	skin	Skin
@@ -11636,7 +11636,7 @@ F	MultiMeshInstance2D	set_multimesh	void	0	0	MultiMesh
 F	MultiMeshInstance2D	get_multimesh	MultiMesh	0	0
 F	MultiMeshInstance2D	set_texture	void	0	0	Texture2D
 F	MultiMeshInstance2D	get_texture	Texture2D	0	0
-P	MultiMeshInstance2D	texture_changed	Signal
+X	MultiMeshInstance2D	texture_changed
 C	MultiMeshInstance3D	GeometryInstance3D	0
 P	MultiMeshInstance3D	multimesh	MultiMesh
 F	MultiMeshInstance3D	set_multimesh	void	0	0	MultiMesh
@@ -11658,11 +11658,11 @@ F	MultiplayerAPI	set_default_interface	void	1	0	StringName
 F	MultiplayerAPI	get_default_interface	StringName	1	0
 F	MultiplayerAPI	create_default_interface	MultiplayerAPI	1	0
 E	MultiplayerAPI	RPCMode	0	RPC_MODE_DISABLED	0	RPC_MODE_ANY_PEER	1	RPC_MODE_AUTHORITY	2
-P	MultiplayerAPI	peer_connected	Signal
-P	MultiplayerAPI	peer_disconnected	Signal
-P	MultiplayerAPI	connected_to_server	Signal
-P	MultiplayerAPI	connection_failed	Signal
-P	MultiplayerAPI	server_disconnected	Signal
+X	MultiplayerAPI	peer_connected	int
+X	MultiplayerAPI	peer_disconnected	int
+X	MultiplayerAPI	connected_to_server
+X	MultiplayerAPI	connection_failed
+X	MultiplayerAPI	server_disconnected
 C	MultiplayerAPIExtension	MultiplayerAPI	0
 F	MultiplayerAPIExtension	_poll	enum::Error	0	0
 F	MultiplayerAPIExtension	_set_multiplayer_peer	void	0	0	MultiplayerPeer
@@ -11698,8 +11698,8 @@ K	MultiplayerPeer	TARGETPEERBROADCAST	int
 K	MultiplayerPeer	TARGETPEERSERVER	int
 E	MultiplayerPeer	ConnectionStatus	0	CONNECTION_DISCONNECTED	0	CONNECTION_CONNECTING	1	CONNECTION_CONNECTED	2
 E	MultiplayerPeer	TransferMode	0	TRANSFER_MODE_UNRELIABLE	0	TRANSFER_MODE_UNRELIABLE_ORDERED	1	TRANSFER_MODE_RELIABLE	2
-P	MultiplayerPeer	peer_connected	Signal
-P	MultiplayerPeer	peer_disconnected	Signal
+X	MultiplayerPeer	peer_connected	int
+X	MultiplayerPeer	peer_disconnected	int
 C	MultiplayerPeerExtension	MultiplayerPeer	0
 F	MultiplayerPeerExtension	_get_packet	enum::Error	0	0	const uint8_t **	int32_t*
 F	MultiplayerPeerExtension	_put_packet	enum::Error	0	0	const uint8_t*	int
@@ -11739,8 +11739,8 @@ F	MultiplayerSpawner	get_spawn_limit	int	0	0
 F	MultiplayerSpawner	set_spawn_limit	void	0	0	int
 F	MultiplayerSpawner	get_spawn_function	Callable	0	0
 F	MultiplayerSpawner	set_spawn_function	void	0	0	Callable
-P	MultiplayerSpawner	despawned	Signal
-P	MultiplayerSpawner	spawned	Signal
+X	MultiplayerSpawner	despawned	Node
+X	MultiplayerSpawner	spawned	Node
 C	MultiplayerSynchronizer	Node	0
 P	MultiplayerSynchronizer	root_path	NodePath
 P	MultiplayerSynchronizer	replication_interval	float
@@ -11766,9 +11766,9 @@ F	MultiplayerSynchronizer	remove_visibility_filter	void	0	0	Callable
 F	MultiplayerSynchronizer	set_visibility_for	void	0	0	int	bool
 F	MultiplayerSynchronizer	get_visibility_for	bool	0	0	int
 E	MultiplayerSynchronizer	VisibilityUpdateMode	0	VISIBILITY_PROCESS_IDLE	0	VISIBILITY_PROCESS_PHYSICS	1	VISIBILITY_PROCESS_NONE	2
-P	MultiplayerSynchronizer	synchronized	Signal
-P	MultiplayerSynchronizer	delta_synchronized	Signal
-P	MultiplayerSynchronizer	visibility_changed	Signal
+X	MultiplayerSynchronizer	synchronized
+X	MultiplayerSynchronizer	delta_synchronized
+X	MultiplayerSynchronizer	visibility_changed	int
 C	Mutex	RefCounted	0
 F	Mutex	lock	void	0	0
 F	Mutex	try_lock	bool	0	0
@@ -11956,12 +11956,12 @@ F	NavigationAgent2D	set_debug_path_custom_point_size	void	0	0	float
 F	NavigationAgent2D	get_debug_path_custom_point_size	float	0	0
 F	NavigationAgent2D	set_debug_path_custom_line_width	void	0	0	float
 F	NavigationAgent2D	get_debug_path_custom_line_width	float	0	0
-P	NavigationAgent2D	path_changed	Signal
-P	NavigationAgent2D	target_reached	Signal
-P	NavigationAgent2D	waypoint_reached	Signal
-P	NavigationAgent2D	link_reached	Signal
-P	NavigationAgent2D	navigation_finished	Signal
-P	NavigationAgent2D	velocity_computed	Signal
+X	NavigationAgent2D	path_changed
+X	NavigationAgent2D	target_reached
+X	NavigationAgent2D	waypoint_reached	Dictionary
+X	NavigationAgent2D	link_reached	Dictionary
+X	NavigationAgent2D	navigation_finished
+X	NavigationAgent2D	velocity_computed	Vector2
 C	NavigationAgent3D	Node	0
 P	NavigationAgent3D	target_position	Vector3
 P	NavigationAgent3D	path_desired_distance	float
@@ -12082,12 +12082,12 @@ F	NavigationAgent3D	set_debug_path_custom_color	void	0	0	Color
 F	NavigationAgent3D	get_debug_path_custom_color	Color	0	0
 F	NavigationAgent3D	set_debug_path_custom_point_size	void	0	0	float
 F	NavigationAgent3D	get_debug_path_custom_point_size	float	0	0
-P	NavigationAgent3D	path_changed	Signal
-P	NavigationAgent3D	target_reached	Signal
-P	NavigationAgent3D	waypoint_reached	Signal
-P	NavigationAgent3D	link_reached	Signal
-P	NavigationAgent3D	navigation_finished	Signal
-P	NavigationAgent3D	velocity_computed	Signal
+X	NavigationAgent3D	path_changed
+X	NavigationAgent3D	target_reached
+X	NavigationAgent3D	waypoint_reached	Dictionary
+X	NavigationAgent3D	link_reached	Dictionary
+X	NavigationAgent3D	navigation_finished
+X	NavigationAgent3D	velocity_computed	Vector3
 C	NavigationLink2D	Node2D	0
 P	NavigationLink2D	enabled	bool
 P	NavigationLink2D	bidirectional	bool
@@ -12560,8 +12560,8 @@ F	NavigationRegion2D	get_travel_cost	float	0	0
 F	NavigationRegion2D	bake_navigation_polygon	void	0	0	bool?
 F	NavigationRegion2D	is_baking	bool	0	0
 F	NavigationRegion2D	get_bounds	Rect2	0	0
-P	NavigationRegion2D	navigation_polygon_changed	Signal
-P	NavigationRegion2D	bake_finished	Signal
+X	NavigationRegion2D	navigation_polygon_changed
+X	NavigationRegion2D	bake_finished
 C	NavigationRegion3D	Node3D	0
 P	NavigationRegion3D	navigation_mesh	NavigationMesh
 P	NavigationRegion3D	enabled	bool
@@ -12590,8 +12590,8 @@ F	NavigationRegion3D	get_travel_cost	float	0	0
 F	NavigationRegion3D	bake_navigation_mesh	void	0	0	bool?
 F	NavigationRegion3D	is_baking	bool	0	0
 F	NavigationRegion3D	get_bounds	AABB	0	0
-P	NavigationRegion3D	navigation_mesh_changed	Signal
-P	NavigationRegion3D	bake_finished	Signal
+X	NavigationRegion3D	navigation_mesh_changed
+X	NavigationRegion3D	bake_finished
 C	NavigationServer2D	Object	0
 F	NavigationServer2D	get_maps	typedarray::RID	0	0
 F	NavigationServer2D	map_create	RID	0	0
@@ -12731,9 +12731,9 @@ F	NavigationServer2D	set_debug_enabled	void	0	0	bool
 F	NavigationServer2D	get_debug_enabled	bool	0	0
 F	NavigationServer2D	get_process_info	int	0	0	enum::NavigationServer2D.ProcessInfo
 E	NavigationServer2D	ProcessInfo	0	INFO_ACTIVE_MAPS	0	INFO_REGION_COUNT	1	INFO_AGENT_COUNT	2	INFO_LINK_COUNT	3	INFO_POLYGON_COUNT	4	INFO_EDGE_COUNT	5	INFO_EDGE_MERGE_COUNT	6	INFO_EDGE_CONNECTION_COUNT	7	INFO_EDGE_FREE_COUNT	8	INFO_OBSTACLE_COUNT	9
-P	NavigationServer2D	map_changed	Signal
-P	NavigationServer2D	navigation_debug_changed	Signal
-P	NavigationServer2D	avoidance_debug_changed	Signal
+X	NavigationServer2D	map_changed	RID
+X	NavigationServer2D	navigation_debug_changed
+X	NavigationServer2D	avoidance_debug_changed
 C	NavigationServer2DManager	Object	0
 F	NavigationServer2DManager	register_server	void	0	0	String	Callable
 F	NavigationServer2DManager	set_default_server	void	0	0	String	int
@@ -12893,9 +12893,9 @@ F	NavigationServer3D	set_debug_enabled	void	0	0	bool
 F	NavigationServer3D	get_debug_enabled	bool	0	0
 F	NavigationServer3D	get_process_info	int	0	0	enum::NavigationServer3D.ProcessInfo
 E	NavigationServer3D	ProcessInfo	0	INFO_ACTIVE_MAPS	0	INFO_REGION_COUNT	1	INFO_AGENT_COUNT	2	INFO_LINK_COUNT	3	INFO_POLYGON_COUNT	4	INFO_EDGE_COUNT	5	INFO_EDGE_MERGE_COUNT	6	INFO_EDGE_CONNECTION_COUNT	7	INFO_EDGE_FREE_COUNT	8	INFO_OBSTACLE_COUNT	9
-P	NavigationServer3D	map_changed	Signal
-P	NavigationServer3D	navigation_debug_changed	Signal
-P	NavigationServer3D	avoidance_debug_changed	Signal
+X	NavigationServer3D	map_changed	RID
+X	NavigationServer3D	navigation_debug_changed
+X	NavigationServer3D	avoidance_debug_changed
 C	NavigationServer3DManager	Object	0
 F	NavigationServer3DManager	register_server	void	0	0	String	Callable
 F	NavigationServer3DManager	set_default_server	void	0	0	String	int
@@ -12922,7 +12922,7 @@ F	NinePatchRect	get_h_axis_stretch_mode	enum::NinePatchRect.AxisStretchMode	0	0
 F	NinePatchRect	set_v_axis_stretch_mode	void	0	0	enum::NinePatchRect.AxisStretchMode
 F	NinePatchRect	get_v_axis_stretch_mode	enum::NinePatchRect.AxisStretchMode	0	0
 E	NinePatchRect	AxisStretchMode	0	AXIS_STRETCH_MODE_STRETCH	0	AXIS_STRETCH_MODE_TILE	1	AXIS_STRETCH_MODE_TILE_FIT	2
-P	NinePatchRect	texture_changed	Signal
+X	NinePatchRect	texture_changed
 C	Node	Object	0
 P	Node	name	StringName
 P	Node	unique_name_in_owner	bool
@@ -13127,17 +13127,17 @@ E	Node	PhysicsInterpolationMode	0	PHYSICS_INTERPOLATION_MODE_INHERIT	0	PHYSICS_I
 E	Node	DuplicateFlags	0	DUPLICATE_SIGNALS	1	DUPLICATE_GROUPS	2	DUPLICATE_SCRIPTS	4	DUPLICATE_USE_INSTANTIATION	8	DUPLICATE_INTERNAL_STATE	16	DUPLICATE_DEFAULT	15
 E	Node	InternalMode	0	INTERNAL_MODE_DISABLED	0	INTERNAL_MODE_FRONT	1	INTERNAL_MODE_BACK	2
 E	Node	AutoTranslateMode	0	AUTO_TRANSLATE_MODE_INHERIT	0	AUTO_TRANSLATE_MODE_ALWAYS	1	AUTO_TRANSLATE_MODE_DISABLED	2
-P	Node	ready	Signal
-P	Node	renamed	Signal
-P	Node	tree_entered	Signal
-P	Node	tree_exiting	Signal
-P	Node	tree_exited	Signal
-P	Node	child_entered_tree	Signal
-P	Node	child_exiting_tree	Signal
-P	Node	child_order_changed	Signal
-P	Node	replacing_by	Signal
-P	Node	editor_description_changed	Signal
-P	Node	editor_state_changed	Signal
+X	Node	ready
+X	Node	renamed
+X	Node	tree_entered
+X	Node	tree_exiting
+X	Node	tree_exited
+X	Node	child_entered_tree	Node
+X	Node	child_exiting_tree	Node
+X	Node	child_order_changed
+X	Node	replacing_by	Node
+X	Node	editor_description_changed	Node
+X	Node	editor_state_changed
 C	Node2D	CanvasItem	0
 P	Node2D	position	Vector2
 P	Node2D	rotation	float
@@ -13279,7 +13279,7 @@ K	Node3D	NOTIFICATIONEXITWORLD	int
 K	Node3D	NOTIFICATIONVISIBILITYCHANGED	int
 K	Node3D	NOTIFICATIONLOCALTRANSFORMCHANGED	int
 E	Node3D	RotationEditMode	0	ROTATION_EDIT_MODE_EULER	0	ROTATION_EDIT_MODE_QUATERNION	1	ROTATION_EDIT_MODE_BASIS	2
-P	Node3D	visibility_changed	Signal
+X	Node3D	visibility_changed
 C	Node3DGizmo	RefCounted	0
 C	Noise	Resource	0
 F	Noise	get_noise_1d	float	0	0	float
@@ -13496,8 +13496,8 @@ K	Object	NOTIFICATIONPOSTINITIALIZE	int
 K	Object	NOTIFICATIONPREDELETE	int
 K	Object	NOTIFICATIONEXTENSIONRELOADED	int
 E	Object	ConnectFlags	1	CONNECT_DEFERRED	1	CONNECT_PERSIST	2	CONNECT_ONE_SHOT	4	CONNECT_REFERENCE_COUNTED	8	CONNECT_APPEND_SOURCE_OBJECT	16
-P	Object	script_changed	Signal
-P	Object	property_list_changed	Signal
+X	Object	script_changed
+X	Object	property_list_changed
 C	Occluder3D	Resource	0
 F	Occluder3D	get_vertices	PackedVector3Array	0	0
 F	Occluder3D	get_indices	PackedInt32Array	0	0
@@ -13658,7 +13658,7 @@ P	OpenXRAnchorTracker	uuid	String
 F	OpenXRAnchorTracker	has_uuid	bool	0	0
 F	OpenXRAnchorTracker	set_uuid	void	0	0	String
 F	OpenXRAnchorTracker	get_uuid	String	0	0
-P	OpenXRAnchorTracker	uuid_changed	Signal
+X	OpenXRAnchorTracker	uuid_changed
 C	OpenXRAndroidThreadSettingsExtension	OpenXRExtensionWrapper	0
 F	OpenXRAndroidThreadSettingsExtension	set_application_thread_type	bool	0	0	enum::OpenXRAndroidThreadSettingsExtension.ThreadType	int?
 E	OpenXRAndroidThreadSettingsExtension	ThreadType	0	THREAD_TYPE_APPLICATION_MAIN	0	THREAD_TYPE_APPLICATION_WORKER	1	THREAD_TYPE_RENDERER_MAIN	2	THREAD_TYPE_RENDERER_WORKER	3
@@ -13668,7 +13668,7 @@ F	OpenXRBindingModifier	_get_ip_modification	PackedByteArray	0	0
 C	OpenXRBindingModifierEditor	PanelContainer	0
 F	OpenXRBindingModifierEditor	get_binding_modifier	OpenXRBindingModifier	0	0
 F	OpenXRBindingModifierEditor	setup	void	0	0	OpenXRActionMap	OpenXRBindingModifier
-P	OpenXRBindingModifierEditor	binding_modifier_removed	Signal
+X	OpenXRBindingModifierEditor	binding_modifier_removed	Object
 C	OpenXRCompositionLayer	Node3D	0
 P	OpenXRCompositionLayer	layer_viewport	Object
 P	OpenXRCompositionLayer	use_android_surface	bool
@@ -13865,7 +13865,7 @@ F	OpenXRFutureResult	cancel_future	void	0	0
 F	OpenXRFutureResult	set_result_value	void	0	0	Variant
 F	OpenXRFutureResult	get_result_value	Variant	0	0
 E	OpenXRFutureResult	ResultStatus	0	RESULT_RUNNING	0	RESULT_FINISHED	1	RESULT_CANCELLED	2
-P	OpenXRFutureResult	completed	Signal
+X	OpenXRFutureResult	completed	OpenXRFutureResult
 C	OpenXRHand	Node3D	0
 P	OpenXRHand	hand	enum::OpenXRHand.Hands
 P	OpenXRHand	motion_range	enum::OpenXRHand.MotionRange
@@ -13993,18 +13993,18 @@ E	OpenXRInterface	PerfSettingsLevel	0	PERF_SETTINGS_LEVEL_POWER_SAVINGS	0	PERF_S
 E	OpenXRInterface	PerfSettingsSubDomain	0	PERF_SETTINGS_SUB_DOMAIN_COMPOSITING	0	PERF_SETTINGS_SUB_DOMAIN_RENDERING	1	PERF_SETTINGS_SUB_DOMAIN_THERMAL	2
 E	OpenXRInterface	PerfSettingsNotificationLevel	0	PERF_SETTINGS_NOTIF_LEVEL_NORMAL	0	PERF_SETTINGS_NOTIF_LEVEL_WARNING	1	PERF_SETTINGS_NOTIF_LEVEL_IMPAIRED	2
 E	OpenXRInterface	HandJointFlags	1	HAND_JOINT_NONE	0	HAND_JOINT_ORIENTATION_VALID	1	HAND_JOINT_ORIENTATION_TRACKED	2	HAND_JOINT_POSITION_VALID	4	HAND_JOINT_POSITION_TRACKED	8	HAND_JOINT_LINEAR_VELOCITY_VALID	16	HAND_JOINT_ANGULAR_VELOCITY_VALID	32
-P	OpenXRInterface	session_begun	Signal
-P	OpenXRInterface	session_stopping	Signal
-P	OpenXRInterface	session_synchronized	Signal
-P	OpenXRInterface	session_focussed	Signal
-P	OpenXRInterface	session_visible	Signal
-P	OpenXRInterface	session_loss_pending	Signal
-P	OpenXRInterface	instance_exiting	Signal
-P	OpenXRInterface	pose_recentered	Signal
-P	OpenXRInterface	refresh_rate_changed	Signal
-P	OpenXRInterface	cpu_level_changed	Signal
-P	OpenXRInterface	gpu_level_changed	Signal
-P	OpenXRInterface	user_presence_changed	Signal
+X	OpenXRInterface	session_begun
+X	OpenXRInterface	session_stopping
+X	OpenXRInterface	session_synchronized
+X	OpenXRInterface	session_focussed
+X	OpenXRInterface	session_visible
+X	OpenXRInterface	session_loss_pending
+X	OpenXRInterface	instance_exiting
+X	OpenXRInterface	pose_recentered
+X	OpenXRInterface	refresh_rate_changed	float
+X	OpenXRInterface	cpu_level_changed	int	int	int
+X	OpenXRInterface	gpu_level_changed	int	int	int
+X	OpenXRInterface	user_presence_changed	bool
 C	OpenXRMarkerTracker	OpenXRSpatialEntityTracker	0
 P	OpenXRMarkerTracker	bounds_size	int
 P	OpenXRMarkerTracker	marker_type	enum::OpenXRSpatialComponentMarkerList.MarkerType
@@ -14032,13 +14032,13 @@ F	OpenXRPlaneTracker	clear_mesh_data	void	0	0
 F	OpenXRPlaneTracker	get_mesh_offset	Transform3D	0	0
 F	OpenXRPlaneTracker	get_mesh	Mesh	0	0
 F	OpenXRPlaneTracker	get_shape	Shape3D	0	0	float?
-P	OpenXRPlaneTracker	mesh_changed	Signal
+X	OpenXRPlaneTracker	mesh_changed
 C	OpenXRRenderModel	Node3D	0
 P	OpenXRRenderModel	render_model	RID
 F	OpenXRRenderModel	get_top_level_path	String	0	0
 F	OpenXRRenderModel	get_render_model	RID	0	0
 F	OpenXRRenderModel	set_render_model	void	0	0	RID
-P	OpenXRRenderModel	render_model_top_level_path_changed	Signal
+X	OpenXRRenderModel	render_model_top_level_path_changed
 C	OpenXRRenderModelExtension	OpenXRExtensionWrapper	0
 F	OpenXRRenderModelExtension	is_active	bool	0	0
 F	OpenXRRenderModelExtension	render_model_create	RID	0	0	int
@@ -14053,9 +14053,9 @@ F	OpenXRRenderModelExtension	render_model_get_animatable_node_count	int	0	0	RID
 F	OpenXRRenderModelExtension	render_model_get_animatable_node_name	String	0	0	RID	int
 F	OpenXRRenderModelExtension	render_model_is_animatable_node_visible	bool	0	0	RID	int
 F	OpenXRRenderModelExtension	render_model_get_animatable_node_transform	Transform3D	0	0	RID	int
-P	OpenXRRenderModelExtension	render_model_added	Signal
-P	OpenXRRenderModelExtension	render_model_removed	Signal
-P	OpenXRRenderModelExtension	render_model_top_level_path_changed	Signal
+X	OpenXRRenderModelExtension	render_model_added	RID
+X	OpenXRRenderModelExtension	render_model_removed	RID
+X	OpenXRRenderModelExtension	render_model_top_level_path_changed	RID
 C	OpenXRRenderModelManager	Node3D	0
 P	OpenXRRenderModelManager	tracker	enum::OpenXRRenderModelManager.RenderModelTracker
 P	OpenXRRenderModelManager	make_local_to_pose	String
@@ -14064,8 +14064,8 @@ F	OpenXRRenderModelManager	set_tracker	void	0	0	enum::OpenXRRenderModelManager.R
 F	OpenXRRenderModelManager	get_make_local_to_pose	String	0	0
 F	OpenXRRenderModelManager	set_make_local_to_pose	void	0	0	String
 E	OpenXRRenderModelManager	RenderModelTracker	0	RENDER_MODEL_TRACKER_ANY	0	RENDER_MODEL_TRACKER_NONE_SET	1	RENDER_MODEL_TRACKER_LEFT_HAND	2	RENDER_MODEL_TRACKER_RIGHT_HAND	3
-P	OpenXRRenderModelManager	render_model_added	Signal
-P	OpenXRRenderModelManager	render_model_removed	Signal
+X	OpenXRRenderModelManager	render_model_added	OpenXRRenderModel
+X	OpenXRRenderModelManager	render_model_removed	OpenXRRenderModel
 C	OpenXRSpatialAnchorCapability	OpenXRExtensionWrapper	0
 F	OpenXRSpatialAnchorCapability	is_spatial_anchor_supported	bool	0	0
 F	OpenXRSpatialAnchorCapability	is_spatial_persistence_supported	bool	0	0
@@ -14182,7 +14182,7 @@ F	OpenXRSpatialEntityExtension	get_spatial_entity_context	RID	0	0	RID
 F	OpenXRSpatialEntityExtension	free_spatial_entity	void	0	0	RID
 E	OpenXRSpatialEntityExtension	Capability	0	CAPABILITY_PLANE_TRACKING	1000741000	CAPABILITY_MARKER_TRACKING_QR_CODE	1000743000	CAPABILITY_MARKER_TRACKING_MICRO_QR_CODE	1000743001	CAPABILITY_MARKER_TRACKING_ARUCO_MARKER	1000743002	CAPABILITY_MARKER_TRACKING_APRIL_TAG	1000743003	CAPABILITY_ANCHOR	1000762000
 E	OpenXRSpatialEntityExtension	ComponentType	0	COMPONENT_TYPE_BOUNDED_2D	1	COMPONENT_TYPE_BOUNDED_3D	2	COMPONENT_TYPE_PARENT	3	COMPONENT_TYPE_MESH_3D	4	COMPONENT_TYPE_PLANE_ALIGNMENT	1000741000	COMPONENT_TYPE_MESH_2D	1000741001	COMPONENT_TYPE_POLYGON_2D	1000741002	COMPONENT_TYPE_PLANE_SEMANTIC_LABEL	1000741003	COMPONENT_TYPE_MARKER	1000743000	COMPONENT_TYPE_ANCHOR	1000762000	COMPONENT_TYPE_PERSISTENCE	1000763000
-P	OpenXRSpatialEntityExtension	spatial_discovery_recommended	Signal
+X	OpenXRSpatialEntityExtension	spatial_discovery_recommended	RID
 C	OpenXRSpatialEntityTracker	XRPositionalTracker	0
 P	OpenXRSpatialEntityTracker	entity	RID
 P	OpenXRSpatialEntityTracker	spatial_tracking_state	enum::OpenXRSpatialEntityTracker.EntityTrackingState
@@ -14196,8 +14196,8 @@ F	OpenXRSpatialEntityTracker	get_next	OpenXRStructureBase	0	0
 F	OpenXRSpatialEntityTracker	add_next	void	0	0	OpenXRStructureBase
 F	OpenXRSpatialEntityTracker	remove_next	void	0	0	OpenXRStructureBase
 E	OpenXRSpatialEntityTracker	EntityTrackingState	0	ENTITY_TRACKING_STATE_STOPPED	1	ENTITY_TRACKING_STATE_PAUSED	2	ENTITY_TRACKING_STATE_TRACKING	3
-P	OpenXRSpatialEntityTracker	next_changed	Signal
-P	OpenXRSpatialEntityTracker	spatial_tracking_state_changed	Signal
+X	OpenXRSpatialEntityTracker	next_changed
+X	OpenXRSpatialEntityTracker	spatial_tracking_state_changed	int
 C	OpenXRSpatialMarkerTrackingCapability	OpenXRExtensionWrapper	0
 F	OpenXRSpatialMarkerTrackingCapability	is_qrcode_supported	bool	0	0
 F	OpenXRSpatialMarkerTrackingCapability	is_micro_qrcode_supported	bool	0	0
@@ -14274,8 +14274,8 @@ F	OptionButton	is_fit_to_longest_item	bool	0	0
 F	OptionButton	set_allow_reselect	void	0	0	bool
 F	OptionButton	get_allow_reselect	bool	0	0
 F	OptionButton	set_disable_shortcuts	void	0	0	bool
-P	OptionButton	item_selected	Signal
-P	OptionButton	item_focused	Signal
+X	OptionButton	item_selected	int
+X	OptionButton	item_focused	int
 C	PCKPacker	RefCounted	0
 F	PCKPacker	pck_start	enum::Error	0	0	String	int?	String?	bool?
 F	PCKPacker	add_file	enum::Error	0	0	String	String	bool?
@@ -14656,7 +14656,7 @@ E	ParticleProcessMaterial	ParticleFlags	0	PARTICLE_FLAG_ALIGN_Y_TO_VELOCITY	0	PA
 E	ParticleProcessMaterial	EmissionShape	0	EMISSION_SHAPE_POINT	0	EMISSION_SHAPE_SPHERE	1	EMISSION_SHAPE_SPHERE_SURFACE	2	EMISSION_SHAPE_BOX	3	EMISSION_SHAPE_POINTS	4	EMISSION_SHAPE_DIRECTED_POINTS	5	EMISSION_SHAPE_RING	6	EMISSION_SHAPE_MAX	7
 E	ParticleProcessMaterial	SubEmitterMode	0	SUB_EMITTER_DISABLED	0	SUB_EMITTER_CONSTANT	1	SUB_EMITTER_AT_END	2	SUB_EMITTER_AT_COLLISION	3	SUB_EMITTER_AT_START	4	SUB_EMITTER_MAX	5
 E	ParticleProcessMaterial	CollisionMode	0	COLLISION_DISABLED	0	COLLISION_RIGID	1	COLLISION_HIDE_ON_CONTACT	2	COLLISION_MAX	3
-P	ParticleProcessMaterial	emission_shape_changed	Signal
+X	ParticleProcessMaterial	emission_shape_changed
 C	Path2D	Node2D	0
 P	Path2D	curve	Curve2D
 F	Path2D	set_curve	void	0	0	Curve2D
@@ -14668,8 +14668,8 @@ F	Path3D	set_curve	void	0	0	Curve3D
 F	Path3D	get_curve	Curve3D	0	0
 F	Path3D	set_debug_custom_color	void	0	0	Color
 F	Path3D	get_debug_custom_color	Color	0	0
-P	Path3D	curve_changed	Signal
-P	Path3D	debug_color_changed	Signal
+X	Path3D	curve_changed
+X	Path3D	debug_color_changed
 C	PathFollow2D	Node2D	0
 P	PathFollow2D	progress	float
 P	PathFollow2D	progress_ratio	float
@@ -16184,7 +16184,7 @@ F	PolygonPathFinder	set_point_penalty	void	0	0	int	float
 F	PolygonPathFinder	get_point_penalty	float	0	0	int
 F	PolygonPathFinder	get_bounds	Rect2	0	0
 C	Popup	Window	0
-P	Popup	popup_hide	Signal
+X	Popup	popup_hide
 C	PopupMenu	Popup	0
 P	PopupMenu	hide_on_item_selection	bool
 P	PopupMenu	hide_on_checkable_item_selection	bool
@@ -16302,10 +16302,10 @@ F	PopupMenu	set_shrink_height	void	0	0	bool
 F	PopupMenu	get_shrink_height	bool	0	0
 F	PopupMenu	set_shrink_width	void	0	0	bool
 F	PopupMenu	get_shrink_width	bool	0	0
-P	PopupMenu	id_pressed	Signal
-P	PopupMenu	id_focused	Signal
-P	PopupMenu	index_pressed	Signal
-P	PopupMenu	menu_changed	Signal
+X	PopupMenu	id_pressed	int
+X	PopupMenu	id_focused	int
+X	PopupMenu	index_pressed	int
+X	PopupMenu	menu_changed
 C	PopupPanel	Popup	0
 C	PortableCompressedTexture2D	Texture2D	0
 P	PortableCompressedTexture2D	size_override	Vector2
@@ -16434,7 +16434,7 @@ F	ProjectSettings	load_resource_pack	bool	0	0	String	bool?	int?
 F	ProjectSettings	save_custom	enum::Error	0	0	String
 F	ProjectSettings	get_changed_settings	PackedStringArray	0	0
 F	ProjectSettings	check_changed_settings_in_group	bool	0	0	String
-P	ProjectSettings	settings_changed	Signal
+X	ProjectSettings	settings_changed
 C	PropertyTweener	Tweener	0
 F	PropertyTweener	from	PropertyTweener	0	0	Variant
 F	PropertyTweener	from_current	PropertyTweener	0	0
@@ -16935,8 +16935,8 @@ F	Range	set_allow_lesser	void	0	0	bool
 F	Range	is_lesser_allowed	bool	0	0
 F	Range	share	void	0	0	Node
 F	Range	unshare	void	0	0
-P	Range	value_changed	Signal
-P	Range	changed	Signal
+X	Range	value_changed	float
+X	Range	changed
 C	RayCast2D	Node2D	0
 P	RayCast2D	enabled	bool
 P	RayCast2D	exclude_parent	bool
@@ -18053,8 +18053,8 @@ E	RenderingServer	RenderingInfo	0	RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME	0	RENDER
 E	RenderingServer	PipelineSource	0	PIPELINE_SOURCE_CANVAS	0	PIPELINE_SOURCE_MESH	1	PIPELINE_SOURCE_SURFACE	2	PIPELINE_SOURCE_DRAW	3	PIPELINE_SOURCE_SPECIALIZATION	4	PIPELINE_SOURCE_MAX	5
 E	RenderingServer	SplashStretchMode	0	SPLASH_STRETCH_MODE_DISABLED	0	SPLASH_STRETCH_MODE_KEEP	1	SPLASH_STRETCH_MODE_KEEP_WIDTH	2	SPLASH_STRETCH_MODE_KEEP_HEIGHT	3	SPLASH_STRETCH_MODE_COVER	4	SPLASH_STRETCH_MODE_IGNORE	5
 E	RenderingServer	Features	0	FEATURE_SHADERS	0	FEATURE_MULTITHREADED	1
-P	RenderingServer	frame_pre_draw	Signal
-P	RenderingServer	frame_post_draw	Signal
+X	RenderingServer	frame_pre_draw
+X	RenderingServer	frame_post_draw
 C	Resource	RefCounted	0
 P	Resource	resource_local_to_scene	bool
 P	Resource	resource_path	String
@@ -18087,8 +18087,8 @@ F	Resource	duplicate	Resource	0	0	bool?
 F	Resource	duplicate_deep	Resource	0	0	enum::Resource.DeepDuplicateMode?
 F	Resource	copy_from_resource	enum::Error	0	0	Resource
 E	Resource	DeepDuplicateMode	0	DEEP_DUPLICATE_NONE	0	DEEP_DUPLICATE_INTERNAL	1	DEEP_DUPLICATE_ALL	2
-P	Resource	changed	Signal
-P	Resource	setup_local_to_scene_requested	Signal
+X	Resource	changed
+X	Resource	setup_local_to_scene_requested
 C	ResourceFormatLoader	RefCounted	0
 F	ResourceFormatLoader	_get_recognized_extensions	PackedStringArray	0	0
 F	ResourceFormatLoader	_recognize_path	bool	0	0	String	StringName
@@ -18389,10 +18389,10 @@ E	RichTextLabel	MenuItems	0	MENU_COPY	0	MENU_SELECT_ALL	1	MENU_MAX	2
 E	RichTextLabel	MetaUnderline	0	META_UNDERLINE_NEVER	0	META_UNDERLINE_ALWAYS	1	META_UNDERLINE_ON_HOVER	2
 E	RichTextLabel	ImageUpdateMask	1	UPDATE_TEXTURE	1	UPDATE_SIZE	2	UPDATE_COLOR	4	UPDATE_ALIGNMENT	8	UPDATE_REGION	16	UPDATE_PAD	32	UPDATE_TOOLTIP	64	UPDATE_WIDTH_UNIT	128
 E	RichTextLabel	ImageUnit	0	IMAGE_UNIT_PIXEL	0	IMAGE_UNIT_PERCENT	1	IMAGE_UNIT_EM	2
-P	RichTextLabel	meta_clicked	Signal
-P	RichTextLabel	meta_hover_started	Signal
-P	RichTextLabel	meta_hover_ended	Signal
-P	RichTextLabel	finished	Signal
+X	RichTextLabel	meta_clicked	Variant
+X	RichTextLabel	meta_hover_started	Variant
+X	RichTextLabel	meta_hover_ended	Variant
+X	RichTextLabel	finished
 C	RigidBody2D	PhysicsBody2D	0
 P	RigidBody2D	mass	float
 P	RigidBody2D	physics_material_override	PhysicsMaterial
@@ -18480,11 +18480,11 @@ E	RigidBody2D	FreezeMode	0	FREEZE_MODE_STATIC	0	FREEZE_MODE_KINEMATIC	1
 E	RigidBody2D	CenterOfMassMode	0	CENTER_OF_MASS_MODE_AUTO	0	CENTER_OF_MASS_MODE_CUSTOM	1
 E	RigidBody2D	DampMode	0	DAMP_MODE_COMBINE	0	DAMP_MODE_REPLACE	1
 E	RigidBody2D	CCDMode	0	CCD_MODE_DISABLED	0	CCD_MODE_CAST_RAY	1	CCD_MODE_CAST_SHAPE	2
-P	RigidBody2D	body_shape_entered	Signal
-P	RigidBody2D	body_shape_exited	Signal
-P	RigidBody2D	body_entered	Signal
-P	RigidBody2D	body_exited	Signal
-P	RigidBody2D	sleeping_state_changed	Signal
+X	RigidBody2D	body_shape_entered	RID	Node	int	int
+X	RigidBody2D	body_shape_exited	RID	Node	int	int
+X	RigidBody2D	body_entered	Node
+X	RigidBody2D	body_exited	Node
+X	RigidBody2D	sleeping_state_changed
 C	RigidBody3D	PhysicsBody3D	0
 P	RigidBody3D	mass	float
 P	RigidBody3D	physics_material_override	PhysicsMaterial
@@ -18572,11 +18572,11 @@ F	RigidBody3D	get_colliding_bodies	typedarray::Node3D	0	0
 E	RigidBody3D	FreezeMode	0	FREEZE_MODE_STATIC	0	FREEZE_MODE_KINEMATIC	1
 E	RigidBody3D	CenterOfMassMode	0	CENTER_OF_MASS_MODE_AUTO	0	CENTER_OF_MASS_MODE_CUSTOM	1
 E	RigidBody3D	DampMode	0	DAMP_MODE_COMBINE	0	DAMP_MODE_REPLACE	1
-P	RigidBody3D	body_shape_entered	Signal
-P	RigidBody3D	body_shape_exited	Signal
-P	RigidBody3D	body_entered	Signal
-P	RigidBody3D	body_exited	Signal
-P	RigidBody3D	sleeping_state_changed	Signal
+X	RigidBody3D	body_shape_entered	RID	Node	int	int
+X	RigidBody3D	body_shape_exited	RID	Node	int	int
+X	RigidBody3D	body_entered	Node
+X	RigidBody3D	body_exited	Node
+X	RigidBody3D	sleeping_state_changed
 C	RootMotionView	VisualInstance3D	0
 P	RootMotionView	animation_path	NodePath
 P	RootMotionView	color	Color
@@ -18624,9 +18624,9 @@ F	SceneMultiplayer	get_max_sync_packet_size	int	0	0
 F	SceneMultiplayer	set_max_sync_packet_size	void	0	0	int
 F	SceneMultiplayer	get_max_delta_packet_size	int	0	0
 F	SceneMultiplayer	set_max_delta_packet_size	void	0	0	int
-P	SceneMultiplayer	peer_authenticating	Signal
-P	SceneMultiplayer	peer_authentication_failed	Signal
-P	SceneMultiplayer	peer_packet	Signal
+X	SceneMultiplayer	peer_authenticating	int
+X	SceneMultiplayer	peer_authentication_failed	int
+X	SceneMultiplayer	peer_packet	int	PackedByteArray
 C	SceneReplicationConfig	Resource	0
 F	SceneReplicationConfig	get_properties	typedarray::NodePath	0	0
 F	SceneReplicationConfig	add_property	void	0	0	NodePath	int?
@@ -18727,20 +18727,20 @@ F	SceneTree	get_multiplayer	MultiplayerAPI	0	0	NodePath?
 F	SceneTree	set_multiplayer_poll_enabled	void	0	0	bool
 F	SceneTree	is_multiplayer_poll_enabled	bool	0	0
 E	SceneTree	GroupCallFlags	0	GROUP_CALL_DEFAULT	0	GROUP_CALL_REVERSE	1	GROUP_CALL_DEFERRED	2	GROUP_CALL_UNIQUE	4
-P	SceneTree	tree_changed	Signal
-P	SceneTree	scene_changed	Signal
-P	SceneTree	tree_process_mode_changed	Signal
-P	SceneTree	node_added	Signal
-P	SceneTree	node_removed	Signal
-P	SceneTree	node_renamed	Signal
-P	SceneTree	node_configuration_warning_changed	Signal
-P	SceneTree	process_frame	Signal
-P	SceneTree	physics_frame	Signal
+X	SceneTree	tree_changed
+X	SceneTree	scene_changed
+X	SceneTree	tree_process_mode_changed
+X	SceneTree	node_added	Node
+X	SceneTree	node_removed	Node
+X	SceneTree	node_renamed	Node
+X	SceneTree	node_configuration_warning_changed	Node
+X	SceneTree	process_frame
+X	SceneTree	physics_frame
 C	SceneTreeTimer	RefCounted	0
 P	SceneTreeTimer	time_left	float
 F	SceneTreeTimer	set_time_left	void	0	0	float
 F	SceneTreeTimer	get_time_left	float	0	0
-P	SceneTreeTimer	timeout	Signal
+X	SceneTreeTimer	timeout
 C	Script	Resource	0
 P	Script	source_code	String
 F	Script	can_instantiate	bool	0	0
@@ -18781,7 +18781,7 @@ F	ScriptBacktrace	get_member_variable_value	Variant	0	0	int	int
 F	ScriptBacktrace	format	String	0	0	int?	int?
 C	ScriptCreateDialog	ConfirmationDialog	0
 F	ScriptCreateDialog	config	void	0	0	String	String	bool?	bool?
-P	ScriptCreateDialog	script_created	Signal
+X	ScriptCreateDialog	script_created	Script
 C	ScriptEditor	PanelContainer	0
 F	ScriptEditor	get_current_editor	ScriptEditorBase	0	0
 F	ScriptEditor	get_open_script_editors	typedarray::ScriptEditorBase	0	0
@@ -18799,21 +18799,21 @@ F	ScriptEditor	clear_docs_from_script	void	0	0	Script
 F	ScriptEditor	get_unsaved_files	PackedStringArray	0	0
 F	ScriptEditor	save_all_scripts	void	0	0
 F	ScriptEditor	close_file	enum::Error	0	0	String
-P	ScriptEditor	editor_script_changed	Signal
-P	ScriptEditor	script_close	Signal
+X	ScriptEditor	editor_script_changed	Script
+X	ScriptEditor	script_close	Script
 C	ScriptEditorBase	VBoxContainer	0
 F	ScriptEditorBase	add_syntax_highlighter	void	0	0	EditorSyntaxHighlighter
 F	ScriptEditorBase	get_base_editor	Control	0	0
-P	ScriptEditorBase	name_changed	Signal
-P	ScriptEditorBase	edited_script_changed	Signal
-P	ScriptEditorBase	search_in_files_requested	Signal
-P	ScriptEditorBase	request_save_history	Signal
-P	ScriptEditorBase	request_help	Signal
-P	ScriptEditorBase	request_open_script_at_line	Signal
-P	ScriptEditorBase	go_to_help	Signal
-P	ScriptEditorBase	request_save_previous_state	Signal
-P	ScriptEditorBase	replace_in_files_requested	Signal
-P	ScriptEditorBase	go_to_method	Signal
+X	ScriptEditorBase	name_changed
+X	ScriptEditorBase	edited_script_changed
+X	ScriptEditorBase	search_in_files_requested	String
+X	ScriptEditorBase	request_save_history
+X	ScriptEditorBase	request_help	String
+X	ScriptEditorBase	request_open_script_at_line	Object	int
+X	ScriptEditorBase	go_to_help	String
+X	ScriptEditorBase	request_save_previous_state	Dictionary
+X	ScriptEditorBase	replace_in_files_requested	String
+X	ScriptEditorBase	go_to_method	Object	String
 C	ScriptExtension	Script	0
 F	ScriptExtension	_editor_can_reload_from_file	bool	0	0
 F	ScriptExtension	_placeholder_erased	void	0	0	void*
@@ -18922,7 +18922,7 @@ C	ScrollBar	Range	0
 P	ScrollBar	custom_step	float
 F	ScrollBar	set_custom_step	void	0	0	float
 F	ScrollBar	get_custom_step	float	0	0
-P	ScrollBar	scrolling	Signal
+X	ScrollBar	scrolling
 C	ScrollContainer	Container	0
 P	ScrollContainer	follow_focus	bool
 P	ScrollContainer	draw_focus_border	bool
@@ -18965,8 +18965,8 @@ F	ScrollContainer	set_draw_focus_border	void	0	0	bool
 F	ScrollContainer	get_draw_focus_border	bool	0	0
 E	ScrollContainer	ScrollMode	0	SCROLL_MODE_DISABLED	0	SCROLL_MODE_AUTO	1	SCROLL_MODE_SHOW_ALWAYS	2	SCROLL_MODE_SHOW_NEVER	3	SCROLL_MODE_RESERVE	4	SCROLL_MODE_MAXIMIZE_FIRST	5
 E	ScrollContainer	ScrollHintMode	0	SCROLL_HINT_MODE_DISABLED	0	SCROLL_HINT_MODE_ALL	1	SCROLL_HINT_MODE_TOP_AND_LEFT	2	SCROLL_HINT_MODE_BOTTOM_AND_RIGHT	3
-P	ScrollContainer	scroll_started	Signal
-P	ScrollContainer	scroll_ended	Signal
+X	ScrollContainer	scroll_started
+X	ScrollContainer	scroll_ended
 C	SegmentShape2D	Shape2D	0
 P	SegmentShape2D	a	Vector2
 P	SegmentShape2D	b	Vector2
@@ -19150,7 +19150,7 @@ F	Skeleton2D	get_modification_stack	SkeletonModificationStack2D	0	0
 F	Skeleton2D	execute_modifications	void	0	0	float	int
 F	Skeleton2D	set_bone_local_pose_override	void	0	0	int	Transform2D	float	bool
 F	Skeleton2D	get_bone_local_pose_override	Transform2D	0	0	int
-P	Skeleton2D	bone_setup_changed	Signal
+X	Skeleton2D	bone_setup_changed
 C	Skeleton3D	Node3D	0
 P	Skeleton3D	motion_scale	float
 P	Skeleton3D	show_rest_only	bool
@@ -19214,12 +19214,12 @@ F	Skeleton3D	physical_bones_add_collision_exception	void	0	0	RID
 F	Skeleton3D	physical_bones_remove_collision_exception	void	0	0	RID
 K	Skeleton3D	NOTIFICATIONUPDATESKELETON	int
 E	Skeleton3D	ModifierCallbackModeProcess	0	MODIFIER_CALLBACK_MODE_PROCESS_PHYSICS	0	MODIFIER_CALLBACK_MODE_PROCESS_IDLE	1	MODIFIER_CALLBACK_MODE_PROCESS_MANUAL	2
-P	Skeleton3D	rest_updated	Signal
-P	Skeleton3D	pose_updated	Signal
-P	Skeleton3D	skeleton_updated	Signal
-P	Skeleton3D	bone_enabled_changed	Signal
-P	Skeleton3D	bone_list_changed	Signal
-P	Skeleton3D	show_rest_only_changed	Signal
+X	Skeleton3D	rest_updated
+X	Skeleton3D	pose_updated
+X	Skeleton3D	skeleton_updated
+X	Skeleton3D	bone_enabled_changed	int
+X	Skeleton3D	bone_list_changed
+X	Skeleton3D	show_rest_only_changed
 C	SkeletonIK3D	SkeletonModifier3D	0
 P	SkeletonIK3D	root_bone	StringName
 P	SkeletonIK3D	tip_bone	StringName
@@ -19441,7 +19441,7 @@ E	SkeletonModifier3D	BoneAxis	0	BONE_AXIS_PLUS_X	0	BONE_AXIS_MINUS_X	1	BONE_AXIS
 E	SkeletonModifier3D	BoneDirection	0	BONE_DIRECTION_PLUS_X	0	BONE_DIRECTION_MINUS_X	1	BONE_DIRECTION_PLUS_Y	2	BONE_DIRECTION_MINUS_Y	3	BONE_DIRECTION_PLUS_Z	4	BONE_DIRECTION_MINUS_Z	5	BONE_DIRECTION_FROM_PARENT	6
 E	SkeletonModifier3D	SecondaryDirection	0	SECONDARY_DIRECTION_NONE	0	SECONDARY_DIRECTION_PLUS_X	1	SECONDARY_DIRECTION_MINUS_X	2	SECONDARY_DIRECTION_PLUS_Y	3	SECONDARY_DIRECTION_MINUS_Y	4	SECONDARY_DIRECTION_PLUS_Z	5	SECONDARY_DIRECTION_MINUS_Z	6	SECONDARY_DIRECTION_CUSTOM	7
 E	SkeletonModifier3D	RotationAxis	0	ROTATION_AXIS_X	0	ROTATION_AXIS_Y	1	ROTATION_AXIS_Z	2	ROTATION_AXIS_ALL	3	ROTATION_AXIS_CUSTOM	4
-P	SkeletonModifier3D	modification_processed	Signal
+X	SkeletonModifier3D	modification_processed
 C	SkeletonProfile	Resource	0
 P	SkeletonProfile	root_bone	StringName
 P	SkeletonProfile	scale_base_bone	StringName
@@ -19477,7 +19477,7 @@ F	SkeletonProfile	set_group	void	0	0	int	StringName
 F	SkeletonProfile	is_required	bool	0	0	int
 F	SkeletonProfile	set_required	void	0	0	int	bool
 E	SkeletonProfile	TailDirection	0	TAIL_DIRECTION_AVERAGE_CHILDREN	0	TAIL_DIRECTION_SPECIFIC_CHILD	1	TAIL_DIRECTION_END	2
-P	SkeletonProfile	profile_updated	Signal
+X	SkeletonProfile	profile_updated
 C	SkeletonProfileHumanoid	SkeletonProfile	0
 C	Skin	Resource	0
 F	Skin	set_bind_count	void	0	0	int
@@ -19523,8 +19523,8 @@ F	Slider	is_editable	bool	0	0
 F	Slider	set_scrollable	void	0	0	bool
 F	Slider	is_scrollable	bool	0	0
 E	Slider	TickPosition	0	TICK_POSITION_BOTTOM_RIGHT	0	TICK_POSITION_TOP_LEFT	1	TICK_POSITION_BOTH	2	TICK_POSITION_CENTER	3
-P	Slider	drag_started	Signal
-P	Slider	drag_ended	Signal
+X	Slider	drag_started
+X	Slider	drag_ended	bool
 C	SliderJoint3D	Joint3D	0
 F	SliderJoint3D	set_param	void	0	0	enum::SliderJoint3D.Param	float
 F	SliderJoint3D	get_param	float	0	0	enum::SliderJoint3D.Param
@@ -19689,9 +19689,9 @@ F	SplitContainer	get_drag_area_control	Control	0	0
 F	SplitContainer	set_split_offset	void	0	0	int
 F	SplitContainer	get_split_offset	int	0	0
 E	SplitContainer	DraggerVisibility	0	DRAGGER_VISIBLE	0	DRAGGER_HIDDEN	1	DRAGGER_HIDDEN_COLLAPSED	2
-P	SplitContainer	dragged	Signal
-P	SplitContainer	drag_started	Signal
-P	SplitContainer	drag_ended	Signal
+X	SplitContainer	dragged	int
+X	SplitContainer	drag_started
+X	SplitContainer	drag_ended
 C	SpotLight3D	Light3D	0
 P	SpotLight3D	spot_range	float
 P	SpotLight3D	spot_attenuation	float
@@ -19876,8 +19876,8 @@ F	Sprite2D	get_vframes	int	0	0
 F	Sprite2D	set_hframes	void	0	0	int
 F	Sprite2D	get_hframes	int	0	0
 F	Sprite2D	get_rect	Rect2	0	0
-P	Sprite2D	frame_changed	Signal
-P	Sprite2D	texture_changed	Signal
+X	Sprite2D	frame_changed
+X	Sprite2D	texture_changed
 C	Sprite3D	SpriteBase3D	0
 P	Sprite3D	texture	Texture2D
 P	Sprite3D	hframes	int
@@ -19900,8 +19900,8 @@ F	Sprite3D	set_vframes	void	0	0	int
 F	Sprite3D	get_vframes	int	0	0
 F	Sprite3D	set_hframes	void	0	0	int
 F	Sprite3D	get_hframes	int	0	0
-P	Sprite3D	frame_changed	Signal
-P	Sprite3D	texture_changed	Signal
+X	Sprite3D	frame_changed
+X	Sprite3D	texture_changed
 C	SpriteBase3D	GeometryInstance3D	0
 P	SpriteBase3D	centered	bool
 P	SpriteBase3D	offset	Vector2
@@ -20017,7 +20017,7 @@ F	StatusIndicator	is_visible	bool	0	0
 F	StatusIndicator	set_menu	void	0	0	NodePath
 F	StatusIndicator	get_menu	NodePath	0	0
 F	StatusIndicator	get_rect	Rect2	0	0
-P	StatusIndicator	pressed	Signal
+X	StatusIndicator	pressed	int	Vector2i
 C	StreamPeer	RefCounted	0
 P	StreamPeer	big_endian	bool
 F	StreamPeer	put_data	enum::Error	0	0	PackedByteArray
@@ -20444,14 +20444,14 @@ F	TabBar	get_deselect_enabled	bool	0	0
 F	TabBar	clear_tabs	void	0	0
 E	TabBar	AlignmentMode	0	ALIGNMENT_LEFT	0	ALIGNMENT_CENTER	1	ALIGNMENT_RIGHT	2	ALIGNMENT_MAX	3
 E	TabBar	CloseButtonDisplayPolicy	0	CLOSE_BUTTON_SHOW_NEVER	0	CLOSE_BUTTON_SHOW_ACTIVE_ONLY	1	CLOSE_BUTTON_SHOW_ALWAYS	2	CLOSE_BUTTON_MAX	3
-P	TabBar	tab_selected	Signal
-P	TabBar	tab_changed	Signal
-P	TabBar	tab_clicked	Signal
-P	TabBar	tab_rmb_clicked	Signal
-P	TabBar	tab_close_pressed	Signal
-P	TabBar	tab_button_pressed	Signal
-P	TabBar	tab_hovered	Signal
-P	TabBar	active_tab_rearranged	Signal
+X	TabBar	tab_selected	int
+X	TabBar	tab_changed	int
+X	TabBar	tab_clicked	int
+X	TabBar	tab_rmb_clicked	int
+X	TabBar	tab_close_pressed	int
+X	TabBar	tab_button_pressed	int
+X	TabBar	tab_hovered	int
+X	TabBar	active_tab_rearranged	int
 C	TabContainer	Container	0
 P	TabContainer	tab_alignment	enum::TabBar.AlignmentMode
 P	TabContainer	current_tab	int
@@ -20517,13 +20517,13 @@ F	TabContainer	get_tab_focus_mode	enum::Control.FocusMode	0	0
 F	TabContainer	set_deselect_enabled	void	0	0	bool
 F	TabContainer	get_deselect_enabled	bool	0	0
 E	TabContainer	TabPosition	0	POSITION_TOP	0	POSITION_BOTTOM	1	POSITION_MAX	2
-P	TabContainer	active_tab_rearranged	Signal
-P	TabContainer	tab_changed	Signal
-P	TabContainer	tab_clicked	Signal
-P	TabContainer	tab_hovered	Signal
-P	TabContainer	tab_selected	Signal
-P	TabContainer	tab_button_pressed	Signal
-P	TabContainer	pre_popup_pressed	Signal
+X	TabContainer	active_tab_rearranged	int
+X	TabContainer	tab_changed	int
+X	TabContainer	tab_clicked	int
+X	TabContainer	tab_hovered	int
+X	TabContainer	tab_selected	int
+X	TabContainer	tab_button_pressed	int
+X	TabContainer	pre_popup_pressed
 C	TextEdit	Control	0
 P	TextEdit	text	String
 P	TextEdit	placeholder_text	String
@@ -20834,13 +20834,13 @@ E	TextEdit	CaretType	0	CARET_TYPE_LINE	0	CARET_TYPE_BLOCK	1
 E	TextEdit	SelectionMode	0	SELECTION_MODE_NONE	0	SELECTION_MODE_SHIFT	1	SELECTION_MODE_POINTER	2	SELECTION_MODE_WORD	3	SELECTION_MODE_LINE	4
 E	TextEdit	LineWrappingMode	0	LINE_WRAPPING_NONE	0	LINE_WRAPPING_BOUNDARY	1
 E	TextEdit	GutterType	0	GUTTER_TYPE_STRING	0	GUTTER_TYPE_ICON	1	GUTTER_TYPE_CUSTOM	2
-P	TextEdit	text_set	Signal
-P	TextEdit	text_changed	Signal
-P	TextEdit	lines_edited_from	Signal
-P	TextEdit	caret_changed	Signal
-P	TextEdit	gutter_clicked	Signal
-P	TextEdit	gutter_added	Signal
-P	TextEdit	gutter_removed	Signal
+X	TextEdit	text_set
+X	TextEdit	text_changed
+X	TextEdit	lines_edited_from	int	int
+X	TextEdit	caret_changed
+X	TextEdit	gutter_clicked	int	int
+X	TextEdit	gutter_added
+X	TextEdit	gutter_removed
 C	TextLine	RefCounted	0
 P	TextLine	direction	enum::TextServer.Direction
 P	TextLine	orientation	enum::TextServer.Orientation
@@ -21546,8 +21546,8 @@ F	TextServerManager	get_interfaces	typedarray::Dictionary	0	0
 F	TextServerManager	find_interface	TextServer	0	0	String
 F	TextServerManager	set_primary_interface	void	0	0	TextServer
 F	TextServerManager	get_primary_interface	TextServer	0	0
-P	TextServerManager	interface_added	Signal
-P	TextServerManager	interface_removed	Signal
+X	TextServerManager	interface_added	StringName
+X	TextServerManager	interface_removed	StringName
 C	Texture	Resource	0
 C	Texture2D	Texture	0
 F	Texture2D	_get_image	Image	0	0
@@ -21806,7 +21806,7 @@ F	ThemeDB	set_fallback_icon	void	0	0	Texture2D
 F	ThemeDB	get_fallback_icon	Texture2D	0	0
 F	ThemeDB	set_fallback_stylebox	void	0	0	StyleBox
 F	ThemeDB	get_fallback_stylebox	StyleBox	0	0
-P	ThemeDB	fallback_changed	Signal
+X	ThemeDB	fallback_changed
 C	Thread	RefCounted	0
 F	Thread	start	enum::Error	0	0	Callable	enum::Thread.Priority?
 F	Thread	get_id	String	0	0
@@ -21882,7 +21882,7 @@ F	TileData	get_custom_data	Variant	0	0	String
 F	TileData	has_custom_data	bool	0	0	String
 F	TileData	set_custom_data_by_layer_id	void	0	0	int	Variant
 F	TileData	get_custom_data_by_layer_id	Variant	0	0	int
-P	TileData	changed	Signal
+X	TileData	changed
 C	TileMap	Node2D	0
 P	TileMap	tile_set	TileSet
 P	TileMap	rendering_quadrant_size	int
@@ -21953,7 +21953,7 @@ F	TileMap	map_to_local	Vector2	0	0	Vector2i
 F	TileMap	local_to_map	Vector2i	0	0	Vector2
 F	TileMap	get_neighbor_cell	Vector2i	0	0	Vector2i	enum::TileSet.CellNeighbor
 E	TileMap	VisibilityMode	0	VISIBILITY_MODE_DEFAULT	0	VISIBILITY_MODE_FORCE_HIDE	2	VISIBILITY_MODE_FORCE_SHOW	1
-P	TileMap	changed	Signal
+X	TileMap	changed
 C	TileMapLayer	Node2D	0
 P	TileMapLayer	tile_map_data	PackedByteArray
 P	TileMapLayer	enabled	bool
@@ -22027,7 +22027,7 @@ F	TileMapLayer	get_navigation_map	RID	0	0
 F	TileMapLayer	set_navigation_visibility_mode	void	0	0	enum::TileMapLayer.DebugVisibilityMode
 F	TileMapLayer	get_navigation_visibility_mode	enum::TileMapLayer.DebugVisibilityMode	0	0
 E	TileMapLayer	DebugVisibilityMode	0	DEBUG_VISIBILITY_MODE_DEFAULT	0	DEBUG_VISIBILITY_MODE_FORCE_HIDE	2	DEBUG_VISIBILITY_MODE_FORCE_SHOW	1
-P	TileMapLayer	changed	Signal
+X	TileMapLayer	changed
 C	TileMapPattern	Resource	0
 F	TileMapPattern	set_cell	void	0	0	Vector2i	int?	Vector2i?	int?
 F	TileMapPattern	has_cell	bool	0	0	Vector2i
@@ -22259,7 +22259,7 @@ F	Timer	get_time_left	float	0	0
 F	Timer	set_timer_process_callback	void	0	0	enum::Timer.TimerProcessCallback
 F	Timer	get_timer_process_callback	enum::Timer.TimerProcessCallback	0	0
 E	Timer	TimerProcessCallback	0	TIMER_PROCESS_PHYSICS	0	TIMER_PROCESS_IDLE	1
-P	Timer	timeout	Signal
+X	Timer	timeout
 C	TorusMesh	PrimitiveMesh	0
 P	TorusMesh	inner_radius	float
 P	TorusMesh	outer_radius	float
@@ -22303,8 +22303,8 @@ F	TouchScreenButton	set_passby_press	void	0	0	bool
 F	TouchScreenButton	is_passby_press_enabled	bool	0	0
 F	TouchScreenButton	is_pressed	bool	0	0
 E	TouchScreenButton	VisibilityMode	0	VISIBILITY_ALWAYS	0	VISIBILITY_TOUCHSCREEN_ONLY	1
-P	TouchScreenButton	pressed	Signal
-P	TouchScreenButton	released	Signal
+X	TouchScreenButton	pressed
+X	TouchScreenButton	released
 C	Translation	Resource	0
 P	Translation	messages	Dictionary
 P	Translation	locale	String
@@ -22495,21 +22495,21 @@ F	Tree	is_auto_tooltip_enabled	bool	0	0
 E	Tree	SelectMode	0	SELECT_SINGLE	0	SELECT_ROW	1	SELECT_MULTI	2
 E	Tree	DropModeFlags	0	DROP_MODE_DISABLED	0	DROP_MODE_ON_ITEM	1	DROP_MODE_INBETWEEN	2
 E	Tree	ScrollHintMode	0	SCROLL_HINT_MODE_DISABLED	0	SCROLL_HINT_MODE_BOTH	1	SCROLL_HINT_MODE_TOP	2	SCROLL_HINT_MODE_BOTTOM	3
-P	Tree	item_selected	Signal
-P	Tree	cell_selected	Signal
-P	Tree	multi_selected	Signal
-P	Tree	item_mouse_selected	Signal
-P	Tree	empty_clicked	Signal
-P	Tree	item_edited	Signal
-P	Tree	custom_item_clicked	Signal
-P	Tree	item_icon_double_clicked	Signal
-P	Tree	item_collapsed	Signal
-P	Tree	check_propagated_to_item	Signal
-P	Tree	button_clicked	Signal
-P	Tree	custom_popup_edited	Signal
-P	Tree	item_activated	Signal
-P	Tree	column_title_clicked	Signal
-P	Tree	nothing_selected	Signal
+X	Tree	item_selected
+X	Tree	cell_selected
+X	Tree	multi_selected	TreeItem	int	bool
+X	Tree	item_mouse_selected	Vector2	int
+X	Tree	empty_clicked	Vector2	int
+X	Tree	item_edited
+X	Tree	custom_item_clicked	int
+X	Tree	item_icon_double_clicked
+X	Tree	item_collapsed	TreeItem
+X	Tree	check_propagated_to_item	TreeItem	int
+X	Tree	button_clicked	TreeItem	int	int	int
+X	Tree	custom_popup_edited	bool
+X	Tree	item_activated
+X	Tree	column_title_clicked	int	int
+X	Tree	nothing_selected
 C	TreeItem	Object	0
 P	TreeItem	collapsed	bool
 P	TreeItem	visible	bool
@@ -22704,11 +22704,11 @@ E	Tween	TweenProcessMode	0	TWEEN_PROCESS_PHYSICS	0	TWEEN_PROCESS_IDLE	1
 E	Tween	TweenPauseMode	0	TWEEN_PAUSE_BOUND	0	TWEEN_PAUSE_STOP	1	TWEEN_PAUSE_PROCESS	2
 E	Tween	TransitionType	0	TRANS_LINEAR	0	TRANS_SINE	1	TRANS_QUINT	2	TRANS_QUART	3	TRANS_QUAD	4	TRANS_EXPO	5	TRANS_ELASTIC	6	TRANS_CUBIC	7	TRANS_CIRC	8	TRANS_BOUNCE	9	TRANS_BACK	10	TRANS_SPRING	11
 E	Tween	EaseType	0	EASE_IN	0	EASE_OUT	1	EASE_IN_OUT	2	EASE_OUT_IN	3
-P	Tween	step_finished	Signal
-P	Tween	loop_finished	Signal
-P	Tween	finished	Signal
+X	Tween	step_finished	int
+X	Tween	loop_finished	int
+X	Tween	finished
 C	Tweener	RefCounted	0
-P	Tweener	finished	Signal
+X	Tweener	finished
 C	TwoBoneIK3D	IKModifier3D	0
 P	TwoBoneIK3D	setting_count	int
 F	TwoBoneIK3D	set_target_node	void	0	0	int	NodePath
@@ -22825,7 +22825,7 @@ F	UndoRedo	get_max_steps	int	0	0
 F	UndoRedo	redo	bool	0	0
 F	UndoRedo	undo	bool	0	0
 E	UndoRedo	MergeMode	0	MERGE_DISABLE	0	MERGE_ENDS	1	MERGE_ALL	2
-P	UndoRedo	version_changed	Signal
+X	UndoRedo	version_changed
 C	UniformSetCacheRD	Object	0
 F	UniformSetCacheRD	get_cache	RID	1	0	RID	int	typedarray::RDUniform
 C	VBoxContainer	BoxContainer	0
@@ -22956,7 +22956,7 @@ F	VideoStreamPlayer	get_buffering_msec	int	0	0
 F	VideoStreamPlayer	set_bus	void	0	0	StringName
 F	VideoStreamPlayer	get_bus	StringName	0	0
 F	VideoStreamPlayer	get_video_texture	Texture2D	0	0
-P	VideoStreamPlayer	finished	Signal
+X	VideoStreamPlayer	finished
 C	VideoStreamTheora	VideoStream	0
 C	Viewport	Node	0
 P	Viewport	disable_3d	bool
@@ -23153,8 +23153,8 @@ E	Viewport	SDFOversize	0	SDF_OVERSIZE_100_PERCENT	0	SDF_OVERSIZE_120_PERCENT	1	S
 E	Viewport	SDFScale	0	SDF_SCALE_100_PERCENT	0	SDF_SCALE_50_PERCENT	1	SDF_SCALE_25_PERCENT	2	SDF_SCALE_MAX	3
 E	Viewport	VRSMode	0	VRS_DISABLED	0	VRS_TEXTURE	1	VRS_XR	2	VRS_MAX	3
 E	Viewport	VRSUpdateMode	0	VRS_UPDATE_DISABLED	0	VRS_UPDATE_ONCE	1	VRS_UPDATE_ALWAYS	2	VRS_UPDATE_MAX	3
-P	Viewport	size_changed	Signal
-P	Viewport	gui_focus_changed	Signal
+X	Viewport	size_changed
+X	Viewport	gui_focus_changed	Control
 C	ViewportTexture	Texture2D	0
 P	ViewportTexture	viewport_path	NodePath
 F	ViewportTexture	set_viewport_path_in_scene	void	0	0	NodePath
@@ -23195,11 +23195,11 @@ F	VirtualJoystick	set_visibility_mode	void	0	0	enum::VirtualJoystick.VisibilityM
 F	VirtualJoystick	get_visibility_mode	enum::VirtualJoystick.VisibilityMode	0	0
 E	VirtualJoystick	JoystickMode	0	JOYSTICK_FIXED	0	JOYSTICK_DYNAMIC	1	JOYSTICK_FOLLOWING	2
 E	VirtualJoystick	VisibilityMode	0	VISIBILITY_ALWAYS	0	VISIBILITY_WHEN_TOUCHED	1
-P	VirtualJoystick	pressed	Signal
-P	VirtualJoystick	tapped	Signal
-P	VirtualJoystick	released	Signal
-P	VirtualJoystick	flicked	Signal
-P	VirtualJoystick	flick_canceled	Signal
+X	VirtualJoystick	pressed
+X	VirtualJoystick	tapped
+X	VirtualJoystick	released	Vector2
+X	VirtualJoystick	flicked	Vector2
+X	VirtualJoystick	flick_canceled
 C	VisibleOnScreenEnabler2D	VisibleOnScreenNotifier2D	0
 P	VisibleOnScreenEnabler2D	enable_mode	enum::VisibleOnScreenEnabler2D.EnableMode
 P	VisibleOnScreenEnabler2D	enable_node_path	NodePath
@@ -23224,14 +23224,14 @@ F	VisibleOnScreenNotifier2D	get_rect	Rect2	0	0
 F	VisibleOnScreenNotifier2D	set_show_rect	void	0	0	bool
 F	VisibleOnScreenNotifier2D	is_showing_rect	bool	0	0
 F	VisibleOnScreenNotifier2D	is_on_screen	bool	0	0
-P	VisibleOnScreenNotifier2D	screen_entered	Signal
-P	VisibleOnScreenNotifier2D	screen_exited	Signal
+X	VisibleOnScreenNotifier2D	screen_entered
+X	VisibleOnScreenNotifier2D	screen_exited
 C	VisibleOnScreenNotifier3D	VisualInstance3D	0
 P	VisibleOnScreenNotifier3D	aabb	AABB
 F	VisibleOnScreenNotifier3D	set_aabb	void	0	0	AABB
 F	VisibleOnScreenNotifier3D	is_on_screen	bool	0	0
-P	VisibleOnScreenNotifier3D	screen_entered	Signal
-P	VisibleOnScreenNotifier3D	screen_exited	Signal
+X	VisibleOnScreenNotifier3D	screen_entered
+X	VisibleOnScreenNotifier3D	screen_exited
 C	VisualInstance3D	Node3D	0
 P	VisualInstance3D	layers	int
 P	VisualInstance3D	sorting_offset	float
@@ -23507,7 +23507,7 @@ P	VisualShaderNodeInput	input_name	StringName
 F	VisualShaderNodeInput	set_input_name	void	0	0	String
 F	VisualShaderNodeInput	get_input_name	String	0	0
 F	VisualShaderNodeInput	get_input_real_name	String	0	0
-P	VisualShaderNodeInput	input_type_changed	Signal
+X	VisualShaderNodeInput	input_type_changed
 C	VisualShaderNodeIntConstant	VisualShaderNodeConstant	0
 P	VisualShaderNodeIntConstant	constant	int
 F	VisualShaderNodeIntConstant	set_constant	void	0	0	int
@@ -23931,9 +23931,9 @@ F	WebRTCPeerConnection	get_signaling_state	enum::WebRTCPeerConnection.SignalingS
 E	WebRTCPeerConnection	ConnectionState	0	STATE_NEW	0	STATE_CONNECTING	1	STATE_CONNECTED	2	STATE_DISCONNECTED	3	STATE_FAILED	4	STATE_CLOSED	5
 E	WebRTCPeerConnection	GatheringState	0	GATHERING_STATE_NEW	0	GATHERING_STATE_GATHERING	1	GATHERING_STATE_COMPLETE	2
 E	WebRTCPeerConnection	SignalingState	0	SIGNALING_STATE_STABLE	0	SIGNALING_STATE_HAVE_LOCAL_OFFER	1	SIGNALING_STATE_HAVE_REMOTE_OFFER	2	SIGNALING_STATE_HAVE_LOCAL_PRANSWER	3	SIGNALING_STATE_HAVE_REMOTE_PRANSWER	4	SIGNALING_STATE_CLOSED	5
-P	WebRTCPeerConnection	session_description_created	Signal
-P	WebRTCPeerConnection	ice_candidate_created	Signal
-P	WebRTCPeerConnection	data_channel_received	Signal
+X	WebRTCPeerConnection	session_description_created	String	String
+X	WebRTCPeerConnection	ice_candidate_created	String	int	String
+X	WebRTCPeerConnection	data_channel_received	WebRTCDataChannel
 C	WebRTCPeerConnectionExtension	WebRTCPeerConnection	0
 F	WebRTCPeerConnectionExtension	_get_connection_state	enum::WebRTCPeerConnection.ConnectionState	0	0
 F	WebRTCPeerConnectionExtension	_get_gathering_state	enum::WebRTCPeerConnection.GatheringState	0	0
@@ -24034,19 +24034,19 @@ F	WebXRInterface	get_display_refresh_rate	float	0	0
 F	WebXRInterface	set_display_refresh_rate	void	0	0	float
 F	WebXRInterface	get_available_display_refresh_rates	Array	0	0
 E	WebXRInterface	TargetRayMode	0	TARGET_RAY_MODE_UNKNOWN	0	TARGET_RAY_MODE_GAZE	1	TARGET_RAY_MODE_TRACKED_POINTER	2	TARGET_RAY_MODE_SCREEN	3
-P	WebXRInterface	session_supported	Signal
-P	WebXRInterface	session_started	Signal
-P	WebXRInterface	session_ended	Signal
-P	WebXRInterface	session_failed	Signal
-P	WebXRInterface	selectstart	Signal
-P	WebXRInterface	select	Signal
-P	WebXRInterface	selectend	Signal
-P	WebXRInterface	squeezestart	Signal
-P	WebXRInterface	squeeze	Signal
-P	WebXRInterface	squeezeend	Signal
-P	WebXRInterface	visibility_state_changed	Signal
-P	WebXRInterface	reference_space_reset	Signal
-P	WebXRInterface	display_refresh_rate_changed	Signal
+X	WebXRInterface	session_supported	String	bool
+X	WebXRInterface	session_started
+X	WebXRInterface	session_ended
+X	WebXRInterface	session_failed	String
+X	WebXRInterface	selectstart	int
+X	WebXRInterface	select	int
+X	WebXRInterface	selectend	int
+X	WebXRInterface	squeezestart	int
+X	WebXRInterface	squeeze	int
+X	WebXRInterface	squeezeend	int
+X	WebXRInterface	visibility_state_changed
+X	WebXRInterface	reference_space_reset
+X	WebXRInterface	display_refresh_rate_changed
 C	Window	Viewport	0
 P	Window	mode	enum::Window.Mode
 P	Window	title	String
@@ -24232,22 +24232,22 @@ E	Window	ContentScaleAspect	0	CONTENT_SCALE_ASPECT_IGNORE	0	CONTENT_SCALE_ASPECT
 E	Window	ContentScaleStretch	0	CONTENT_SCALE_STRETCH_FRACTIONAL	0	CONTENT_SCALE_STRETCH_INTEGER	1
 E	Window	LayoutDirection	0	LAYOUT_DIRECTION_INHERITED	0	LAYOUT_DIRECTION_APPLICATION_LOCALE	1	LAYOUT_DIRECTION_LTR	2	LAYOUT_DIRECTION_RTL	3	LAYOUT_DIRECTION_SYSTEM_LOCALE	4	LAYOUT_DIRECTION_MAX	5	LAYOUT_DIRECTION_LOCALE	1
 E	Window	WindowInitialPosition	0	WINDOW_INITIAL_POSITION_ABSOLUTE	0	WINDOW_INITIAL_POSITION_CENTER_PRIMARY_SCREEN	1	WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN	2	WINDOW_INITIAL_POSITION_CENTER_OTHER_SCREEN	3	WINDOW_INITIAL_POSITION_CENTER_SCREEN_WITH_MOUSE_FOCUS	4	WINDOW_INITIAL_POSITION_CENTER_SCREEN_WITH_KEYBOARD_FOCUS	5
-P	Window	window_input	Signal
-P	Window	nonclient_window_input	Signal
-P	Window	files_dropped	Signal
-P	Window	mouse_entered	Signal
-P	Window	mouse_exited	Signal
-P	Window	focus_entered	Signal
-P	Window	focus_exited	Signal
-P	Window	close_requested	Signal
-P	Window	go_back_requested	Signal
-P	Window	visibility_changed	Signal
-P	Window	about_to_popup	Signal
-P	Window	theme_changed	Signal
-P	Window	dpi_changed	Signal
-P	Window	titlebar_changed	Signal
-P	Window	title_changed	Signal
-P	Window	output_max_linear_value_changed	Signal
+X	Window	window_input	InputEvent
+X	Window	nonclient_window_input	InputEvent
+X	Window	files_dropped	PackedStringArray
+X	Window	mouse_entered
+X	Window	mouse_exited
+X	Window	focus_entered
+X	Window	focus_exited
+X	Window	close_requested
+X	Window	go_back_requested
+X	Window	visibility_changed
+X	Window	about_to_popup
+X	Window	theme_changed
+X	Window	dpi_changed
+X	Window	titlebar_changed
+X	Window	title_changed
+X	Window	output_max_linear_value_changed	float
 C	WorkerThreadPool	Object	0
 F	WorkerThreadPool	add_task	int	0	0	Callable	bool?	String?
 F	WorkerThreadPool	is_task_completed	bool	0	0	int
@@ -24366,11 +24366,11 @@ F	XRController3D	get_input	Variant	0	0	StringName
 F	XRController3D	get_float	float	0	0	StringName
 F	XRController3D	get_vector2	Vector2	0	0	StringName
 F	XRController3D	get_tracker_hand	enum::XRPositionalTracker.TrackerHand	0	0
-P	XRController3D	button_pressed	Signal
-P	XRController3D	button_released	Signal
-P	XRController3D	input_float_changed	Signal
-P	XRController3D	input_vector2_changed	Signal
-P	XRController3D	profile_changed	Signal
+X	XRController3D	button_pressed	String
+X	XRController3D	button_released	String
+X	XRController3D	input_float_changed	String	float
+X	XRController3D	input_vector2_changed	String	Vector2
+X	XRController3D	profile_changed	String
 C	XRControllerTracker	XRPositionalTracker	0
 C	XRFaceModifier3D	Node3D	0
 P	XRFaceModifier3D	face_tracker	String
@@ -24452,7 +24452,7 @@ E	XRInterface	TrackingStatus	0	XR_NORMAL_TRACKING	0	XR_EXCESSIVE_MOTION	1	XR_INS
 E	XRInterface	PlayAreaMode	0	XR_PLAY_AREA_UNKNOWN	0	XR_PLAY_AREA_3DOF	1	XR_PLAY_AREA_SITTING	2	XR_PLAY_AREA_ROOMSCALE	3	XR_PLAY_AREA_STAGE	4	XR_PLAY_AREA_CUSTOM	2147483647
 E	XRInterface	EnvironmentBlendMode	0	XR_ENV_BLEND_MODE_OPAQUE	0	XR_ENV_BLEND_MODE_ADDITIVE	1	XR_ENV_BLEND_MODE_ALPHA_BLEND	2
 E	XRInterface	VRSTextureFormat	0	XR_VRS_TEXTURE_FORMAT_UNIFIED	0	XR_VRS_TEXTURE_FORMAT_FRAGMENT_SHADING_RATE	1	XR_VRS_TEXTURE_FORMAT_FRAGMENT_DENSITY_MAP	2
-P	XRInterface	play_area_changed	Signal
+X	XRInterface	play_area_changed	int
 C	XRInterfaceExtension	XRInterface	0
 F	XRInterfaceExtension	_get_name	StringName	0	0
 F	XRInterfaceExtension	_get_capabilities	int	0	0
@@ -24505,7 +24505,7 @@ F	XRNode3D	get_is_active	bool	0	0
 F	XRNode3D	get_has_tracking_data	bool	0	0
 F	XRNode3D	get_pose	XRPose	0	0
 F	XRNode3D	trigger_haptic_pulse	void	0	0	String	float	float	float	float
-P	XRNode3D	tracking_changed	Signal
+X	XRNode3D	tracking_changed	bool
 C	XROrigin3D	Node3D	0
 P	XROrigin3D	world_scale	float
 P	XROrigin3D	current	bool
@@ -24548,13 +24548,13 @@ F	XRPositionalTracker	set_pose	void	0	0	StringName	Transform3D	Vector3	Vector3	e
 F	XRPositionalTracker	get_input	Variant	0	0	StringName
 F	XRPositionalTracker	set_input	void	0	0	StringName	Variant
 E	XRPositionalTracker	TrackerHand	0	TRACKER_HAND_UNKNOWN	0	TRACKER_HAND_LEFT	1	TRACKER_HAND_RIGHT	2	TRACKER_HAND_MAX	3
-P	XRPositionalTracker	pose_changed	Signal
-P	XRPositionalTracker	pose_lost_tracking	Signal
-P	XRPositionalTracker	button_pressed	Signal
-P	XRPositionalTracker	button_released	Signal
-P	XRPositionalTracker	input_float_changed	Signal
-P	XRPositionalTracker	input_vector2_changed	Signal
-P	XRPositionalTracker	profile_changed	Signal
+X	XRPositionalTracker	pose_changed	XRPose
+X	XRPositionalTracker	pose_lost_tracking	XRPose
+X	XRPositionalTracker	button_pressed	String
+X	XRPositionalTracker	button_released	String
+X	XRPositionalTracker	input_float_changed	String	float
+X	XRPositionalTracker	input_vector2_changed	String	Vector2
+X	XRPositionalTracker	profile_changed	String
 C	XRServer	Object	0
 P	XRServer	world_scale	float
 P	XRServer	world_origin	Vector3
@@ -24584,13 +24584,13 @@ F	XRServer	get_primary_interface	XRInterface	0	0
 F	XRServer	set_primary_interface	void	0	0	XRInterface
 E	XRServer	TrackerType	0	TRACKER_HEAD	1	TRACKER_CONTROLLER	2	TRACKER_BASESTATION	4	TRACKER_ANCHOR	8	TRACKER_HAND	16	TRACKER_BODY	32	TRACKER_FACE	64	TRACKER_ANY_KNOWN	127	TRACKER_UNKNOWN	128	TRACKER_ANY	255
 E	XRServer	RotationMode	0	RESET_FULL_ROTATION	0	RESET_BUT_KEEP_TILT	1	DONT_RESET_ROTATION	2
-P	XRServer	reference_frame_changed	Signal
-P	XRServer	interface_added	Signal
-P	XRServer	interface_removed	Signal
-P	XRServer	tracker_added	Signal
-P	XRServer	tracker_updated	Signal
-P	XRServer	tracker_removed	Signal
-P	XRServer	world_origin_changed	Signal
+X	XRServer	reference_frame_changed
+X	XRServer	interface_added	StringName
+X	XRServer	interface_removed	StringName
+X	XRServer	tracker_added	StringName	int
+X	XRServer	tracker_updated	StringName	int
+X	XRServer	tracker_removed	StringName	int
+X	XRServer	world_origin_changed
 C	XRTracker	RefCounted	0
 P	XRTracker	type	enum::XRServer.TrackerType
 P	XRTracker	name	String

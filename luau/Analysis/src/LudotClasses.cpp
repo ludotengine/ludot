@@ -151,4 +151,79 @@ void addLudotTaskLibrary(GlobalTypes& globals)
     getMutable<TableType>(library)->name = "task";
     globals.globalScope->bindings[globals.globalNames.names->getOrAdd("task")] = Binding{library, Location()};
 }
+
+namespace
+{
+// The Signal table type for one argument pack, which may be the alias's generic pack.
+TypeId buildSignalType(TypeArena& arena, const LudotSignalTypes& types, TypePackId params)
+{
+    const BuiltinTypes& builtins = *types.builtins;
+    TypePackId anyPack = arena.addTypePack(VariadicTypePack{builtins.anyType});
+    TypeId signal = arena.addType(TableType{TableState::Sealed, TypeLevel{}});
+    TypeId handler = arena.addType(FunctionType{params, anyPack});
+    auto method = [&](TypePackId arguments, TypePackId results)
+    {
+        TypeId function = arena.addType(FunctionType{arguments, results});
+        getMutable<FunctionType>(function)->hasSelf = true;
+        return Property::readonly(function);
+    };
+    TypePackId connection = arena.addTypePack({types.connection});
+    TableType* table = getMutable<TableType>(signal);
+    table->props[types.fire] = method(arena.addTypePack({signal}, params), builtins.emptyTypePack);
+    table->props[types.connect] = method(arena.addTypePack({signal, handler}), connection);
+    table->props[types.once] = method(arena.addTypePack({signal, handler}), connection);
+    table->props[types.wait] = method(arena.addTypePack({signal}), params);
+    table->props[types.disconnectAll] = method(arena.addTypePack({signal}), builtins.emptyTypePack);
+    return signal;
+}
+} // namespace
+
+TypeId LudotSignalTypes::instantiate(TypeArena& arena, TypePackId params) const
+{
+    TypeId signal = buildSignalType(arena, *this, params);
+    TableType* table = getMutable<TableType>(signal);
+    table->name = "Signal";
+    table->instantiatedTypePackParams = {params};
+    return signal;
+}
+
+LudotSignalTypes addLudotSignalTypes(GlobalTypes& globals, ApiCase methodCase, ApiCase propertyCase)
+{
+    auto& arena = globals.globalTypes;
+    const BuiltinTypes& builtins = *globals.builtinTypes;
+    LudotSignalTypes types;
+    types.builtins = &builtins;
+    types.fire = engineApiName("fire", methodCase);
+    types.connect = engineApiName("connect", methodCase);
+    types.once = engineApiName("once", methodCase);
+    types.wait = engineApiName("wait", methodCase);
+    types.disconnectAll = engineApiName("disconnect_all", methodCase);
+
+    types.connection = arena.addType(ExternType{"Connection", {}, std::nullopt, std::nullopt, {}, nullptr, "ludot", std::nullopt});
+    TypeId disconnect = arena.addType(FunctionType{arena.addTypePack({types.connection}), builtins.emptyTypePack});
+    getMutable<FunctionType>(disconnect)->hasSelf = true;
+    ExternType* connection = getMutable<ExternType>(types.connection);
+    connection->props[engineApiName("disconnect", methodCase)] = Property::readonly(disconnect);
+    connection->props[engineApiName("connected", propertyCase)] = Property::readonly(builtins.booleanType);
+    globals.globalScope->exportedTypeBindings["Connection"] = TypeFun{{}, types.connection};
+
+    // The type: Signal<T...>, whose pack is the fired arguments. Signal<> fires nothing.
+    TypePackId generic = arena.addTypePack(GenericTypePack{"T"});
+    TypeFun signal{{}, buildSignalType(arena, types, generic)};
+    getMutable<TableType>(signal.type)->name = "Signal";
+    signal.typePackParams.push_back(GenericTypePackDefinition{generic, std::nullopt});
+    globals.globalScope->exportedTypeBindings["Signal"] = signal;
+
+    // The value: Signal.new<T...>(...names), which takes the pack from its annotation.
+    TypePackId fresh = arena.addTypePack(GenericTypePack{"T"});
+    TypeId constructor = arena.addType(FunctionType{
+        {}, {fresh}, arena.addTypePack(VariadicTypePack{builtins.stringType}), arena.addTypePack({types.instantiate(arena, fresh)})
+    });
+    TypeId library = arena.addType(TableType{
+        {{"new", Property::readonly(constructor)}}, std::nullopt, TypeLevel{}, globals.globalScope.get(), TableState::Sealed
+    });
+    getMutable<TableType>(library)->name = "Signal";
+    globals.globalScope->bindings[globals.globalNames.names->getOrAdd("Signal")] = Binding{library, Location()};
+    return types;
+}
 } // namespace Luau

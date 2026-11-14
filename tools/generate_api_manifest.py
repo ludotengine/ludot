@@ -7,7 +7,7 @@ from generate_api_types import casing
 
 
 def generate(api):
-    rows = ['LUDOT_API_3']
+    rows = ['LUDOT_API_4']
     primitives = {'Nil', 'bool', 'int', 'float', 'String', 'StringName', 'NodePath'}
     for enum in api.get('global_enums', []):
         fields = ['G', enum['name'], str(int(enum.get('is_bitfield', False)))]
@@ -59,8 +59,9 @@ def generate(api):
             for constant in enum.get('values', []):
                 fields.extend([constant['name'], str(constant['value'])])
             rows.append('\t'.join(fields))
+        # X rows list a signal's argument types, so analysis can type it as Signal<(args...)>.
         for signal in entry.get('signals', []):
-            rows.append('\t'.join(['P', name, signal['name'], 'Signal']))
+            rows.append('\t'.join(['X', name, signal['name'], *[arg.get('type', 'Variant') for arg in signal.get('arguments', [])]]))
     for singleton in api.get('singletons', []):
         rows.append('\t'.join(['S', singleton['name'], singleton['type']]))
     return '\n'.join(rows) + '\n'

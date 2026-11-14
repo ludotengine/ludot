@@ -85,7 +85,8 @@ static func _collect(dir_path: String, out: Array[String]) -> void:
 			continue
 		var full := dir_path.path_join(entry)
 		if dir.current_is_dir():
-			if not SKIP_DIRS.has(full):
+			# Addon folders are skipped whatever their case, such as res://Addons.
+			if not SKIP_DIRS.has(full.to_lower()):
 				_collect(full, out)
 		elif entry.ends_with(".gd"):
 			out.append(full)

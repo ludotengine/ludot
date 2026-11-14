@@ -36,11 +36,11 @@ func _cmd_get_scan_state(_params: Dictionary) -> Dictionary:
 
 func _cmd_read_script(params: Dictionary) -> Dictionary:
 	var path := str(params.get("script_path", ""))
-	# #207 Phase 1: language-aware — .gd (default) and .cs both read.
-	if not path.ends_with(".gd") and not path.ends_with(".cs"):
+	# #207 Phase 1: language-aware — .gd (default), .cs, and Ludot's .luau all read.
+	if not _is_script_path(path):
 		return _router._fail(
 			"VALIDATION_ERROR",
-			"script_path must be a .gd or .cs file: '%s'." % path,
+			"script_path must be a .gd, .cs, or .luau file: '%s'." % path,
 		)
 	if not FileAccess.file_exists(path):
 		return _router._fail("RESOURCE_NOT_FOUND", "No script at '%s'." % path)
@@ -54,8 +54,8 @@ func _cmd_list_scripts(params: Dictionary) -> Dictionary:
 		return _router._fail("RESOURCE_NOT_FOUND", "No directory '%s'." % directory)
 	# #207 Phase 1: language-aware — "gd" (default) collects .gd, "cs" collects .cs.
 	var language := str(params.get("language", "gd"))
-	if language != "gd" and language != "cs":
-		return _router._fail("VALIDATION_ERROR", "language must be 'gd' or 'cs'.", "language")
+	if language != "gd" and language != "cs" and language != "luau":
+		return _router._fail("VALIDATION_ERROR", "language must be 'gd', 'cs', or 'luau'.", "language")
 	var scripts: Array = []
 	_collect_scripts(directory, scripts, language)
 	scripts.sort()
@@ -99,9 +99,8 @@ func _cmd_write_script(params: Dictionary) -> Dictionary:
 	var path := str(params.get("script_path", ""))
 	# Require a res:// script path (.gd or .cs, #207 Phase 1). Containment against
 	# res:// escape is enforced server-side; this is defense-in-depth.
-	if not path.begins_with("res://") \
-			or (not path.ends_with(".gd") and not path.ends_with(".cs")):
-		return _router._fail("VALIDATION_ERROR", "script_path must be a res:// .gd or .cs file.")
+	if not path.begins_with("res://") or not _is_script_path(path):
+		return _router._fail("VALIDATION_ERROR", "script_path must be a res:// .gd, .cs, or .luau file.")
 	var content := str(params.get("content", ""))
 	var before_state := MCPReceipt.file_state(path)
 	var existed := FileAccess.file_exists(path)
@@ -149,8 +148,8 @@ func _cmd_patch_script(params: Dictionary) -> Dictionary:
 				+ "Use write_script for full-file .cs authoring.",
 			"script_path",
 		)
-	if not path.ends_with(".gd"):
-		return _router._fail("VALIDATION_ERROR", "script_path must end with .gd.")
+	if not path.ends_with(".gd") and not path.ends_with(".luau"):
+		return _router._fail("VALIDATION_ERROR", "script_path must end with .gd or .luau.")
 	if not FileAccess.file_exists(path):
 		return _router._fail("RESOURCE_NOT_FOUND", "No script at '%s'." % path)
 	var find := str(params.get("find", ""))
@@ -187,7 +186,7 @@ func _collect_scripts(directory: String, out: Array, language: String) -> void:
 	var dir := DirAccess.open(directory)
 	if dir == null:
 		return
-	var extension := ".gd" if language == "gd" else ".cs"
+	var extension := "." + language
 	dir.list_dir_begin()
 	var name := dir.get_next()
 	while name != "":
@@ -201,3 +200,7 @@ func _collect_scripts(directory: String, out: Array, language: String) -> void:
 	dir.list_dir_end()
 
 
+
+
+func _is_script_path(path: String) -> bool:
+	return path.ends_with(".gd") or path.ends_with(".cs") or path.ends_with(".luau")

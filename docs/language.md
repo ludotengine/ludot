@@ -278,6 +278,90 @@ Starting callbacks in threads costs little. Finished threads are reused, so a pl
 callback allocates nothing. On Linux, a GDScript call to a Luau method measured
 0.74 µs, against 0.69 µs with the previous `pcall` path.
 
+## Signals
+
+`Signal` is a global, modeled on Roblox's RBXScriptSignal. It is both the
+constructor table and the type. The type's arguments are what the signal fires:
+
+```lua
+const HealthChanged: Signal<number, number> = Signal.new()
+const connection: Connection = HealthChanged:connect(function(previous, current)
+	print(previous, current)
+end)
+HealthChanged:fire(100, 75)
+print(connection.Connected) --> true
+connection:disconnect()
+
+const Saved: Signal<> = Signal.new()
+const Debug: Signal<...any> = Signal.new()
+```
+
+| Member | Behavior |
+| --- | --- |
+| `Signal.new(...names)` | Creates a signal. The optional names label its arguments for the engine. |
+| `signal:connect(handler)` | Runs `handler` on every fire and returns a `Connection`. |
+| `signal:once(handler)` | Runs `handler` on the next fire only and returns a `Connection`. |
+| `signal:fire(...)` | Calls every connected handler with the arguments. |
+| `signal:wait()` | Yields the current thread until the next fire and returns its arguments. |
+| `signal:disconnectAll()` | Disconnects every handler connected through this API. |
+| `connection:disconnect()` | Disconnects the handler. Disconnecting twice does nothing. |
+| `connection.Connected` | Whether the handler is still connected. |
+
+Method names follow `luau/api/method_casing` (`Fire`, `Connect` in PascalCase) and
+`Connected` follows `luau/api/property_casing`. There is no `emit`. `typeof` returns
+`"Signal"` and `"Connection"`. Handler parameter types are inferred from the signal,
+so they can be left off. Without an annotation, `Signal.new()` fires anything, and
+the `signal_declaration` warning asks for a `Signal<...>` type.
+
+Each handler runs in its own resumable thread, so it can call `task.wait`. Handlers
+run in connection order, from a snapshot taken when the fire starts, so a handler can
+connect or disconnect others while it runs. The same function connected twice runs
+twice. A failing handler is printed with its stack trace and the remaining handlers
+still run. `wait` errors outside a yieldable thread, such as module top-level code. A
+handler belongs to the object whose code connected it; when that object is freed, its
+connections are dropped.
+
+### Engine signals
+
+Engine signals use the same type. `self.TreeExiting` is a `Signal<>`, and
+`self.ChildEnteredTree` is a `Signal<Node>`, typed from the engine's argument
+information. `connect` returns a `Connection`, and `fire` emits the engine signal, so
+GDScript handlers run too. `disconnectAll` on an engine signal removes only the
+connections made through this API, never editor or GDScript connections.
+
+### Signal fields
+
+On a class that extends an engine class, a field declared as `Signal<...>` is also a
+script signal, named exactly as the field:
+
+```lua
+class Player extends CharacterBody3D = {
+	public Died: Signal<> = Signal.new()
+	public HealthChanged: Signal<number, number> = Signal.new("previous", "current")
+
+	function damage(amount: number)
+		const previous = self.Health
+		self.Health -= amount
+		self.HealthChanged:fire(previous, self.Health)
+	end
+}
+```
+
+The Node dock lists these signals, scenes save their connections, and GDScript can
+`connect("Died", ...)` and `emit_signal("HealthChanged", 1.0, 2.0)`. Firing from Luau
+and emitting from GDScript reach the same handlers. Argument types come from the type
+arguments and names from the string literals passed to `Signal.new`, or `arg1`,
+`arg2`, and so on. The checker warns when the names don't match the type arguments or
+aren't string literals.
+
+These fields are read-only after construction, cannot be `export`ed, and are hidden
+from the inspector property list. Plain Luau classes keep ordinary fields: each
+instance gets its own signal, and it can be replaced.
+
+Values cross an engine signal as engine values, like any engine call. Tables and plain
+class objects travel as `LuauValue` references, so Luau handlers receive the same table
+or object and GDScript handlers receive a `LuauValue` with `to_variant()`.
+
 ## Match expressions and statements
 
 A match evaluates its subject once and tests arms in source order. Only the first
@@ -424,7 +508,7 @@ constructs. Existing StyLua ignore comments remain effective.
 
 Use `-- selene: allow(match_exhaustiveness)` for the next statement, or
 `--# selene: allow(match_exhaustiveness)` at the start of a file, to suppress the
-native editor or LSP warning. Naming rules remain separate from engine casing settings.
+native editor or LSP warning. `signal_declaration` works the same way. Naming rules remain separate from engine casing settings.
 The shader subset rejects these new constructs with source diagnostics; its
 existing numeric-for syntax remains supported.
 
@@ -437,7 +521,8 @@ Project Settings > Luau > Api provides two independent settings:
 | `luau/api/method_casing` | `camelCase`, `PascalCase`, `snake_case` | `camelCase` |
 | `luau/api/property_casing` | `camelCase`, `PascalCase`, `snake_case` | `PascalCase` |
 
-The property setting also controls signals and builtin value components. Static
+The property setting also controls signal names (`self.TreeExiting`) and builtin value
+components. Signal methods follow the method setting, as described in Signals. Static
 methods use the method setting. Native class/type names retain their original
 engine spelling, including acronym names such as `HTTPClient`, `RID`, and `AABB`.
 Constructors always use `.new()`. Native enum constants use their original Godot spelling and retain existing
@@ -498,9 +583,9 @@ The native binding reflects methods, properties, signals, static methods, and
 constants. Property reads and writes go straight to the engine object, so
 `self.Name = "x"` is visible to `self:getName()` on the next line. Member lookups use
 a per-class cache built from ClassDB. Scripted and dynamic properties fall back to a
-reflective scan. Luau functions convert to engine `Callable` values, so
-`timer.Timeout:connect(onTimeout)` works. Arrays, dictionaries, and packed arrays
-support indexing (from 1), `#`, and iteration.
+reflective scan. Luau functions convert to engine `Callable` values. Signals are
+`Signal` objects, so `timer.Timeout:connect(onTimeout)` returns a `Connection`.
+Arrays, dictionaries, and packed arrays support indexing (from 1), `#`, and iteration.
 
 ## Hot reload
 
@@ -514,7 +599,8 @@ class, reload with it.
 
 Functions created by the previous version keep working after a reload and run the
 new code. That includes callbacks connected to signals and functions stored in
-fields or tables. Functions match by name and position within their enclosing
+fields or tables. Adding or removing a `Signal` field updates the script's signal
+list; existing connections on the object stay. Functions match by name and position within their enclosing
 function. A function keeps its old code while it is running, or if the variables it
 captures changed. A failed edit leaves the previous version running. A thread
 suspended in `task.wait` is still running, so it finishes with the code it started

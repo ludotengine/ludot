@@ -3569,6 +3569,128 @@ private:
     }
 };
 
+// Ludot Signal declarations: Signal.new() needs a Signal<...> annotation to check its
+// arguments, and parameter names must be string literals that match the type arguments.
+class LintSignalDeclaration : AstVisitor
+{
+public:
+    LUAU_NOINLINE static void process(LintContext& context, const AstNameTable& names)
+    {
+        LintSignalDeclaration pass{context, names};
+        context.root->visit(&pass);
+    }
+
+private:
+    LintContext* context;
+    AstName signalName;
+    AstName newName;
+
+    LintSignalDeclaration(LintContext& context, const AstNameTable& names)
+        : context(&context)
+        , signalName(names.get("Signal"))
+        , newName(names.get("new"))
+    {
+    }
+
+    AstExprCall* signalConstructor(AstExpr* expr) const
+    {
+        while (auto group = expr ? expr->as<AstExprGroup>() : nullptr)
+            expr = group->expr;
+        auto call = expr ? expr->as<AstExprCall>() : nullptr;
+        auto index = call ? call->func->as<AstExprIndexName>() : nullptr;
+        auto global = index ? index->expr->as<AstExprGlobal>() : nullptr;
+        if (!global || global->name != signalName || index->index != newName || index->op != '.')
+            return nullptr;
+        return call;
+    }
+
+    // The number of fired arguments a Signal<...> annotation declares, or nullopt when it is
+    // variadic, generic, or not a Signal annotation.
+    std::optional<size_t> declaredArguments(AstType* annotation) const
+    {
+        auto reference = annotation ? annotation->as<AstTypeReference>() : nullptr;
+        if (!reference || reference->prefix || reference->name != signalName)
+            return std::nullopt;
+        if (reference->parameters.size == 1 && reference->parameters.data[0].typePack)
+        {
+            auto pack = reference->parameters.data[0].typePack->as<AstTypePackExplicit>();
+            if (!pack || pack->typeList.tailType)
+                return std::nullopt;
+            return pack->typeList.types.size;
+        }
+        size_t count = 0;
+        for (const AstTypeOrPack& parameter : reference->parameters)
+        {
+            if (!parameter.type)
+                return std::nullopt;
+            ++count;
+        }
+        return count;
+    }
+
+    void check(AstExpr* value, AstType* annotation, bool field, const Location& location)
+    {
+        AstExprCall* call = signalConstructor(value);
+        if (!call)
+            return;
+        if (!annotation)
+        {
+            emitWarning(
+                *context,
+                LintWarning::Code_SignalDeclaration,
+                location,
+                "Signal.new() has no type annotation, so its arguments are not checked; declare it as Signal<...>"
+            );
+            return;
+        }
+        if (call->args.size == 0)
+            return;
+        for (AstExpr* name : call->args)
+            if (field && !name->is<AstExprConstantString>())
+            {
+                emitWarning(
+                    *context, LintWarning::Code_SignalDeclaration, name->location, "Signal parameter names in a signal field must be string literals"
+                );
+                return;
+            }
+        std::optional<size_t> expected = declaredArguments(annotation);
+        if (expected && *expected != call->args.size)
+            emitWarning(
+                *context,
+                LintWarning::Code_SignalDeclaration,
+                call->location,
+                "Signal.new() names %zu parameter%s, but the annotation declares %zu argument%s",
+                call->args.size,
+                call->args.size == 1 ? "" : "s",
+                *expected,
+                *expected == 1 ? "" : "s"
+            );
+    }
+
+    bool visit(AstStatLocal* node) override
+    {
+        for (size_t i = 0; i < node->vars.size && i < node->values.size; ++i)
+            check(node->values.data[i], node->vars.data[i]->annotation, false, node->vars.data[i]->location);
+        return true;
+    }
+
+    bool visit(AstStatAssign* node) override
+    {
+        for (size_t i = 0; i < node->vars.size && i < node->values.size; ++i)
+            if (node->vars.data[i]->is<AstExprGlobal>())
+                check(node->values.data[i], nullptr, false, node->vars.data[i]->location);
+        return true;
+    }
+
+    bool visit(AstStatClass* node) override
+    {
+        for (const AstClassMember& member : node->members)
+            if (auto property = get_if<AstClassProperty>(&member))
+                check(property->defaultValue, property->ty, true, property->nameLocation);
+        return true;
+    }
+};
+
 std::vector<LintWarning> lint(
     AstStat* root,
     const AstNameTable& names,
@@ -3610,6 +3732,9 @@ std::vector<LintWarning> lint(
         root->visit(&matches);
     }
 
+
+    if (context.warningEnabled(LintWarning::Code_SignalDeclaration))
+        LintSignalDeclaration::process(context, names);
 
     if (context.warningEnabled(LintWarning::Code_UnknownGlobal) || context.warningEnabled(LintWarning::Code_DeprecatedGlobal) ||
         context.warningEnabled(LintWarning::Code_GlobalUsedAsLocal) || context.warningEnabled(LintWarning::Code_PlaceholderRead) ||

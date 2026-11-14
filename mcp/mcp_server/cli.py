@@ -176,7 +176,11 @@ def _run_version(binary: list[str]) -> str | None:
 
 
 def _find_addon(project: Path) -> Path | None:
-    candidates = sorted(project.rglob("addons/godot_mcp/plugin.cfg"))
+    # Projects may keep addons in a differently cased folder, such as Addons/.
+    candidates = sorted(
+        path for path in project.rglob("plugin.cfg")
+        if path.parent.name == "godot_mcp" and path.parent.parent.name.lower() == "addons"
+    )
     if not candidates:
         return None
     default = project / "addons" / "godot_mcp" / "plugin.cfg"

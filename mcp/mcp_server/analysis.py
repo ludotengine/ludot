@@ -374,7 +374,7 @@ def find_orphaned_resources(
         if not res.startswith(scan_dir):
             continue
         # skip .godot cache and addons by default
-        if "/.godot/" in res or "/addons/" in res:
+        if "/.godot/" in res or "/addons/" in res.lower():
             continue
         if res in index.referenced or res in index.entry_points:
             continue

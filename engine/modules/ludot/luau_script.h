@@ -3,6 +3,7 @@
 #include "core/object/script_instance.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/object/ref_counted.h"
 #include "core/os/mutex.h"
 #include "lua.h"
 #include "Luau/LudotNaming.h"
@@ -10,6 +11,30 @@
 
 // Registers the task library. Defined in luau_task.cpp.
 void ludot_open_task(lua_State *L);
+// The Signal library and its Signal and Connection objects. Defined in luau_signal.cpp.
+void ludot_open_signal(lua_State *L);
+// Pushes the Signal object for an engine signal, such as Node.tree_exiting.
+void ludot_push_engine_signal(lua_State *L, Object *p_object, const StringName &p_name);
+// The engine Signal value of a Signal object, or false for a Luau-only signal.
+bool ludot_signal_variant(lua_State *L, int p_index, Variant &r_value);
+// Binds each Signal field of a script object to the engine signal of the same name, so
+// Luau, GDScript, and the editor share its handlers. Connections made earlier move over.
+void ludot_bind_signal_fields(lua_State *L, int p_object, Object *p_owner, const HashMap<StringName, MethodInfo> &p_signals);
+// A Luau value carried through an engine signal, so tables and plain class objects keep
+// their identity between Luau handlers. Defined in luau_signal.cpp.
+class LuauValue : public RefCounted {
+    GDCLASS(LuauValue, RefCounted);
+    int reference = LUA_NOREF;
+    uint64_t generation = 0;
+protected:
+    static void _bind_methods();
+public:
+    void store(lua_State *L, int p_index);
+    // Pushes the value, or nil after the VM restarted.
+    void push(lua_State *L) const;
+    Variant to_variant() const;
+    ~LuauValue();
+};
 // Every exposed, non-editor engine enum, named for the Enum global. Built on first use.
 const Luau::EngineEnumCatalog &ludot_engine_enum_catalog();
 
@@ -33,10 +58,13 @@ class LuauScript : public Script {
 	HashMap<StringName, Dictionary> property_enums;
 	HashMap<StringName, MethodInfo> methods;
     HashSet<LuauScriptInstance *> instances;
+    // Signal-typed fields, which the engine lists and emits as script signals.
+    HashMap<StringName, MethodInfo> signals;
 protected:
     static void _bind_methods();
 public:
     bool can_instantiate() const override;
+    const HashMap<StringName, MethodInfo> &get_signals() const { return signals; }
     int get_class_reference() const { return class_ref; }
     Ref<Script> get_base_script() const override { return base_script; }
     StringName get_global_name() const override { return class_name; }
@@ -54,6 +82,24 @@ public:
     Array get_lint_warnings(const String &p_code) const;
     PackedStringArray get_completions(const String &p_code) const;
     Dictionary get_symbol_help(const String &p_code, const String &p_symbol, Object *p_owner = nullptr) const;
+    // Tooling queries for editor integrations such as the MCP addon. Editor builds only.
+    // The engine API as Luau spells it, with Godot's documentation.
+    static Dictionary get_api_docs(const String &p_symbol);
+    // Checker and syntax errors, and lint and Selene warnings with suppressions applied,
+    // for source that belongs at p_path. Nothing runs.
+    static Array check_code(const String &p_code, const String &p_path);
+    static Array lint_code(const String &p_code, const String &p_path);
+    // Hover help for the identifier at a 1-based line and column, and completions there.
+    static Dictionary inspect_code(const String &p_code, const String &p_path, int p_line, int p_column);
+    // Engine enums whose name matches p_query; an exact name lists its items.
+    static Array find_enums(const String &p_query);
+    // The file an import path resolves to from p_from, or "" when it does not resolve.
+    static String resolve_module_path(const String &p_requested, const String &p_from);
+    // StyLua with the user's settings and the Ludot syntax protections.
+    static Dictionary format_code(const String &p_code);
+    // The built-in templates for p_base_class and its ancestors, and their expansion.
+    static Array get_templates(const String &p_base_class);
+    static String create_from_template(const String &p_template, const String &p_class_name, const String &p_base_class);
 #ifdef TOOLS_ENABLED
     StringName get_doc_class_name() const override { return class_name; }
     Vector<DocData::ClassDoc> get_documentation() const override { return {}; }
@@ -65,8 +111,12 @@ public:
     bool is_valid() const override { return valid; }
     bool is_abstract() const override { return false; }
     ScriptLanguage *get_language() const override;
-    bool has_script_signal(const StringName &p_signal) const override { return false; }
-    void get_script_signal_list(List<MethodInfo> *r_signals) const override {}
+    bool has_script_signal(const StringName &p_signal) const override { return signals.has(p_signal); }
+    void get_script_signal_list(List<MethodInfo> *r_signals) const override {
+        for (const KeyValue<StringName, MethodInfo> &signal : signals) {
+            r_signals->push_back(signal.value);
+        }
+    }
     bool get_property_default_value(const StringName &p_property, Variant &r_value) const override;
     void get_script_method_list(List<MethodInfo> *r_methods) const override;
 	void get_script_property_list(List<PropertyInfo> *r_properties) const override {
@@ -208,7 +258,8 @@ public:
     // Task scheduler. One per VM, stepped from SceneTree::process_frame. Engine calls
     // into Luau start in resumable threads, so task.wait can yield from callbacks.
     struct Task {
-        enum Kind { DEFER, WAIT, DELAY };
+        // SIGNAL waits for a Signal to fire. It never resumes on a timer.
+        enum Kind { DEFER, WAIT, DELAY, SIGNAL };
         int ref = LUA_NOREF;
         Kind kind = DEFER;
         ObjectID owner;

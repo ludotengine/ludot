@@ -57,6 +57,7 @@ from mcp_server.tools.import_asset import register_import_asset
 from mcp_server.tools.input_map import register_input_map
 from mcp_server.tools.input_sim import register_input_sim
 from mcp_server.tools.inspection import register_inspection
+from mcp_server.tools.luau import register_luau
 from mcp_server.tools.mutation import register_mutation
 from mcp_server.tools.navigation import register_navigation
 from mcp_server.tools.node_ops import register_node_ops
@@ -251,6 +252,7 @@ def create_server(
     register_vcs(mcp, bridge, config)
     register_class_info(mcp, bridge)
     register_inspection(mcp, bridge)
+    register_luau(mcp, bridge)
     register_mutation(mcp, bridge)
     register_scene_session(mcp, bridge)
     register_node_ops(mcp, bridge)

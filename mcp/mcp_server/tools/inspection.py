@@ -122,14 +122,8 @@ def register_inspection(mcp: FastMCP, bridge: Bridge) -> None:
 
     @mcp.tool(meta=READ_ONLY, tags=INSPECTION)
     async def get_ludot_conventions() -> LudotConventions:
-        """Read the style to follow before writing or editing Luau in a Ludot project:
-        the project's engine API casing (``api_casing.method``/``property``), the
-        user's naming casing per kind (``naming_casing``: variable, constant,
-        function, method, property, class; "Any" means no preference), lint and
-        StyLua formatter preferences, module aliases, editor indentation, and the
-        project's .luaurc/selene/stylua files. Call it once per session before
-        writing code; on stock Godot ``is_ludot`` is false.
-        """
+        """Ludot style to follow before writing Luau: engine API casing, the
+        user's naming casing per kind, lint, StyLua, indentation, module aliases."""
         return LudotConventions(**await route(bridge, "cmd_get_ludot_conventions"))
 
     @mcp.tool(meta=READ_ONLY, tags=INSPECTION)
@@ -138,13 +132,8 @@ def register_inspection(mcp: FastMCP, bridge: Bridge) -> None:
         prefix: str = "",
         max_results: MaxResults = 500,
     ) -> SettingsList:
-        """List settings whose name starts with ``prefix``. ``scope="project"`` reads
-        project.godot (e.g. prefix "luau/", "application/", "display/");
-        ``scope="editor"`` reads the user's editor preferences shared by all their
-        projects (e.g. "text_editor/luau/", "interface/"). Enum settings include
-        their ``options``. Values of settings that may hold credentials are
-        withheld (``redacted``). ``truncated`` is true when capped at ``max_results``.
-        """
+        """List project settings (``scope="project"``) or editor preferences
+        (``scope="editor"``) under ``prefix``; credential-like values are withheld."""
         params = {"scope": scope, "prefix": prefix, "max_results": max_results}
         return SettingsList(**await route(bridge, "cmd_list_settings", params))
 

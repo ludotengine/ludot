@@ -395,6 +395,10 @@ states return an empty model (`is_open=False` / `tree=None` / `selected=None`), 
 | `godot_inspection_get_node_groups` | `node_path: str` | `NodeGroups { node_path, groups[] }` | `cmd_get_node_groups` |
 | `godot_inspection_get_ludot_conventions` | — | `LudotConventions { engine_version, is_ludot, api_casing, naming_casing, lint, formatter, completion, modules, indentation, project_config_files }` | `cmd_get_ludot_conventions` |
 | `godot_inspection_list_settings` | `scope: "project"\|"editor" = "project"`, `prefix: str = ""`, `max_results: int = 500` | `SettingsList { scope, prefix, settings[{ name, type, value, redacted, options? }], truncated }` | `cmd_list_settings` |
+| `godot_inspection_luau_api` | `symbol: str` | `LuauApiDocs { query, found, kind, name, casing, description, members?, suggestions?, ... }` | `cmd_luau_api` |
+| `godot_inspection_luau_enums` | `query: str = ""` | `LuauEnumList { query, enums[{ name, bitfield, godot_sources, item_count, items? }] }` | `cmd_luau_enums` |
+| `godot_inspection_luau_resolve_module` | `module: str`, `from_path: res:// = "res://main.luau"` | `LuauModuleResolution { path, from_path, resolved?, found }` | `cmd_luau_resolve_module` |
+| `godot_inspection_luau_inspect` | `script_path`, `line: int`, `column: int`, `max_completions: int = 100` | `LuauInspection { script_path, line, column, symbol, help, completions[], completions_truncated }` | `cmd_luau_inspect` |
 | `godot_inspection_snapshot_subtree` | `node_path: str = ".", properties: [str] = [], max_depth: int = -1` | `SnapshotResult { snapshot_id, node_path, snapshot }` | `cmd_snapshot_subtree` |
 | `godot_inspection_diff_snapshots` | `before_id: str, after_id: str? = None, node_path: str = "."` | `SnapshotDiff { added: [node], removed: [node], changed: [DiffEntry { node, property, before, after }] }` | `cmd_snapshot_subtree` (live re-read only) |
 
@@ -562,6 +566,9 @@ writes, and writes register `UndoRedo`). `godot_scripts_get_parse_errors` shells
 | `godot_scripts_write` | `script_path, content, dry_run=False` | `WriteScriptResult { script_path, created, would_overwrite, dry_run, hint? }` | `mutating` |
 | `godot_scripts_patch` | `script_path, find, replace, dry_run=False` | `PatchScriptResult { script_path, replacements, dry_run }` | `mutating` |
 | `godot_scripts_get_parse_errors` | `script_path` | `ParseCheckResult { script_path, ok, errors: [ParseError{message, source?, line?}], rescan_pending }` | `read_only` |
+| `godot_scripts_luau_diagnose` | `script_path` | `LuauDiagnosis { script_path, ok, errors[{line, column, message}], warnings[{line, end_line, code, message}], format{ok, changed, error?, diff?} }` | `read_only` |
+| `godot_scripts_luau_format` | `script_path`, `dry_run=False` | `LuauFormatResult { script_path, changed, diff, dry_run, receipt? }` | `mutating` |
+| `godot_scripts_create_luau_script` | `script_path`, `base_class="Node"`, `class_name=""`, `template=""`, `dry_run=False` | `CreateLuauScriptResult { script_path, created, content, templates[], previous_existed, dry_run, receipt? }` | `mutating` |
 
 Non-`.gd` paths, missing files, and a `find` string that isn't present return structured
 errors. A `script_path` that isn't a `res://` path **or that escapes the project root**

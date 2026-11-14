@@ -1283,6 +1283,11 @@ void ConstraintGenerator::prototypeClass(const ScopePtr& scope, AstStatClass* cl
                     p.location = classProp.nameLocation;
                     if (classProp.isPrivate)
                         p.tags.push_back("ludot.private|" + module->name + "|" + declName);
+                    // A Signal field on an engine-backed class is also an engine signal, so it
+                    // stays bound to the value the constructor created.
+                    if (auto reference = classProp.ty ? classProp.ty->as<AstTypeReference>() : nullptr;
+                        reference && !reference->prefix && reference->name == "Signal")
+                        p.tags.push_back("ludot.signalfield");
 
                     // We make the default constructor take read-only args. This is true, in that we do not write to the table you pass for
                     // constructing an object.

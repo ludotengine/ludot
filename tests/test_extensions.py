@@ -318,6 +318,87 @@ return { worker, deferred, later, elapsed, frame }
             result = self.run_source('--!strict\n' + wrong, 'luau-analyze', flags)
             self.assertNotEqual(result.returncode, 0, wrong)
 
+    def test_signal_cases_type_check(self):
+        source = (ROOT / 'tests/fixtures/signals/cases.luau').read_text()
+        flags = ('--ludot-api=' + str(ROOT / 'types/engine.api'),)
+        self.assert_passes(self.run_source(source, 'luau-analyze', flags))
+
+    def test_signal_misuse_is_reported(self):
+        source = (ROOT / 'tests/fixtures/signals/errors.luau').read_text()
+        flags = ('--ludot-api=' + str(ROOT / 'types/engine.api'),)
+        result = self.run_source(source, 'luau-analyze', flags)
+        output = result.stdout + result.stderr
+        self.assertNotEqual(result.returncode, 0)
+        lines = source.splitlines()
+        errors = {int(line) for line in __import__('re').findall(r'main\.luau\((\d+),\d+\): TypeError', output)}
+        for needle in ('fire("full", 75)', 'fire(100)', 'function(previous: string', 'const name: string', ':emit(', 'p.Died:fire(5)'):
+            line = next(i + 1 for i, text in enumerate(lines) if needle in text)
+            self.assertIn(line, errors, needle + '\n' + output)
+        untyped = next(i + 1 for i, text in enumerate(lines) if text.startswith('const Untyped'))
+        self.assertIn(f'main.luau({untyped},7): SignalDeclaration', output)
+        # The untyped signal accepts anything, so its fires are not errors.
+        self.assertNotIn(untyped + 1, errors)
+
+    def test_signal_declaration_lint(self):
+        source = """--!strict
+const Named: Signal<number, number> = Signal.new("previous")
+const Matched: Signal<number, number> = Signal.new("previous", "current")
+const Variadic: Signal<...any> = Signal.new("anything")
+const label = "amount"
+class Bag = {
+	public Changed: Signal<number> = Signal.new(label)
+	public Loose = Signal.new()
+}
+return { Named, Matched, Variadic, Bag }
+"""
+        flags = ('--ludot-api=' + str(ROOT / 'types/engine.api'),)
+        result = self.run_source(source, 'luau-analyze', flags)
+        output = result.stdout + result.stderr
+        self.assertIn('main.luau(2,39): SignalDeclaration: Signal.new() names 1 parameter, but the annotation declares 2 arguments', output)
+        self.assertIn('main.luau(7,46): SignalDeclaration: Signal parameter names in a signal field must be string literals', output)
+        self.assertIn('main.luau(8,9): SignalDeclaration: Signal.new() has no type annotation', output)
+        self.assertEqual(output.count('SignalDeclaration'), 3, output)
+
+    def test_signal_fields_on_engine_classes(self):
+        source = """--!strict
+class Player extends CharacterBody3D = {
+	public Died: Signal<> = Signal.new()
+	public HealthChanged: Signal<number, number> = Signal.new("previous", "current")
+	export Shown: Signal<> = Signal.new()
+	function _ready()
+		self.Died = Signal.new()
+		const connection: Connection = self.TreeExiting:connect(function() end)
+		self.ChildEnteredTree:connect(function(node: Node) print(node.Name, connection.Connected) end)
+		self.ChildEnteredTree:fire(5)
+	end
+}
+class Bag = {
+	public Changed: Signal<> = Signal.new()
+}
+const bag = Bag.new()
+bag.Changed = Signal.new()
+return { Player, bag }
+"""
+        flags = ('--ludot-api=' + str(ROOT / 'types/engine.api'),)
+        result = self.run_source(source, 'luau-analyze', flags)
+        output = result.stdout + result.stderr
+        self.assertIn("main.luau(5,9): TypeError: Signal field 'Shown' cannot be exported", output)
+        self.assertIn("main.luau(7,3): TypeError: Signal field 'Died' is read-only after construction", output)
+        self.assertIn("main.luau(10,30): TypeError: Expected this to be 'Node', but got 'number'", output)
+        # Plain Luau classes may replace their signals.
+        self.assertEqual(output.count('TypeError'), 3, output)
+
+    def test_signal_method_casing(self):
+        source = """--!strict
+const Ping: Signal<string> = Signal.new()
+const connection: Connection = Ping:Connect(function(text) print(text) end)
+Ping:Fire("x")
+Ping:DisconnectAll()
+print(connection.connected)
+"""
+        flags = ('--ludot-api=' + str(ROOT / 'types/engine.api'), '--ludot-method-casing=PascalCase', '--ludot-property-casing=camelCase')
+        self.assert_passes(self.run_source(source, 'luau-analyze', flags))
+
     def test_godot_is_a_all_objects_and_invalid_names(self):
         source = '''--!strict
 const function read(event: InputEvent): Vector2?
