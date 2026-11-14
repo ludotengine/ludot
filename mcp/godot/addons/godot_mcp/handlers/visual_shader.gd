@@ -85,7 +85,7 @@ func _cmd_add_shader_node(params: Dictionary) -> Dictionary:
 	var path := str(params.get("shader_path", ""))
 	var node_type := str(params.get("node_type", ""))
 	var node_id := int(params.get("node_id", -1))
-	var position := Coerce.from_json(params.get("position", [0.0, 0.0]), TYPE_VECTOR2)
+	var position: Variant = Coerce.from_json(params.get("position", [0.0, 0.0]), TYPE_VECTOR2)
 
 	if not path.begins_with("res://"):
 		return _router._fail("VALIDATION_ERROR", "shader_path must start with res://.")

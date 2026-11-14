@@ -163,7 +163,7 @@ func _cmd_batch_set_property(params: Dictionary) -> Dictionary:
 	var property := str(params.get("property", ""))
 	if property.is_empty():
 		return _router._fail("VALIDATION_ERROR", "'property' must be a non-empty string.")
-	var targets := _batch_targets(root, params)
+	var targets: Variant = _batch_targets(root, params)
 	if targets is Dictionary:
 		return targets  # structured error from target resolution
 	var value: Variant = params.get("value")

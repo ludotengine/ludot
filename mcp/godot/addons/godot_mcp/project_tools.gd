@@ -188,7 +188,7 @@ static func _parse_func(
 		if default_text.is_empty():
 			required.append(arg_name)
 		else:
-			var parsed := _default_value(schema.get("type", ""), default_text)
+			var parsed: Variant = _default_value(schema.get("type", ""), default_text)
 			if parsed != null:
 				schema["default"] = parsed
 		properties[arg_name] = schema
