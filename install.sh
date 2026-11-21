@@ -33,7 +33,7 @@ else
 	tar -xzf "$work/$asset.tar.gz" -C "$work/unpack"
 	source_directory="$work/unpack/$asset"
 	parent="${XDG_DATA_HOME:-$HOME/.local/share}"
-	target="$parent/ludot"
+	target="$parent/ludot-engine"
 fi
 mkdir -p "$parent" "$HOME/.local/bin"
 staged="$target.new.$$"

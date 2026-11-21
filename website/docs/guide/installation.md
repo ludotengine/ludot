@@ -10,7 +10,7 @@ Run the command for your system. Run it again later to update.
 curl -fsSL https://github.com/ludotengine/ludot/releases/latest/download/install.sh | sh
 ```
 
-- **Linux x86_64:** installs to `~/.local/share/ludot`, with the `ludot` command in `~/.local/bin`.
+- **Linux x86_64:** installs to `~/.local/share/ludot-engine`, with the `ludot` command in `~/.local/bin`.
 - **macOS Apple Silicon:** installs to `~/Applications/Ludot.app`.
 
 </div>

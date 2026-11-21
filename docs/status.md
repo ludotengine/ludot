@@ -20,7 +20,7 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   checks cover flight, the planet camera, riding along with a moving world, ground
   clearance, pause, and orbit visibility. A 54-second Forward+ capture covers the tour.
 - Vendored Godot 4.7.2-stable and Luau 0.743 source with pinned provenance.
-- Engine version 4.7.2-lu.6, set by the `status` field in `engine/version.py`.
+- Engine version 4.7.2-lu.7, set by the `status` field in `engine/version.py`.
 - Project Manager update check repointed to Ludot's GitHub Releases (`ludotengine/ludot`),
   comparing `4.7.2-lu.<N>` versions and offering one-click install via the release's
   `install.sh` / `install.ps1` or opening the release page.

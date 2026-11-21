@@ -75,6 +75,10 @@ else:
         )
 
     def test_install_and_update(self):
+        user_data = self.folder / "home/.local/share/ludot"
+        (user_data / "app_userdata").mkdir(parents=True)
+        (user_data / "projects.cfg").write_text("[/tmp/demo]\n")
+        (user_data / "app_userdata/save.txt").write_text("keep")
         for version in ["9.8.7-lu.1", "9.8.7-lu.2"]:
             self.release(version)
             result = self.install()
@@ -84,6 +88,8 @@ else:
             self.assertEqual(
                 subprocess.check_output([str(executable)], text=True).strip(), version
             )
+            self.assertEqual((user_data / "projects.cfg").read_text(), "[/tmp/demo]\n")
+            self.assertEqual((user_data / "app_userdata/save.txt").read_text(), "keep")
         self.assertTrue(
             (
                 self.folder
