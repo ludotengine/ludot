@@ -26,7 +26,7 @@ test('generated reference covers the committed manifest', async () => {
 	assert.match(node, /Read getNode/)
 	assert.match(node, /Native name: <code>get_node<\/code>/)
 	assert.match(node, /## Signals/)
-	assert.match(node, /\[Object\]\(\.\/Object.md\)/)
+	assert.match(node, /<p class="inheritance">.*<a href="\.\/Object\.html">Object<\/a><\/p>/)
 	assert.match(node, /v-pre/)
 })
 

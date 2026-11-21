@@ -361,12 +361,13 @@ def generate_reference(classes, xmls, casing, write, site, enum_rows):
         chain = []
         parent = entry["parent"]
         while parent in classes:
-            chain.append(f"[{parent}](./{parent}.md)")
+            chain.append(f'<a href="./{parent}.html">{parent}</a>')
             parent = classes[parent]["parent"]
         if chain:
             parts += [
-                '<div class="inheritance-label">Inherits</div>',
-                " → ".join(chain),
+                '<p class="inheritance"><span class="inheritance-label">Inherits</span>'
+                + " → ".join(chain)
+                + "</p>",
                 "",
             ]
         if category == "Editor":
