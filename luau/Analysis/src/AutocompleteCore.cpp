@@ -1507,7 +1507,7 @@ static AutocompleteEntryMap autocompleteStatement(
                 continue;
 
             std::string n = toString(name);
-            if ((name.local && name.local->isSynthetic) || (!name.local && (n == "__ludot_enum" || n == "__ludot_match_eq")))
+            if ((name.local && name.local->isSynthetic) || (!name.local && (n == "__ludot_enum" || n == "__ludot_match_eq" || n == "__ludot_signal")))
                 continue;
             if (!result.count(n))
             {
@@ -1712,7 +1712,7 @@ static AutocompleteContext autocompleteExpression(
                     continue;
 
                 std::string n = toString(name);
-                if ((name.local && name.local->isSynthetic) || (!name.local && (n == "__ludot_enum" || n == "__ludot_match_eq"))) continue;
+                if ((name.local && name.local->isSynthetic) || (!name.local && (n == "__ludot_enum" || n == "__ludot_match_eq" || n == "__ludot_signal"))) continue;
                 if (!result.count(n))
                 {
                     TypeCorrectKind typeCorrect = checkTypeCorrectKind(module, typeArena, builtinTypes, node, position, binding.typeId);
@@ -2222,6 +2222,22 @@ AutocompleteResult autocomplete_(
     }
     else if (AstStatLocal* statLocal = node->as<AstStatLocal>())
     {
+        // A Ludot import lowers to `local ns = require(path)` spanning the whole statement, followed by one local per
+        // item. A cursor past the path and namespace name is inside the item list, so offer the module's exports.
+        if (statLocal->vars.size == 1 && statLocal->values.size == 1)
+        {
+            AstLocal* ns = statLocal->vars.data[0];
+            auto call = statLocal->values.data[0]->as<AstExprCall>();
+            if (call && call->location.begin == statLocal->location.begin && position > call->location.end &&
+                (ns->isSynthetic || position > ns->location.end))
+            {
+                std::optional<TypeId> ty = scopeAtPosition->lookup(Symbol(ns));
+                if (!ty)
+                    return {};
+                return {autocompleteProps(*module, typeArena, builtinTypes, follow(*ty), PropIndexType::Point, ancestry), ancestry, AutocompleteContext::Property};
+            }
+        }
+
         if (statLocal->vars.size == 1 && (!statLocal->equalsSignLocation || position < statLocal->equalsSignLocation->begin))
             return {{{"function", AutocompleteEntry{AutocompleteEntryKind::Keyword}}}, ancestry, AutocompleteContext::Unknown};
         else if (statLocal->equalsSignLocation && position >= statLocal->equalsSignLocation->end)

@@ -32,14 +32,16 @@ bool ludot_complete_block(CodeEdit *editor) {
 	Luau::AstNameTable names(allocator);
 	Luau::Lexer lexer(bytes.get_data(), bytes.length(), names);
 	Luau::Lexeme::Type last = Luau::Lexeme::Eof;
-	bool function = false, branch = false, match_with = false;
+	bool function = false, branch = false, match_with = false, saw_signal = false;
 	int parentheses = 0;
 	while (lexer.next().type != Luau::Lexeme::Eof) {
 		if (lexer.current().location.begin.line != unsigned(line)) {
 			continue;
 		}
 		last = lexer.current().type;
-		match_with = last == Luau::Lexeme::Name && String(lexer.current().name) == "with";
+		const bool is_with = last == Luau::Lexeme::Name && String(lexer.current().name) == "with";
+		match_with = is_with && !saw_signal;
+		saw_signal = last == Luau::Lexeme::Name && String(lexer.current().name) == "signal";
 		branch |= last == Luau::Lexeme::Name && (String(lexer.current().name) == "case" || String(lexer.current().name) == "otherwise");
 		if (last == '(') {
 			++parentheses;

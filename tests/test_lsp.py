@@ -153,11 +153,17 @@ class LspTests(unittest.TestCase):
         self.assertEqual({item['newText'] for item in renamed['changes'][uri]}, {'score'})
     def test_import_alias_rename(self):
         (self.root / 'helper.luau').write_text('return {add = function(a: number): number return a + 1 end}')
-        uri = self.open('import add from "./helper"\nprint(add(1))')
+        uri = self.open('import "./helper".{ add }\nprint(add(1))')
         renamed = self.server.request({'method': 'textDocument/rename', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 8}, 'newName': 'plus'}})
         edits = renamed['changes'][uri]
-        self.assertEqual(edits[0]['newText'], '(add as plus)')
+        self.assertEqual(edits[0]['newText'], 'add as plus')
         self.assertEqual(edits[1]['newText'], 'plus')
+    def test_import_item_completion(self):
+        (self.root / 'helper.luau').write_text('return {add = function(a: number): number return a + 1 end, subtract = 1}')
+        for text in ('import "./helper".{ a }', 'import "./helper".{  }', 'import "./helper" as helper.{ add,  }'):
+            uri = self.open(text)
+            result = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': text.index('}') - 1}}})
+            self.assertEqual({'add', 'subtract'}, {entry['label'] for entry in result}, text)
     def test_signature_help(self):
         uri = self.open('local function add(a: number, b: number): number return a + b end\nadd(1, 2)')
         result = self.server.request({'method': 'textDocument/signatureHelp', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 7}}})
@@ -166,7 +172,7 @@ class LspTests(unittest.TestCase):
         self.assertEqual(result['activeParameter'], 1)
     def test_import_definition(self):
         (self.root / 'helper.luau').write_text('return {add = function(a: number): number return a + 1 end}')
-        uri = self.open('import add from "./helper"\nprint(add(1))')
+        uri = self.open('import "./helper".{ add }\nprint(add(1))')
         result = self.server.request({'method': 'textDocument/definition', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 8}}})
         self.assertEqual(result[0]['uri'], (self.root / 'helper.luau').as_uri())
     def test_shader_completion_and_unicode_diagnostics(self):
@@ -271,16 +277,16 @@ class LspTests(unittest.TestCase):
 
     def test_signal_completion_and_declaration_warning(self):
         self.server.api = ROOT / 'types/engine.api'
-        uri = self.open('--!strict\nconst Ping: Signal<number> = Signal.new()\nPing:')
+        uri = self.open('--!strict\nconst Ping = signal with (value: number)\nPing:')
         completions = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 2, 'character': 5}}})
         labels = [entry['label'] for entry in completions]
         for name in ('fire', 'connect', 'once', 'wait', 'disconnectAll'):
             self.assertIn(name, labels)
         self.assertNotIn('emit', labels)
-        text = '--!strict\nconst Loose = Signal.new()\nreturn Loose'
+        text = '--!strict\nconst Loose = signal with (value)\nreturn Loose'
         self.server.documents[uri] = {'version': 2, 'text': text}
         self.server.publish(uri)
-        warning = next(d for d in self.messages[-1]['params']['diagnostics'] if 'Signal.new() has no type annotation' in d['message'])
+        warning = next(d for d in self.messages[-1]['params']['diagnostics'] if "Signal parameter 'value' has no type annotation" in d['message'])
         self.assertEqual(warning['severity'], 2)
         self.server.documents[uri] = {'version': 3, 'text': text.replace('const Loose', '-- selene: allow(signal_declaration)\nconst Loose')}
         checked, _ = self.server.analyze(uri)

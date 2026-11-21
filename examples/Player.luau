@@ -1,4 +1,4 @@
-import (add as plus) from "@helpers/mathutils"
+import "@helpers/mathutils".{ add as plus }
 
 class Player extends CharacterBody2D = {
     export Speed: number = 1 in 0 to 1 step 0.1

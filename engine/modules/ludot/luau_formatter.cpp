@@ -103,22 +103,8 @@ struct Adapter : Luau::AstVisitor {
 				statement->visit(this);
 				continue;
 			}
-			// Import expansions share their original start location. The lexer
-			// supplies the namespace suffix omitted from the lowered local AST.
-			Luau::Allocator allocator;
-			Luau::AstNameTable names(allocator);
-			Luau::Lexer lexer(source.data() + start, source.size() - start, names);
-			while (lexer.next().type != Luau::Lexeme::Eof) {
-				if (lexer.current().type != Luau::Lexeme::QuotedString && lexer.current().type != Luau::Lexeme::RawString) {
-					continue;
-				}
-				Luau::Position end = lexer.current().location.end;
-				if (lexer.next().type == Luau::Lexeme::Name && std::string(lexer.current().name) == "as") {
-					end = lexer.next().location.end;
-				}
-				protect(start, relative_offset(start, end));
-				break;
-			}
+			// Import statements span their whole source, including the alias and item list.
+			protect(start, offset(statement->location.end));
 		}
 		return false;
 	}

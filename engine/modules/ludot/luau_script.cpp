@@ -739,15 +739,42 @@ Variant::Type annotation_type(Luau::AstType *type) {
     for (int i = Variant::VECTOR2; i < Variant::VARIANT_MAX; ++i) if (Variant::get_type_name(Variant::Type(i)) == name) return Variant::Type(i);
     return Variant::OBJECT;
 }
-// A field declared as Signal<...> is a script signal.
+// A field initialized with `signal with (...)` or declared as Signal<...> is a script signal.
 bool signal_annotation(Luau::AstType *type) {
     const auto ref = type != nullptr ? type->as<Luau::AstTypeReference>() : nullptr;
     return ref != nullptr && !ref->prefix && String::utf8(ref->name.value) == "Signal";
 }
-// The signal's arguments take their types from the type arguments and their names from
-// the string literals passed to Signal.new, or arg1, arg2, and so on.
+const Luau::AstSignalInfo *property_signal_info(const Luau::AstClassProperty *p_property) {
+    Luau::AstExpr *value = p_property != nullptr ? p_property->defaultValue : nullptr;
+    while (const auto group = value != nullptr ? value->as<Luau::AstExprGroup>() : nullptr) value = group->expr;
+    const auto assertion = value != nullptr ? value->as<Luau::AstExprTypeAssertion>() : nullptr;
+    return assertion != nullptr ? assertion->signalInfo : nullptr;
+}
+bool is_signal_property(const Luau::AstClassProperty *p_property) {
+    return property_signal_info(p_property) != nullptr || signal_annotation(p_property->ty);
+}
+// The signal's arguments take their names and types from `signal with (...)`, or from a
+// Signal<...> annotation (defaulting to arg1, arg2, and so on).
 MethodInfo signal_info(const Luau::AstClassProperty *p_property) {
     MethodInfo info(String::utf8(p_property->name.value));
+    auto push_arg = [&](const String &p_name, Luau::AstType *p_type) {
+        const auto type_ref = p_type != nullptr ? p_type->as<Luau::AstTypeReference>() : nullptr;
+        const String type_name = type_ref != nullptr ? String::utf8(type_ref->name.value) : String();
+        Variant::Type type = p_type != nullptr ? annotation_type(p_type) : Variant::NIL;
+        PropertyInfo argument(type, p_name);
+        if (p_type == nullptr || type_name == "any" || type_name == "unknown" || type_ref == nullptr) {
+            argument.type = Variant::NIL;
+            argument.usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
+        }
+        else if (type == Variant::OBJECT) argument.class_name = type_name;
+        info.arguments.push_back(argument);
+    };
+    if (const Luau::AstSignalInfo *sig = property_signal_info(p_property)) {
+        for (const Luau::AstSignalParam &param : sig->params) {
+            push_arg(String::utf8(param.name.value), param.type);
+        }
+        return info;
+    }
     const auto ref = p_property->ty->as<Luau::AstTypeReference>();
     std::vector<Luau::AstType *> types;
     if (ref->parameters.size == 1 && ref->parameters.data[0].typePack != nullptr) {
@@ -759,27 +786,8 @@ MethodInfo signal_info(const Luau::AstClassProperty *p_property) {
             if (parameter.type != nullptr) types.push_back(parameter.type);
         }
     }
-    PackedStringArray names;
-    Luau::AstExpr *value = p_property->defaultValue;
-    while (const auto group = value != nullptr ? value->as<Luau::AstExprGroup>() : nullptr) value = group->expr;
-    if (const auto call = value != nullptr ? value->as<Luau::AstExprCall>() : nullptr) {
-        for (Luau::AstExpr *argument : call->args) {
-            const auto name = argument->as<Luau::AstExprConstantString>();
-            names.push_back(name != nullptr ? String::utf8(name->value.data, name->value.size) : String());
-        }
-    }
     for (size_t i = 0; i < types.size(); ++i) {
-        const String name = int(i) < names.size() && !names[i].is_empty() ? names[i] : "arg" + itos(i + 1);
-        const auto type_ref = types[i]->as<Luau::AstTypeReference>();
-        const String type_name = type_ref != nullptr ? String::utf8(type_ref->name.value) : String();
-        Variant::Type type = annotation_type(types[i]);
-        PropertyInfo argument(type, name);
-        if (type_name == "any" || type_name == "unknown" || type_ref == nullptr) {
-            argument.type = Variant::NIL;
-            argument.usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
-        }
-        else if (type == Variant::OBJECT) argument.class_name = type_name;
-        info.arguments.push_back(argument);
+        push_arg("arg" + itos(i + 1), types[i]);
     }
     return info;
 }
@@ -2057,10 +2065,13 @@ Error LuauScript::reload(bool p_keep_state) {
 		property_enums = base_script->property_enums;
 	}
     for (const auto &member : declaration->members) {
-        if (const auto property = Luau::get_if<Luau::AstClassProperty>(&member); property != nullptr && signal_annotation(property->ty)) {
-            // A Signal field is a script signal named after the field. It is not an inspector property.
-            const MethodInfo info = signal_info(property);
-            signals.insert(info.name, info);
+        if (const auto property = Luau::get_if<Luau::AstClassProperty>(&member); property != nullptr && is_signal_property(property)) {
+            // Public signal fields register as Godot script signals; private ones stay Luau-only.
+            // Neither is an inspector property.
+            if (!property->isPrivate) {
+                const MethodInfo info = signal_info(property);
+                signals.insert(info.name, info);
+            }
             continue;
         }
         if (const auto property = Luau::get_if<Luau::AstClassProperty>(&member)) {
@@ -2315,7 +2326,7 @@ String LuauLanguage::get_global_class_name(const String &p_path, String *r_base_
 }
 
 Vector<String> LuauLanguage::get_reserved_words() const {
-	return { "and", "break", "continue", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "const", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "class", "extends", "export", "onready", "private", "public", "import", "type", "from", "as", "to", "step", "enum", "match", "with", "case", "otherwise" };
+	return { "and", "break", "continue", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "const", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "class", "extends", "export", "onready", "private", "public", "import", "type", "as", "to", "step", "enum", "match", "with", "case", "otherwise", "signal" };
 }
 bool LuauLanguage::validate(const String &p_script, const String &p_path, List<String> *r_functions, List<ScriptError> *r_errors, List<Warning> *r_warnings, HashSet<int> *r_safe_lines) const {
     const CharString text = p_script.utf8();
@@ -2347,7 +2358,7 @@ Error LuauLanguage::complete_code(const String &p_code, const String &p_path, Ob
             // An even quote count means the cursor follows a closed string rather than sitting inside one.
             if (quote >= 0 && line.count(line.substr(quote, 1)) % 2 == 1) {
                 const String before = line.substr(0, quote).strip_edges();
-                if (before.begins_with("import ") || before.ends_with("from") || before.ends_with("require(")) {
+                if (before == "import" || before == "import type" || before.ends_with("require(")) {
                     const String requested = line.substr(quote + 1);
                     const Dictionary aliases = module_aliases(p_path);
                     const int slash = requested.rfind("/");

@@ -611,90 +611,121 @@ AstStat* Parser::parseStat()
 }
 
 // Ludot imports lower to existing require/type AST nodes, keeping source locations.
+// import [type] "path" [as name] [.{ [type] Name [as Name], ... }]
 AstStat* Parser::parseImport(const Location& start)
 {
-    bool typeOnly = lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "type";
+    auto isWord = [&](const Lexeme& lexeme, const char* word)
+    {
+        return lexeme.type == Lexeme::Name && AstName(lexeme.name) == word;
+    };
+
+    bool typeOnly = isWord(lexer.current(), "type");
     if (typeOnly)
         nextLexeme();
 
-    std::vector<std::pair<Name, Name>> bindings;
-    bool namespaceImport = lexer.current().type == Lexeme::QuotedString || lexer.current().type == Lexeme::RawString;
-    if (!namespaceImport)
-    {
-        do
-        {
-            bool renamed = lexer.current().type == '(';
-            if (renamed)
-                nextLexeme();
-            Name imported = parseName("imported name");
-            Name binding = imported;
-            if (renamed)
-            {
-                if (lexer.current().type != Lexeme::Name || AstName(lexer.current().name) != "as")
-                    report(lexer.current().location, "Expected 'as' in renamed import");
-                else
-                    nextLexeme();
-                binding = parseName("import binding");
-                expectAndConsume(')', "renamed import");
-            }
-            bindings.emplace_back(imported, binding);
-            if (lexer.current().type != ',')
-                break;
-            nextLexeme();
-        } while (lexer.current().type != Lexeme::Eof);
-        if (lexer.current().type != Lexeme::Name || AstName(lexer.current().name) != "from")
-            report(lexer.current().location, "Expected 'from' after imported names");
-        else
-            nextLexeme();
-    }
     if (lexer.current().type != Lexeme::QuotedString && lexer.current().type != Lexeme::RawString)
-        return reportStatError(lexer.current().location, {}, {}, "Expected a string module path");
+        return reportStatError(lexer.current().location, {}, {}, "Expected a string module path after 'import'");
 
     AstExpr* path = parseString();
     AstExpr* require = allocator.alloc<AstExprGlobal>(start, nameTable.getOrAdd("require"));
     AstExpr* call = allocator.alloc<AstExprCall>(Location(start, path->location), require, copy(&path, 1), false, false,
         AstArray<AstTypeOrPack>{}, path->location);
 
-    if (namespaceImport && !(lexer.current().type == Lexeme::Name && AstName(lexer.current().name) == "as"))
+    std::optional<Name> namespaceName;
+    if (isWord(lexer.current(), "as"))
     {
-        if (typeOnly)
-            report(start, "A type namespace import requires 'as' and a namespace name");
-        return allocator.alloc<AstStatExpr>(Location(start, path->location), call);
-    }
-
-    Name namespaceName(nameTable.getOrAdd(format("__ludot_import_%u_%u", start.begin.line, start.begin.column).c_str()), start);
-    if (namespaceImport)
-    {
-        nextLexeme(); // as
+        nextLexeme();
         namespaceName = parseName("import namespace");
     }
-    AstLocal* ns = pushLocal(Binding(namespaceName, nullptr, {0, 0}, true));
-    ns->isTypeImport = typeOnly;
-    ns->isSynthetic = !namespaceImport;
-    auto nsStat = allocator.alloc<AstStatLocal>(Location(start, path->location), copy(&ns, 1), copy(&call, 1), std::nullopt, true);
-    nsStat->isTypeImport = typeOnly;
-    std::vector<AstStat*> stats{nsStat};
-    for (const auto& [imported, binding] : bindings)
+
+    struct Item
+    {
+        Name imported;
+        Name binding;
+        bool isType;
+    };
+    std::vector<Item> items;
+    bool hasList = lexer.current().type == '.';
+    if (hasList)
+    {
+        Location dot = lexer.current().location;
+        nextLexeme();
+        if (typeOnly)
+            report(dot, "A type-only import can't list items; import types by name with .{ type Name }");
+        MatchLexeme open = lexer.current();
+        expectAndConsume('{', "import list");
+        while (lexer.current().type != '}' && lexer.current().type != Lexeme::Eof)
+        {
+            // 'type' is contextual: 'type Name' imports a type, while 'type', 'type,' and 'type as x' import a value named type.
+            bool isType = isWord(lexer.current(), "type") && lexer.lookahead().type == Lexeme::Name && !isWord(lexer.lookahead(), "as");
+            if (isType)
+                nextLexeme();
+            Name imported = parseName("imported name");
+            Name binding = imported;
+            if (isWord(lexer.current(), "as"))
+            {
+                nextLexeme();
+                binding = parseName("import binding");
+            }
+            items.push_back({imported, binding, isType});
+            if (lexer.current().type != ',')
+                break;
+            nextLexeme();
+        }
+        if (items.empty())
+            report(lexer.current().location, "Expected at least one name in the import list");
+        expectMatchAndConsume('}', open);
+    }
+
+    Location location(start, lexer.previousLocation());
+    if (!namespaceName && !hasList)
     {
         if (typeOnly)
+            report(start, "A type-only import needs 'as' and a namespace name");
+        return allocator.alloc<AstStatExpr>(location, call);
+    }
+
+    // An import that only names types has nothing to load at runtime.
+    bool typesOnly = typeOnly;
+    if (!namespaceName)
+    {
+        typesOnly = true;
+        for (const Item& item : items)
+            typesOnly = typesOnly && item.isType;
+    }
+
+    Name nsName = namespaceName ? *namespaceName
+                                : Name(nameTable.getOrAdd(format("__ludot_import_%u_%u", start.begin.line, start.begin.column).c_str()), start);
+    AstLocal* ns = pushLocal(Binding(nsName, nullptr, {0, 0}, true));
+    ns->isTypeImport = typesOnly;
+    ns->isSynthetic = !namespaceName;
+    auto nsStat = allocator.alloc<AstStatLocal>(location, copy(&ns, 1), copy(&call, 1), std::nullopt, true);
+    nsStat->isTypeImport = typesOnly;
+    if (items.empty())
+        return nsStat;
+
+    std::vector<AstStat*> stats{nsStat};
+    for (const Item& item : items)
+    {
+        if (item.isType)
         {
-            auto reference = allocator.alloc<AstTypeReference>(imported.location, ns->name, imported.name,
-                namespaceName.location, imported.location, false, AstArray<AstTypeOrPack>{}, ns);
-            auto alias = allocator.alloc<AstStatTypeAlias>(binding.location, binding.name, binding.location,
+            auto reference = allocator.alloc<AstTypeReference>(item.imported.location, ns->name, item.imported.name, nsName.location,
+                item.imported.location, false, AstArray<AstTypeOrPack>{}, ns);
+            auto alias = allocator.alloc<AstStatTypeAlias>(item.binding.location, item.binding.name, item.binding.location,
                 AstArray<AstGenericType*>{}, AstArray<AstGenericTypePack*>{}, reference, false);
             alias->isImportAlias = true;
             stats.push_back(alias);
         }
         else
         {
-            AstExpr* source = allocator.alloc<AstExprLocal>(binding.location, ns, false);
-            AstExpr* value = allocator.alloc<AstExprIndexName>(binding.location, source, imported.name,
-                imported.location, binding.location.begin, '.');
-            AstLocal* local = pushLocal(Binding(binding, nullptr, {0, 0}, true));
-            stats.push_back(allocator.alloc<AstStatLocal>(binding.location, copy(&local, 1), copy(&value, 1), std::nullopt, true));
+            AstExpr* source = allocator.alloc<AstExprLocal>(item.binding.location, ns, false);
+            AstExpr* value = allocator.alloc<AstExprIndexName>(item.binding.location, source, item.imported.name, item.imported.location,
+                item.binding.location.begin, '.');
+            AstLocal* local = pushLocal(Binding(item.binding, nullptr, {0, 0}, true));
+            stats.push_back(allocator.alloc<AstStatLocal>(item.binding.location, copy(&local, 1), copy(&value, 1), std::nullopt, true));
         }
     }
-    auto expansion = allocator.alloc<AstStatBlock>(Location(start, lexer.previousLocation()), copy(stats.data(), stats.size()));
+    auto expansion = allocator.alloc<AstStatBlock>(location, copy(stats.data(), stats.size()));
     expansion->isImportExpansion = true;
     return expansion;
 }
@@ -4332,6 +4363,124 @@ AstStat* Parser::parseEnum(const Location& start, bool exported)
     return stat;
 }
 
+bool Parser::ludotSignalStart()
+{
+    if (!ludotWord(lexer.current(), "signal"))
+        return false;
+    Lexer probe = lexer;
+    if (!ludotWord(probe.next(), "with"))
+        return false;
+    return probe.next().type == '(';
+}
+
+AstExpr* Parser::parseSignal()
+{
+    Location start = lexer.current().location;
+    nextLexeme(); // signal
+    nextLexeme(); // with
+    MatchLexeme openParen = lexer.current();
+    nextLexeme(); // (
+
+    std::vector<AstSignalParam> params;
+    std::vector<AstType*> paramTypes;
+    bool hasVariadic = false;
+    AstType* variadicType = nullptr;
+    Location variadicLocation;
+
+    while (lexer.current().type != ')' && lexer.current().type != Lexeme::Eof)
+    {
+        unsigned before = lexer.current().location.begin.line;
+        if (lexer.current().type == Lexeme::Dot3)
+        {
+            hasVariadic = true;
+            variadicLocation = lexer.current().location;
+            nextLexeme();
+            if (lexer.current().type == ':')
+            {
+                nextLexeme();
+                variadicType = parseType();
+                variadicLocation = Location(variadicLocation, variadicType->location);
+            }
+            else if (lexer.current().type != ')' && lexer.current().type != ',')
+            {
+                variadicType = parseType();
+                variadicLocation = Location(variadicLocation, variadicType->location);
+            }
+            if (lexer.current().type == ',')
+                nextLexeme();
+            if (lexer.current().type != ')')
+                report(lexer.current().location, "Variadic signal parameter must be last");
+            break;
+        }
+
+        std::optional<Name> paramName = parseNameOpt("signal parameter name");
+        if (!paramName)
+        {
+            if (lexer.current().type != ')' && lexer.current().location.begin.line == before)
+                nextLexeme();
+            break;
+        }
+
+        AstType* paramType = nullptr;
+        Location paramEnd = paramName->location;
+        if (lexer.current().type == ':')
+        {
+            nextLexeme();
+            paramType = parseType();
+            paramEnd = paramType->location;
+        }
+        Location paramLoc(paramName->location, paramEnd);
+        params.push_back({paramName->name, paramName->location, paramType, paramLoc});
+        paramTypes.push_back(
+            paramType ? paramType : allocator.alloc<AstTypeReference>(paramLoc, std::nullopt, nameTable.getOrAdd("any"), std::nullopt, paramLoc)
+        );
+
+        if (lexer.current().type == ',')
+            nextLexeme();
+        else if (lexer.current().type != ')')
+        {
+            report(lexer.current().location, "Expected ',' or ')' after signal parameter");
+            if (lexer.current().type != Lexeme::Name || lexer.current().location.begin.line == before)
+                nextLexeme();
+        }
+    }
+
+    Location end = lexer.current().location;
+    expectMatchAndConsume(')', openParen);
+    Location location(start, end);
+
+    AstTypePack* tailPack = nullptr;
+    if (hasVariadic)
+    {
+        AstType* tailElem = variadicType
+                                ? variadicType
+                                : allocator.alloc<AstTypeReference>(variadicLocation, std::nullopt, nameTable.getOrAdd("any"), std::nullopt, variadicLocation);
+        tailPack = allocator.alloc<AstTypePackVariadic>(variadicLocation, tailElem);
+    }
+
+    AstTypePackExplicit* pack = allocator.alloc<AstTypePackExplicit>(location, AstTypeList{copy(paramTypes.data(), paramTypes.size()), tailPack});
+    AstTypeOrPack paramPack{{}, pack};
+    AstTypeReference* signalType = allocator.alloc<AstTypeReference>(
+        location, std::nullopt, nameTable.getOrAdd("Signal"), std::nullopt, start, true, copy(&paramPack, 1)
+    );
+
+    AstExpr* factory = allocator.alloc<AstExprGlobal>(start, nameTable.getOrAdd("__ludot_signal"));
+    AstExpr* call = allocator.alloc<AstExprCall>(location, factory, AstArray<AstExpr*>{nullptr, 0}, false, false, AstArray<AstTypeOrPack>{}, location);
+    call->syntax = LudotSyntax::Signal;
+
+    auto* info = allocator.alloc<AstSignalInfo>();
+    info->location = location;
+    info->params = copy(params.data(), params.size());
+    info->hasVariadic = hasVariadic;
+    info->variadicType = variadicType;
+    info->variadicLocation = variadicLocation;
+
+    auto* assertion = allocator.alloc<AstExprTypeAssertion>(location, call, signalType);
+    assertion->syntax = LudotSyntax::Signal;
+    assertion->signalInfo = info;
+    return assertion;
+}
+
 AstLocal* Parser::ludotTemporary(const Location& location)
 {
     AstName name = nameTable.getOrAdd(format("__ludot_value_%u", ++ludotTemporaryId).c_str());
@@ -5022,6 +5171,8 @@ LUAU_NOINLINE AstExpr* Parser::parseAttributedFunction(const Location& start)
 // simpleexp -> NUMBER | STRING | NIL | true | false | ... | constructor | [attributes] FUNCTION body | primaryexp
 AstExpr* Parser::parseSimpleExpr()
 {
+    if (ludotSignalStart())
+        return parseSignal();
     if (ludotMatchStart())
         return static_cast<AstExpr*>(parseMatch(true));
     Location start = lexer.current().location;

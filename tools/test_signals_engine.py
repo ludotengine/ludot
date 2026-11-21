@@ -24,9 +24,10 @@ CASES_EXPECTED = '|'.join([
 ])
 
 FIGHTER = '''class Fighter extends Node = {
-	public Died: Signal<> = Signal.new()
-	public HealthChanged: Signal<number, number> = Signal.new("previous", "current")
-	public Hit: Signal<Node> = Signal.new()
+	public Died = signal with ()
+	public HealthChanged = signal with (previous: number, current: number)
+	public Hit = signal with (target: Node)
+	private Internal = signal with (code: number)
 	public Health: number = 100
 	public Log: { string } = {}
 
@@ -56,7 +57,7 @@ FIGHTER = '''class Fighter extends Node = {
 
 HERO = '''import "./fighter" as Fighter
 class Hero extends Fighter = {
-	public Leveled: Signal<number> = Signal.new("level")
+	public Leveled = signal with (level: number)
 
 	function levelUp(level: number)
 		self.Leveled:fire(level)
@@ -66,7 +67,7 @@ return Hero
 '''
 
 HUB = '''const Hub = {
-	Ping = Signal.new() :: Signal<>,
+	Ping = signal with (),
 	Count = 0,
 }
 return Hub
@@ -88,9 +89,9 @@ class Listener extends Node = {
 
 PROBE = '''import "./hub" as Hub
 class Probe extends Node = {
-	public Ping: Signal<> = Signal.new()
-	public Pair: Signal<string, number> = Signal.new("name", "size")
-	public Gone: Signal<> = Signal.new()
+	public Ping = signal with ()
+	public Pair = signal with (name: string, size: number)
+	public Gone = signal with ()
 	public Log: { string } = {}
 
 	function note(entry: string)
@@ -248,12 +249,14 @@ func _process(_delta: float) -> bool:
 		if not expect(health.args[0].name == "previous" and health.args[1].name == "current" and health.args[0].type == TYPE_FLOAT, "HealthChanged arguments are wrong: " + str(health.args)):
 			return true
 		var hit := signal_named(script, "Hit")
-		if not expect(hit.args[0].name == "arg1" and hit.args[0].type == TYPE_OBJECT and hit.args[0].class_name == "Node", "Hit arguments are wrong: " + str(hit.args)):
+		if not expect(hit.args[0].name == "target" and hit.args[0].type == TYPE_OBJECT and hit.args[0].class_name == "Node", "Hit arguments are wrong: " + str(hit.args)):
 			return true
 		if not expect(fighter.has_signal("Died") and script.has_script_signal("Died"), "Died is not a script signal"):
 			return true
+		if not expect(not fighter.has_signal("Internal") and not script.has_script_signal("Internal"), "Private signal leaked to Godot script signals"):
+			return true
 		for property in fighter.get_property_list():
-			if property.name == "Died":
+			if property.name == "Died" or property.name == "Internal":
 				fail("A Signal field is listed as a property")
 				return true
 		# GDScript handlers receive Luau fires, and Luau handlers receive GDScript emits.
@@ -334,7 +337,7 @@ func _process(_delta: float) -> bool:
 		# Hot reload adds Extra and removes Gone while connections exist.
 		probe.connect("Gone", on_ping)
 		var source: String = probe_script.source_code
-		probe_script.source_code = source.replace('public Gone: Signal<> = Signal.new()', 'public Extra: Signal<string> = Signal.new("value")')
+		probe_script.source_code = source.replace('public Gone = signal with ()', 'public Extra = signal with (value: string)')
 		if not expect(probe_script.reload(true) == OK, "The probe did not reload"):
 			return true
 		if not expect(probe_script.has_script_signal("Extra") and not probe_script.has_script_signal("Gone"), "The reload did not update the signal list"):

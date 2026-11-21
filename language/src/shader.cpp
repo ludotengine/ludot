@@ -351,23 +351,32 @@ bool unit(Generator& gen, const std::string& source, const std::string& path, bo
             Import entry;
             entry.location = token.location;
             lexer.next();
-            if (lexer.current().type == '(') return diagnose(lexer.current().location, "Shader imports cannot rename declarations");
-            if (lexer.current().type == Lexeme::Name && std::string(lexer.current().name) == "type") return diagnose(lexer.current().location, "Shader imports have no types");
-            while (lexer.current().type == Lexeme::Name) {
-                entry.names.push_back(lexer.current().name);
-                lexer.next();
-                if (lexer.current().type != ',') break;
-                lexer.next();
-            }
-            if (!entry.names.empty()) {
-                if (lexer.current().type != Lexeme::Name || std::string(lexer.current().name) != "from") return diagnose(lexer.current().location, "Expected 'from' in shader import");
-                lexer.next();
-            }
-            if (lexer.current().type != Lexeme::QuotedString) return diagnose(lexer.current().location, "Expected a quoted path in shader import");
+            auto word = [&](const char* expected) { return lexer.current().type == Lexeme::Name && std::string(lexer.current().name) == expected; };
+            if (word("type")) return diagnose(lexer.current().location, "Shader imports have no types");
+            if (lexer.current().type != Lexeme::QuotedString) return diagnose(lexer.current().location, "Expected a quoted path after 'import'");
             entry.requested = std::string(lexer.current().data, lexer.current().getLength());
-            blank(offset(token.location.begin), offset(lexer.current().location.end));
+            Location last = lexer.current().location;
             lexer.next();
-            if (lexer.current().type == Lexeme::Name && std::string(lexer.current().name) == "as") return diagnose(lexer.current().location, "Shader imports cannot use namespaces");
+            if (word("as")) return diagnose(lexer.current().location, "Shader imports cannot use namespaces");
+            if (lexer.current().type == '.') {
+                lexer.next();
+                if (lexer.current().type != '{') return diagnose(lexer.current().location, "Expected '{' after '.' in shader import");
+                lexer.next();
+                while (lexer.current().type != '}') {
+                    if (word("type") && lexer.lookahead().type == Lexeme::Name) return diagnose(lexer.current().location, "Shader imports have no types");
+                    if (lexer.current().type != Lexeme::Name) return diagnose(lexer.current().location, "Expected a declaration name in shader import");
+                    entry.names.push_back(lexer.current().name);
+                    lexer.next();
+                    if (word("as")) return diagnose(lexer.current().location, "Shader imports cannot rename declarations");
+                    if (lexer.current().type != ',') break;
+                    lexer.next();
+                }
+                if (lexer.current().type != '}') return diagnose(lexer.current().location, "Expected '}' to close shader import list");
+                if (entry.names.empty()) return diagnose(lexer.current().location, "Expected at least one name in shader import list");
+                last = lexer.current().location;
+                lexer.next();
+            }
+            blank(offset(token.location.begin), offset(last.end));
             imports.push_back(entry);
             continue;
         }

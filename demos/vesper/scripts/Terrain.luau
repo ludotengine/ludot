@@ -1,5 +1,5 @@
 import "@sim/Scene" as Scene
-import type Shape from "@sim/System"
+import "@sim/System".{ type Shape }
 
 --- Planet surfaces: a cube puffed into a sphere, then displaced by layered noise,
 --- ridges, terraces, canyons, and craters.

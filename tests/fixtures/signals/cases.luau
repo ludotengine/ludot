@@ -8,14 +8,14 @@ const function note(entry: string)
 end
 
 -- 1. A module-level signal with no arguments.
-const Saved: Signal<> = Signal.new()
+const Saved = signal with ()
 Saved:connect(function()
 	note("saved")
 end)
 Saved:fire()
 
 -- 2. Typed arguments, fired and received.
-const HealthChanged: Signal<number, number> = Signal.new()
+const HealthChanged = signal with (previous: number, current: number)
 HealthChanged:connect(function(previous: number, current: number)
 	note(`health {previous}->{current}`)
 end)
@@ -29,7 +29,7 @@ HealthChanged:fire(10, 5)
 HealthChanged:disconnectAll()
 
 -- 4. connect returns a Connection that can be disconnected.
-const Tick: Signal<number> = Signal.new()
+const Tick = signal with (frame: number)
 const connection: Connection = Tick:connect(function(frame: number)
 	note(`tick {frame}`)
 end)
@@ -58,7 +58,7 @@ Tick:fire(5)
 Tick:fire(6)
 
 -- 7. wait yields until the next fire and returns its arguments.
-const Loaded: Signal<string, number> = Signal.new()
+const Loaded = signal with (name: string, size: number)
 const waiter = coroutine.create(function()
 	const name, size = Loaded:wait()
 	note(`waited {name} {size}`)
@@ -67,7 +67,7 @@ coroutine.resume(waiter)
 Loaded:fire("level1", 42)
 
 -- 8. Any number of untyped arguments.
-const Debug: Signal<...any> = Signal.new()
+const Debug = signal with (...any)
 Debug:connect(function(...)
 	note(`debug {select("#", ...)}`)
 end)
@@ -79,8 +79,8 @@ const function forward<T...>(from: Signal<T...>, to: Signal<T...>): Connection
 		to:fire(...)
 	end)
 end
-const Source: Signal<string> = Signal.new()
-const Target: Signal<string> = Signal.new()
+const Source = signal with (message: string)
+const Target = signal with (message: string)
 Target:connect(function(message: string)
 	note(`forwarded {message}`)
 end)
@@ -96,7 +96,7 @@ Saved:connect(count)
 Saved:fire()
 
 -- 11. An erroring handler doesn't stop the others.
-const Risky: Signal<> = Signal.new()
+const Risky = signal with ()
 Risky:connect(function()
 	error("boom")
 end)
@@ -109,8 +109,8 @@ Risky:fire()
 class Player = {
 	public Name: string = ""
 	public Health: number = 100
-	public Died: Signal<> = Signal.new()
-	public Damaged: Signal<number, number> = Signal.new()
+	public Died = signal with ()
+	public Damaged = signal with (previous: number, current: number)
 
 	function damage(amount: number)
 		const previous = self.Health

@@ -1,7 +1,6 @@
 import "@sim/Clock" as Clock
 import "@sim/Tour" as Tour
-import "@sim/Scene" as Scene
-import type Body from "@sim/Scene"
+import "@sim/Scene" as Scene.{ type Body }
 
 --- Camera control. Free flight rides along with the nearest world, so you can hover over
 --- its surface while it orbits. The planet camera circles one world. The tour plays the

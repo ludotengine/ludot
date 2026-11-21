@@ -173,7 +173,8 @@ enum class LudotSyntax
     Coalesce,
     CoalesceAssign,
     Range,
-    Pipeline
+    Pipeline,
+    Signal
 };
 
 class AstNode
@@ -683,6 +684,23 @@ public:
 
 std::string toString(AstExprBinary::Op op);
 
+struct AstSignalParam
+{
+    AstName name;
+    Location nameLocation;
+    AstType* type = nullptr;
+    Location location;
+};
+
+struct AstSignalInfo
+{
+    Location location;
+    AstArray<AstSignalParam> params;
+    bool hasVariadic = false;
+    AstType* variadicType = nullptr;
+    Location variadicLocation;
+};
+
 class AstExprTypeAssertion : public AstExpr
 {
 public:
@@ -694,6 +712,7 @@ public:
 
     AstExpr* expr;
     AstType* annotation;
+    AstSignalInfo* signalInfo = nullptr;
 };
 
 class AstExprIfElse : public AstExpr

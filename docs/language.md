@@ -135,31 +135,64 @@ functions, or classes.
 
 ## Imports
 
+Every import starts with `import` and a module path. What comes after the path
+decides what you get.
+
 ```lua
-import add from "@helpers/mathutils"
-import add, subtract from "@helpers/mathutils"
-import (add as plus), subtract from "@helpers/mathutils"
-import "@pkgs/something" as something
-import type Person from "@helpers/personutils"
-import type (Person as Guy), Female from "@helpers/personutils"
-import type "@helpers/personutils" as utils
-import "@helpers/personutils" as personutils
 import "@helpers/setup"
+import "@helpers/mathutils" as math
+import "@helpers/mathutils".{ add, subtract }
+import "@helpers/mathutils".{ add as plus, subtract }
+import "@helpers/personutils".{ type Person, createPerson }
+import "@helpers/personutils" as people.{ type Person }
+import type "@helpers/personutils" as utils
 ```
 
 | Form | What you get |
 | --- | --- |
-| `import a, b from "path"` | Named values, as immutable locals |
-| `import (a as b) from "path"` | A named value under a different local name |
-| `import "path" as name` | The whole module, including its exported types |
-| `import type A from "path"` | Types only, with no runtime load |
-| `import type "path" as name` | A type-only namespace, which can't be read as a value |
 | `import "path"` | Runs the module for its side effects |
+| `import "path" as name` | The whole module, including its exported types |
+| `import "path".{ a, b }` | Named values, as immutable locals |
+| `import "path".{ a as b }` | A named value under a different local name |
+| `import "path".{ type A }` | A named type |
+| `import "path" as name.{ a }` | The whole module and named items in one statement |
+| `import type "path" as name` | A type-only namespace, which can't be read as a value |
 
 Each import statement loads its module once.
 
 A module exports types with `export type`. It exports values by returning a table or
 with Luau's value export syntax.
+
+### Named items
+
+The braces list the exports you want, much like `use module::{a, b}` in Rust. The
+path comes first, so the editor can complete item names from the module's exports.
+
+- `as` renames the name to its left, whether that's an item or the module.
+- Mark types with `type`, as in TypeScript's `import { type A }`. Values and types
+  can share one list. If every item is a type and there's no namespace, the module
+  isn't loaded at runtime.
+- A long list can span several lines and end with a trailing comma:
+
+```lua
+import "@pkgs/ui".{
+	Button,
+	type ButtonProps,
+	Label as Text,
+}
+```
+
+`type` still works as an ordinary name. `.{ type }` and `.{ type as kind }` import a
+value called `type`. `type` followed by another name marks a type.
+
+### Namespaces
+
+`as name` binds the whole module to one local, like `import module as name` in
+Python. Exported types are available as `name.Type`.
+
+`import type "path" as name` binds a namespace for types only. The module isn't
+loaded at runtime, and reading `name` as a value is an error. A type-only import
+can't take an item list. Mark the items with `type` instead.
 
 ### Aliases
 
@@ -403,11 +436,12 @@ callback allocates nothing. On Linux, a GDScript call into a Luau method measure
 
 ## Signals
 
-`Signal` is a global modeled on Roblox's RBXScriptSignal. It's both the constructor
-and the type. The type arguments list what the signal fires with:
+Signals are created with `signal with (...)`, modeled on Roblox's RBXScriptSignal.
+The parameter list names and types the arguments the signal fires with, and its
+type is `Signal<T...>`:
 
 ```lua
-const HealthChanged: Signal<number, number> = Signal.new()
+const HealthChanged = signal with (previous: number, current: number)
 
 const connection: Connection = HealthChanged:connect(function(previous, current)
 	print(previous, current)
@@ -417,13 +451,13 @@ HealthChanged:fire(100, 75)
 print(connection.Connected) --> true
 connection:disconnect()
 
-const Saved: Signal<> = Signal.new()
-const Debug: Signal<...any> = Signal.new()
+const Saved = signal with ()
+const Debug = signal with (...any)
 ```
 
-| Member | What it does |
+| Form / Member | What it does |
 | --- | --- |
-| `Signal.new(...names)` | Creates a signal. The optional names label its arguments for the engine. |
+| `signal with (param: Type, ...)` | Creates a signal. Parameter names also label its arguments for the engine. |
 | `signal:connect(handler)` | Runs `handler` on every fire. Returns a `Connection`. |
 | `signal:once(handler)` | Runs `handler` on the next fire only. Returns a `Connection`. |
 | `signal:fire(...)` | Calls every connected handler with the arguments. |
@@ -437,10 +471,11 @@ const Debug: Signal<...any> = Signal.new()
 - Methods follow `luau/api/method_casing`, so they become `Fire` and `Connect` in
   PascalCase. `Connected` follows `luau/api/property_casing`.
 - The method is `fire`. There is no `emit`.
-- `typeof` returns `"Signal"` or `"Connection"`.
+- `Signal` is a type only (`Signal<number, number>`, `Signal<>`, `Signal<...any>`).
+  `typeof` returns `"Signal"` or `"Connection"`.
 - Handler parameter types come from the signal, so you can leave them off.
-- A `Signal.new()` without a type annotation accepts anything. The
-  `signal_declaration` warning asks you to add a `Signal<...>` type.
+- A signal parameter without a type annotation, such as `signal with (value)`,
+  defaults to `any` and triggers the `signal_declaration` warning.
 
 ### How handlers run
 
@@ -467,13 +502,14 @@ information.
 
 ### Signal fields
 
-In a class that extends an engine class, a field typed `Signal<...>` also becomes a
-script signal with the same name:
+In a class that extends an engine class, a `public` field initialized with
+`signal with (...)` also becomes a script signal with the same name:
 
 ```lua
 class Player extends CharacterBody3D = {
-	public Died: Signal<> = Signal.new()
-	public HealthChanged: Signal<number, number> = Signal.new("previous", "current")
+	public Died = signal with ()
+	public HealthChanged = signal with (previous: number, current: number)
+	private InternalTick = signal with (dt: number)
 
 	function damage(amount: number)
 		const previous = self.Health
@@ -485,19 +521,16 @@ class Player extends CharacterBody3D = {
 
 These signals work everywhere a GDScript signal does:
 
-- The Node dock lists them, and scenes save their connections.
+- The Node dock lists them with their parameter names and types, and scenes save
+  their connections.
 - GDScript can call `connect("Died", ...)` and `emit_signal("HealthChanged", 1.0, 2.0)`.
 - Firing from Luau and emitting from GDScript reach the same handlers.
 
-Argument types come from the type arguments. Argument names come from the strings
-passed to `Signal.new`, or default to `arg1`, `arg2`, and so on. The checker warns
-when the names don't match the type arguments or aren't string literals.
+`private` signal fields stay internal to the declaring class: they are not
+registered as engine signals and cannot be accessed from other classes.
 
-Signal fields are read-only after construction, can't be `export`ed, and don't
-appear in the Inspector.
-
-In plain Luau classes that don't extend an engine class, a signal field is an
-ordinary field. Each instance gets its own signal, and it can be replaced.
+Signal fields are read-only, cannot be `export`ed or `onready`, and do not appear
+in the Inspector.
 
 ### Passing values
 

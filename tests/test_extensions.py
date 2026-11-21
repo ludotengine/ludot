@@ -335,62 +335,68 @@ return { worker, deferred, later, elapsed, frame }
             line = next(i + 1 for i, text in enumerate(lines) if needle in text)
             self.assertIn(line, errors, needle + '\n' + output)
         untyped = next(i + 1 for i, text in enumerate(lines) if text.startswith('const Untyped'))
-        self.assertIn(f'main.luau({untyped},7): SignalDeclaration', output)
-        # The untyped signal accepts anything, so its fires are not errors.
+        self.assertIn(f'main.luau({untyped},30): SignalDeclaration', output)
+        # The untyped parameter defaults to any, so its fires are not errors.
         self.assertNotIn(untyped + 1, errors)
 
     def test_signal_declaration_lint(self):
         source = """--!strict
-const Named: Signal<number, number> = Signal.new("previous")
-const Matched: Signal<number, number> = Signal.new("previous", "current")
-const Variadic: Signal<...any> = Signal.new("anything")
-const label = "amount"
+const Typed = signal with (previous: number, current: number)
+const Variadic = signal with (...any)
+const Untyped = signal with (value)
+const BareVariadic = signal with (...)
 class Bag = {
-	public Changed: Signal<number> = Signal.new(label)
-	public Loose = Signal.new()
+	public Loose = signal with (item, count: number)
 }
-return { Named, Matched, Variadic, Bag }
+return { Typed, Variadic, Untyped, BareVariadic, Bag }
 """
         flags = ('--ludot-api=' + str(ROOT / 'types/engine.api'),)
         result = self.run_source(source, 'luau-analyze', flags)
         output = result.stdout + result.stderr
-        self.assertIn('main.luau(2,39): SignalDeclaration: Signal.new() names 1 parameter, but the annotation declares 2 arguments', output)
-        self.assertIn('main.luau(7,46): SignalDeclaration: Signal parameter names in a signal field must be string literals', output)
-        self.assertIn('main.luau(8,9): SignalDeclaration: Signal.new() has no type annotation', output)
+        self.assertIn("main.luau(4,30): SignalDeclaration: Signal parameter 'value' has no type annotation, so its type defaults to any", output)
+        self.assertIn("main.luau(5,35): SignalDeclaration: Variadic signal parameter '...' has no type annotation, so its type defaults to any", output)
+        self.assertIn("main.luau(7,30): SignalDeclaration: Signal parameter 'item' has no type annotation, so its type defaults to any", output)
         self.assertEqual(output.count('SignalDeclaration'), 3, output)
 
     def test_signal_fields_on_engine_classes(self):
         source = """--!strict
 class Player extends CharacterBody3D = {
-	public Died: Signal<> = Signal.new()
-	public HealthChanged: Signal<number, number> = Signal.new("previous", "current")
-	export Shown: Signal<> = Signal.new()
+	public Died = signal with ()
+	public HealthChanged = signal with (previous: number, current: number)
+	private Internal = signal with (code: number)
+	export Shown = signal with ()
+	onready public Late = signal with ()
 	function _ready()
-		self.Died = Signal.new()
+		self.Died = signal with ()
+		self.Internal:fire(1)
 		const connection: Connection = self.TreeExiting:connect(function() end)
 		self.ChildEnteredTree:connect(function(node: Node) print(node.Name, connection.Connected) end)
 		self.ChildEnteredTree:fire(5)
 	end
 }
 class Bag = {
-	public Changed: Signal<> = Signal.new()
+	public Changed = signal with ()
 }
 const bag = Bag.new()
-bag.Changed = Signal.new()
-return { Player, bag }
+bag.Changed = signal with ()
+const player = Player.new()
+player.Internal:fire(2)
+return { Player, bag, player }
 """
         flags = ('--ludot-api=' + str(ROOT / 'types/engine.api'),)
         result = self.run_source(source, 'luau-analyze', flags)
         output = result.stdout + result.stderr
-        self.assertIn("main.luau(5,9): TypeError: Signal field 'Shown' cannot be exported", output)
-        self.assertIn("main.luau(7,3): TypeError: Signal field 'Died' is read-only after construction", output)
-        self.assertIn("main.luau(10,30): TypeError: Expected this to be 'Node', but got 'number'", output)
-        # Plain Luau classes may replace their signals.
-        self.assertEqual(output.count('TypeError'), 3, output)
+        self.assertIn("main.luau(6,9): TypeError: Signal field 'Shown' cannot be exported", output)
+        self.assertIn("main.luau(7,17): TypeError: Signal field 'Late' cannot be onready", output)
+        self.assertIn("main.luau(9,3): TypeError: Signal field 'Died' is read-only", output)
+        self.assertIn("main.luau(13,30): TypeError: Expected this to be 'Node', but got 'number'", output)
+        self.assertIn("main.luau(20,1): TypeError: Signal field 'Changed' is read-only", output)
+        self.assertIn("Internal", output)
+        self.assertEqual(output.count('TypeError'), 6, output)
 
     def test_signal_method_casing(self):
         source = """--!strict
-const Ping: Signal<string> = Signal.new()
+const Ping = signal with (text: string)
 const connection: Connection = Ping:Connect(function(text) print(text) end)
 Ping:Fire("x")
 Ping:DisconnectAll()

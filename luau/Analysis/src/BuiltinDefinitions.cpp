@@ -360,6 +360,8 @@ void registerBuiltinGlobals(Frontend& frontend, GlobalTypes& globals, bool typeC
 
     globalScope->bindings[globals.globalNames.names->getOrAdd("__ludot_enum")] =
         Binding{builtinTypes->anyType, Location(), false, "", "@luau/global/__ludot_enum"};
+    globalScope->bindings[globals.globalNames.names->getOrAdd("__ludot_signal")] =
+        Binding{builtinTypes->anyType, Location(), false, "", "@luau/global/__ludot_signal"};
     TypeId matchEquality = arena.addType(
         FunctionType{
             arena.addTypePack({builtinTypes->unknownType, builtinTypes->unknownType}, arena.addTypePack(VariadicTypePack{builtinTypes->unknownType})),

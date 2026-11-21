@@ -406,9 +406,8 @@ int connection_tostring(lua_State *L) {
 	return 1;
 }
 
-// Signal.new(...names). The names are read from the source by the engine, for script signals.
+// __ludot_signal(), lowered from `signal with (...)`.
 int signal_new(lua_State *L) {
-	for (int i = 1; i <= lua_gettop(L); ++i) luaL_checkstring(L, i);
 	new (lua_newuserdatatagged(L, sizeof(SignalData), LUDOT_SIGNAL_TAG)) SignalData;
 	lua_createtable(L, 0, 6);
 	set_shared_fields(L, "Signal", SIGNAL_TOSTRING);
@@ -507,11 +506,8 @@ void ludot_open_signal(lua_State *L) {
 	lua_setreadonly(L, -1, true);
 	lua_pop(L, 1);
 
-	lua_createtable(L, 0, 1);
-	lua_pushcfunction(L, signal_new, "Signal.new");
-	lua_setfield(L, -2, "new");
-	lua_setreadonly(L, -1, true);
-	lua_setglobal(L, "Signal");
+	lua_pushcfunction(L, signal_new, "__ludot_signal");
+	lua_setglobal(L, "__ludot_signal");
 }
 
 void ludot_push_engine_signal(lua_State *L, Object *p_object, const StringName &p_name) {

@@ -172,7 +172,7 @@ class Server:
             text = self.documents[uri]['text']
         line = text.split('\n')[position['line']]
         prefix = line.encode('utf-16-le')[:position['character'] * 2].decode('utf-16-le', errors='ignore')
-        match = re.search(r'(?:\bfrom\s+|\bimport\s+(?:type\s+)?|\brequire\s*\(\s*)["\']([^"\']*)$', prefix)
+        match = re.search(r'(?:\bimport\s+(?:type\s+)?|\brequire\s*\(\s*)["\']([^"\']*)$', prefix)
         if match is None:
             return None
         requested = match[1]
@@ -282,7 +282,7 @@ class Server:
                 if site == declaration and result.get('importName'):
                     prefix = documents[uri]['text'].split('\n')[site['line']].encode('utf-8')[:site['column']].decode('utf-8')
                     if re.search(r'\bas\s*$', prefix) is None:
-                        replacement = f"({result['importName']} as {name})"
+                        replacement = f"{result['importName']} as {name}"
                 changes.setdefault(item['uri'], []).append({'range': item['range'], 'newText': replacement})
             return {'changes': changes}
         if method == 'textDocument/hover':

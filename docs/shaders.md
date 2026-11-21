@@ -108,12 +108,13 @@ Import libraries before any other declaration:
 
 ```lua
 shader canvas_item
-import tinted from "./shaders/tint_common"
+import "./shaders/tint_common".{ tinted }
 import "@shaders/noise"
 ```
 
 - `import "path"` includes the library.
-- `import a, b from "path"` also checks that the library declares `a` and `b`.
+- `import "path".{ a, b }` also checks that the library declares `a` and `b`. The
+  list works like a Luau import list, without renames, types, or namespaces.
 
 Either way, every declaration in the library becomes visible.
 

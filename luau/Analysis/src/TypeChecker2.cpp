@@ -1293,14 +1293,17 @@ void TypeChecker2::reportErrorsFromAssigningToNever(AstExpr* lhs, TypeId rhsType
 
 namespace
 {
-// The class instance and Signal field an assignment targets, when that field belongs to a
-// class backed by an engine object. Plain Luau classes may reassign their signals.
-bool isGodotBacked(const ExternType* type)
+bool isLudotSignalProperty(const AstClassProperty* prop)
 {
-    for (; type; type = type->parent ? get<ExternType>(follow(*type->parent)) : nullptr)
-        if (type->name == "Object" && type->definitionModuleName == "ludot")
-            return true;
-    return false;
+    if (!prop)
+        return false;
+    const AstExpr* value = prop->defaultValue;
+    while (auto group = value ? value->as<AstExprGroup>() : nullptr)
+        value = group->expr;
+    if (auto assertion = value ? value->as<AstExprTypeAssertion>() : nullptr; assertion && assertion->signalInfo)
+        return true;
+    auto reference = prop->ty ? prop->ty->as<AstTypeReference>() : nullptr;
+    return reference && !reference->prefix && reference->name == "Signal";
 }
 } // namespace
 
@@ -1319,9 +1322,9 @@ void TypeChecker2::checkLudotSignalFieldAssignment(AstExpr* target)
         if (prop == owner->props.end())
             continue;
         bool signalField = std::find(prop->second.tags.begin(), prop->second.tags.end(), "ludot.signalfield") != prop->second.tags.end();
-        if (signalField && isGodotBacked(owner) && ludotConstructors.empty())
+        if (signalField && ludotConstructors.empty())
             reportError(
-                GenericError{"Signal field '" + std::string(index->index.value) + "' is read-only after construction; connect to it or fire it instead"},
+                GenericError{"Signal field '" + std::string(index->index.value) + "' is read-only; connect to it or fire it instead"},
                 target->location
             );
         return;
@@ -1645,19 +1648,27 @@ void TypeChecker2::visit(AstStatClass* stat)
         {
             if (prop->ty)
                 visit(prop->ty);
-            auto reference = prop->ty ? prop->ty->as<AstTypeReference>() : nullptr;
-            if (prop->isExported && reference && !reference->prefix && reference->name == "Signal")
-                reportError(
-                    GenericError{"Signal field '" + std::string(prop->name.value) + "' cannot be exported; the engine lists it as a signal instead"},
-                    prop->nameLocation
-                );
+            if (isLudotSignalProperty(prop))
+            {
+                if (prop->isExported)
+                    reportError(
+                        GenericError{"Signal field '" + std::string(prop->name.value) + "' cannot be exported; the engine lists it as a signal instead"},
+                        prop->nameLocation
+                    );
+                if (prop->isOnready)
+                    reportError(
+                        GenericError{"Signal field '" + std::string(prop->name.value) + "' cannot be onready; signals are created with the instance"},
+                        prop->nameLocation
+                    );
+            }
         }
         else if (const auto* method = member.get_if<AstClassMethod>())
         {
-            if (method->functionName == "__init")
+            const bool isSyntheticInit = method->functionName == "__init" || method->functionName == "__onready";
+            if (isSyntheticInit)
                 ludotConstructors.push_back(method->function);
             visit(method->function);
-            if (method->functionName == "__init")
+            if (isSyntheticInit)
                 ludotConstructors.pop_back();
 
             if (method->functionName == "__init")

@@ -101,6 +101,8 @@ private:
     AstExpr* ludotPipeline(AstExpr* left, AstExpr* right);
     AstStat* parseNilAssign(AstExpr* target);
     AstStat* parseEnum(const Location& start, bool exported);
+    bool ludotSignalStart();
+    AstExpr* parseSignal();
     bool ludotMatchStart();
     AstNode* parseMatch(bool expression);
     AstStatBlock* parseMatchArmBody();

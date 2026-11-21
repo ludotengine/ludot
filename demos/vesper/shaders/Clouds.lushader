@@ -1,6 +1,6 @@
 shader spatial
 import "./Noise"
-import sunlight from "./Light"
+import "./Light".{ sunlight }
 renderMode("unshaded", "cull_disabled", "blend_mix", "depth_draw_never")
 
 --- Drifting cloud bands on a thin shell, lit with the same sun as the ground.

@@ -213,17 +213,6 @@ LudotSignalTypes addLudotSignalTypes(GlobalTypes& globals, ApiCase methodCase, A
     getMutable<TableType>(signal.type)->name = "Signal";
     signal.typePackParams.push_back(GenericTypePackDefinition{generic, std::nullopt});
     globals.globalScope->exportedTypeBindings["Signal"] = signal;
-
-    // The value: Signal.new<T...>(...names), which takes the pack from its annotation.
-    TypePackId fresh = arena.addTypePack(GenericTypePack{"T"});
-    TypeId constructor = arena.addType(FunctionType{
-        {}, {fresh}, arena.addTypePack(VariadicTypePack{builtins.stringType}), arena.addTypePack({types.instantiate(arena, fresh)})
-    });
-    TypeId library = arena.addType(TableType{
-        {{"new", Property::readonly(constructor)}}, std::nullopt, TypeLevel{}, globals.globalScope.get(), TableState::Sealed
-    });
-    getMutable<TableType>(library)->name = "Signal";
-    globals.globalScope->bindings[globals.globalNames.names->getOrAdd("Signal")] = Binding{library, Location()};
     return types;
 }
 } // namespace Luau

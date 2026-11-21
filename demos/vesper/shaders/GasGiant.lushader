@@ -1,6 +1,6 @@
 shader spatial
 import "./Noise"
-import sunlight from "./Light"
+import "./Light".{ sunlight }
 renderMode("unshaded", "cull_back")
 
 --- Turbulent latitude bands, sheared by noise, with a slow storm vortex.

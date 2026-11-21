@@ -76,7 +76,7 @@ return { greet = greet }
 Import the function at the top of `Main.luau`, before the class:
 
 ```luau
-import greet from "./helpers/Greeting"
+import "./helpers/Greeting".{ greet }
 
 class Main extends Control = {
 	onready private Message = self:getNode("Message") :: Label

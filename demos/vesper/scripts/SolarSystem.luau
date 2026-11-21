@@ -1,7 +1,6 @@
-import "@sim/System" as System
+import "@sim/System" as System.{ type World }
 import "@sim/Terrain" as Terrain
 import "@sim/Scene" as Scene
-import type World from "@sim/System"
 
 --- Builds the whole system at startup: sun, sky, worlds, air, rings, belt, and orbits.
 

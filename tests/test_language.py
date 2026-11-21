@@ -94,12 +94,19 @@ assert(counter.Value == 12)
             self.assertIn("reserved for the constructor", result.stderr)
     def test_value_import_forms_and_alias_require(self):
         self.write('.luaurc', json.dumps({'aliases': {'helpers': './helpers'}}))
-        self.write('helpers/math.luau', 'return { add = function(a, b) return a + b end, subtract = function(a, b) return a - b end }')
+        self.write('helpers/math.luau', 'return { add = function(a, b) return a + b end, subtract = function(a, b) return a - b end, type = "math" }')
         result = self.run_luau('''
-import (add as plus), subtract from "@helpers/math"
+import "@helpers/math".{ add as plus, subtract }
 import "@helpers/math" as math
+import "@helpers/math" as both.{ add }
+import "@helpers/math".{
+    add as sum,
+    type,
+}
 import "@helpers/math"
 assert(plus(2, 3) == 5)
+assert(both.add == add and sum == add)
+assert(type == "math")
 assert(subtract(8, 3) == 5)
 assert(math.add(3, 4) == 7)
 assert(require("@helpers/math") == math)
@@ -108,7 +115,7 @@ assert(require("@helpers/math") == math)
     def test_type_import_has_no_runtime_effect(self):
         # The missing module must never be loaded by the VM.
         result = self.run_luau('''
-import type Person from "./missing"
+import "./missing".{ type Person }
 import type "./also_missing" as people
 local p: Person? = nil
 local q: people.Person? = nil
@@ -119,23 +126,38 @@ assert(p == q)
         result = self.run_luau('import type "./missing" as types\nprint(types)')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('cannot be used as a value', result.stderr)
+    def test_import_syntax_errors(self):
+        cases = {
+            'import add from "./m"': "Expected a string module path after 'import'",
+            'import (add as plus) from "./m"': "Expected a string module path after 'import'",
+            'import "./m".{}': 'Expected at least one name in the import list',
+            'import type "./m".{ Person }': "A type-only import can't list items",
+            'import type "./m"': "A type-only import needs 'as'",
+        }
+        for source, message in cases.items():
+            result = self.run_luau(source)
+            self.assertNotEqual(result.returncode, 0, source)
+            self.assertIn(message, result.stderr, source)
     def test_type_import_forms(self):
         self.write('.luaurc', json.dumps({'aliases': {'helpers': './helpers'}}))
         self.write('helpers/person.luau', 'export type Person = {Name: string}\nexport type Female = Person & {Age: number}\nreturn {createPerson = function(): Person return {Name = "Ada"} end}')
         result = self.run_luau('''--!strict
-import type (Person as Guy), Female from "@helpers/person"
+import "@helpers/person".{ type Person as Guy, type Female }
 import type "@helpers/person" as utils
 import "@helpers/person" as people
+import "@helpers/person".{ type Person, createPerson }
 local a: Guy = {Name = "Ada"}
+local e: Person = createPerson()
 local b: utils.Person = a
 local c: people.Person = people.createPerson()
 local d: Female = {Name = "Ada", Age = 30}
-return {a, b, c, d}
+return {a, b, c, d, e}
 ''', 'luau-analyze')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('SameLineStatement', result.stdout + result.stderr)
     def test_generic_named_type_import(self):
         self.write('box.luau', 'export type Box<T = number> = {value: T}\nexport type Fn<A...> = (A...) -> ()\nreturn {}')
-        source = '--!strict\nimport type (Box as Container), Fn from "./box"\nlocal a: Container<string> = {value = "ok"}\nlocal b: Container = {value = 42}\nlocal f: Fn<number, string> = function(a: number, b: string) end\nreturn {a, b, f}'
+        source = '--!strict\nimport "./box".{ type Box as Container, type Fn }\nlocal a: Container<string> = {value = "ok"}\nlocal b: Container = {value = 42}\nlocal f: Fn<number, string> = function(a: number, b: string) end\nreturn {a, b, f}'
         result = self.run_luau(source, 'luau-analyze')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         result = self.run_luau(source.replace('{value = "ok"}', '{value = 42}'), 'luau-analyze')

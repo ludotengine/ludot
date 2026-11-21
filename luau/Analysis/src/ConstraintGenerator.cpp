@@ -1283,10 +1283,13 @@ void ConstraintGenerator::prototypeClass(const ScopePtr& scope, AstStatClass* cl
                     p.location = classProp.nameLocation;
                     if (classProp.isPrivate)
                         p.tags.push_back("ludot.private|" + module->name + "|" + declName);
-                    // A Signal field on an engine-backed class is also an engine signal, so it
-                    // stays bound to the value the constructor created.
-                    if (auto reference = classProp.ty ? classProp.ty->as<AstTypeReference>() : nullptr;
-                        reference && !reference->prefix && reference->name == "Signal")
+                    // A Signal field stays bound to the value the constructor created.
+                    const AstExpr* defaultValue = classProp.defaultValue;
+                    while (auto group = defaultValue ? defaultValue->as<AstExprGroup>() : nullptr)
+                        defaultValue = group->expr;
+                    auto signalAssertion = defaultValue ? defaultValue->as<AstExprTypeAssertion>() : nullptr;
+                    auto reference = classProp.ty ? classProp.ty->as<AstTypeReference>() : nullptr;
+                    if ((signalAssertion && signalAssertion->signalInfo) || (reference && !reference->prefix && reference->name == "Signal"))
                         p.tags.push_back("ludot.signalfield");
 
                     // We make the default constructor take read-only args. This is true, in that we do not write to the table you pass for
@@ -2652,7 +2655,16 @@ ControlFlow ConstraintGenerator::visit(const ScopePtr& scope, AstStatClass* stat
                     if (classProp.isOnready && !classProp.ty && classProp.defaultValue)
                         return;
 
-                    auto target = classProp.ty ? resolveType(scope, classProp.ty, false) : builtinTypes->anyType;
+                    AstType* propType = classProp.ty;
+                    if (!propType)
+                    {
+                        const AstExpr* defaultValue = classProp.defaultValue;
+                        while (auto group = defaultValue ? defaultValue->as<AstExprGroup>() : nullptr)
+                            defaultValue = group->expr;
+                        if (auto assertion = defaultValue ? defaultValue->as<AstExprTypeAssertion>() : nullptr; assertion && assertion->signalInfo)
+                            propType = assertion->annotation;
+                    }
+                    auto target = propType ? resolveType(scope, propType, false) : builtinTypes->anyType;
                     emplaceType<BoundType>(asMutable(blockedTy), target);
                 },
                 [&](const AstClassMethod& method)

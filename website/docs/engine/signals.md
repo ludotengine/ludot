@@ -6,11 +6,12 @@ source: docs/language.md
 
 ## Signals
 
-`Signal` is a global modeled on Roblox's RBXScriptSignal. It's both the constructor
-and the type. The type arguments list what the signal fires with:
+Signals are created with `signal with (...)`, modeled on Roblox's RBXScriptSignal.
+The parameter list names and types the arguments the signal fires with, and its
+type is `Signal<T...>`:
 
 ```luau
-const HealthChanged: Signal<number, number> = Signal.new()
+const HealthChanged = signal with (previous: number, current: number)
 
 const connection: Connection = HealthChanged:connect(function(previous, current)
 	print(previous, current)
@@ -20,13 +21,13 @@ HealthChanged:fire(100, 75)
 print(connection.Connected) --> true
 connection:disconnect()
 
-const Saved: Signal<> = Signal.new()
-const Debug: Signal<...any> = Signal.new()
+const Saved = signal with ()
+const Debug = signal with (...any)
 ```
 
-| Member | What it does |
+| Form / Member | What it does |
 | --- | --- |
-| `Signal.new(...names)` | Creates a signal. The optional names label its arguments for the engine. |
+| `signal with (param: Type, ...)` | Creates a signal. Parameter names also label its arguments for the engine. |
 | `signal:connect(handler)` | Runs `handler` on every fire. Returns a `Connection`. |
 | `signal:once(handler)` | Runs `handler` on the next fire only. Returns a `Connection`. |
 | `signal:fire(...)` | Calls every connected handler with the arguments. |
@@ -40,10 +41,11 @@ const Debug: Signal<...any> = Signal.new()
 - Methods follow `luau/api/method_casing`, so they become `Fire` and `Connect` in
   PascalCase. `Connected` follows `luau/api/property_casing`.
 - The method is `fire`. There is no `emit`.
-- `typeof` returns `"Signal"` or `"Connection"`.
+- `Signal` is a type only (`Signal<number, number>`, `Signal<>`, `Signal<...any>`).
+  `typeof` returns `"Signal"` or `"Connection"`.
 - Handler parameter types come from the signal, so you can leave them off.
-- A `Signal.new()` without a type annotation accepts anything. The
-  `signal_declaration` warning asks you to add a `Signal<...>` type.
+- A signal parameter without a type annotation, such as `signal with (value)`,
+  defaults to `any` and triggers the `signal_declaration` warning.
 
 ### How handlers run
 
@@ -70,13 +72,14 @@ information.
 
 ### Signal fields
 
-In a class that extends an engine class, a field typed `Signal<...>` also becomes a
-script signal with the same name:
+In a class that extends an engine class, a `public` field initialized with
+`signal with (...)` also becomes a script signal with the same name:
 
 ```luau
 class Player extends CharacterBody3D = {
-	public Died: Signal<> = Signal.new()
-	public HealthChanged: Signal<number, number> = Signal.new("previous", "current")
+	public Died = signal with ()
+	public HealthChanged = signal with (previous: number, current: number)
+	private InternalTick = signal with (dt: number)
 
 	function damage(amount: number)
 		const previous = self.Health
@@ -88,19 +91,16 @@ class Player extends CharacterBody3D = {
 
 These signals work everywhere a GDScript signal does:
 
-- The Node dock lists them, and scenes save their connections.
+- The Node dock lists them with their parameter names and types, and scenes save
+  their connections.
 - GDScript can call `connect("Died", ...)` and `emit_signal("HealthChanged", 1.0, 2.0)`.
 - Firing from Luau and emitting from GDScript reach the same handlers.
 
-Argument types come from the type arguments. Argument names come from the strings
-passed to `Signal.new`, or default to `arg1`, `arg2`, and so on. The checker warns
-when the names don't match the type arguments or aren't string literals.
+`private` signal fields stay internal to the declaring class: they are not
+registered as engine signals and cannot be accessed from other classes.
 
-Signal fields are read-only after construction, can't be `export`ed, and don't
-appear in the Inspector.
-
-In plain Luau classes that don't extend an engine class, a signal field is an
-ordinary field. Each instance gets its own signal, and it can be replaced.
+Signal fields are read-only, cannot be `export`ed or `onready`, and do not appear
+in the Inspector.
 
 ### Passing values
 

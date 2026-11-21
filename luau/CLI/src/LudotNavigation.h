@@ -83,7 +83,8 @@ inline void write(Json::JsonEmitter& json, Frontend& frontend, const std::string
                     if (declaration->vars.data[i] != local) continue;
                     auto index = declaration->values.data[i]->as<AstExprIndexName>();
                     auto ns = index ? index->expr->as<AstExprLocal>() : nullptr;
-                    if (ns && std::string(ns->local->name.value).rfind("__ludot_import_", 0) == 0) importName = index->index.value;
+                    // Import items lower to `local name = ns.name` with the value placed on the binding itself.
+                    if (ns && index->location == local->location) importName = index->index.value;
                 }
             }
         }

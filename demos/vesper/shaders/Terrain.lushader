@@ -1,6 +1,6 @@
 shader spatial
 import "./Noise"
-import sunlight from "./Light"
+import "./Light".{ sunlight }
 renderMode("unshaded", "cull_back")
 
 --- Colors terrain by height, slope, latitude, and plains mask, then lights it from the sun.

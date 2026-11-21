@@ -11,7 +11,7 @@ titleTemplate: A game engine you script in Luau
 ```lushader
 shader spatial
 import "./Noise"
-import sunlight from "./Light"
+import "./Light".{ sunlight }
 renderMode("unshaded", "cull_back")
 
 export Pale: vec3 = vec3(0.93, 0.84, 0.68)
@@ -56,7 +56,7 @@ end
 ```lushader
 shader spatial
 import "./Noise"
-import sunlight from "./Light"
+import "./Light".{ sunlight }
 renderMode("unshaded", "cull_disabled", "blend_mix", "depth_draw_never")
 
 export Tint: vec3 = vec3(0.96, 0.95, 0.92)

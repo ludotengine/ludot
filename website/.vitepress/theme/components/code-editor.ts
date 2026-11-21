@@ -144,7 +144,7 @@ export function mountEditor(
 			const token = lua.token(stream, state)
 			if (token === 'variable' || token === 'variable-2') {
 				if (
-					/^(const|class|extends|export|public|private|onready|import|from|as|enum|match|with|case|otherwise|to|step|continue)$/.test(
+					/^(const|class|extends|export|public|private|onready|import|as|enum|match|with|case|otherwise|to|step|continue)$/.test(
 						stream.current(),
 					)
 				)

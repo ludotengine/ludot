@@ -146,7 +146,7 @@ function fragment() Albedo = brighten(Tint, 1.5) end""")
         noise = 'shader include\nimport "./common"\nexport Scale: number = 2\nlocal function wave(x: number): number\n    return sin(x * Scale) * Half\nend'
         common = 'shader include\nlocal Half: number = 0.5'
         r = self.compile_project({
-            'main.lushader': 'shader canvas_item\nimport wave from "./lib/noise"\nimport "@shaders/common"\nfunction fragment() Color = vec4(wave(Time) * Half) end',
+            'main.lushader': 'shader canvas_item\nimport "./lib/noise".{ wave }\nimport "@shaders/common"\nfunction fragment() Color = vec4(wave(Time) * Half) end',
             'lib/noise.lushader': noise,
             'lib/common.lushader': common,
             '.luaurc': '{"aliases": {"shaders": "./lib"}}',
@@ -165,14 +165,17 @@ function fragment() Albedo = brighten(Tint, 1.5) end""")
         self.assertEqual(r.returncode, 0, r.stderr)
     def test_include_errors(self):
         cases = [
-            ({'main.lushader': 'shader canvas_item\nimport missing from "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include\nlocal Half: number = 0.5'}, 'does not declare'),
+            ({'main.lushader': 'shader canvas_item\nimport "./lib".{ missing }\nfunction fragment() end', 'lib.lushader': 'shader include\nlocal Half: number = 0.5'}, 'does not declare'),
             ({'main.lushader': 'shader canvas_item\nimport "./a"\nfunction fragment() end', 'a.lushader': 'shader include\nimport "./b"', 'b.lushader': 'shader include\nimport "./a"'}, 'Cyclic shader import'),
             ({'main.lushader': 'shader canvas_item\nimport "./absent"\nfunction fragment() end'}, 'Cannot find shader include'),
             ({'main.lushader': 'shader canvas_item\nimport "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include\nfunction fragment() end'}, 'cannot declare entry points'),
             ({'main.lushader': 'shader canvas_item\nimport "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include\nrenderMode("unshaded")'}, 'cannot set render modes'),
             ({'main.lushader': 'shader canvas_item\nimport "./lib"\nfunction fragment() end', 'lib.lushader': 'shader canvas_item\nfunction fragment() end'}, "must start with 'shader include'"),
             ({'main.lushader': 'shader canvas_item\nlocal Half: number = 1\nimport "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include'}, 'must come before'),
-            ({'main.lushader': 'shader canvas_item\nimport (a as b) from "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include'}, 'cannot rename'),
+            ({'main.lushader': 'shader canvas_item\nimport "./lib".{ a as b }\nfunction fragment() end', 'lib.lushader': 'shader include'}, 'cannot rename'),
+            ({'main.lushader': 'shader canvas_item\nimport "./lib" as lib\nfunction fragment() end', 'lib.lushader': 'shader include'}, 'cannot use namespaces'),
+            ({'main.lushader': 'shader canvas_item\nimport "./lib".{ type Half }\nfunction fragment() end', 'lib.lushader': 'shader include'}, 'have no types'),
+            ({'main.lushader': 'shader canvas_item\nimport Half from "./lib"\nfunction fragment() end', 'lib.lushader': 'shader include'}, "quoted path after 'import'"),
             ({'main.lushader': 'shader canvas_item\nimport "lib"\nfunction fragment() end'}, './, ../, or @alias'),
         ]
         for files, message in cases:

@@ -13,9 +13,8 @@ struct GlobalTypes;
 // Declares the engine's task library: spawn, defer, delay, wait, and cancel.
 void addLudotTaskLibrary(GlobalTypes& globals);
 
-// The Roblox-style Signal library: the `Signal` global with `Signal.new<T...>(...names)`,
-// the `Signal<T...>` type whose pack is the fired arguments, and `Connection`. Engine
-// signals use the same type.
+// The Roblox-style Signal types: `Signal<T...>` (created with `signal with (...)`),
+// whose pack is the fired arguments, and `Connection`. Engine signals use the same type.
 struct LudotSignalTypes
 {
     TypeId connection = nullptr;

@@ -4,7 +4,7 @@ const base = luauGrammar[0]
 const extensions = [
 	{
 		name: 'keyword.control.ludot',
-		match: '\\b(?:const|class|extends|export|private|public|onready|import|from|as|enum|match|with|case|otherwise|to|step)\\b',
+		match: '\\b(?:const|class|extends|export|private|public|onready|import|as|enum|match|with|case|otherwise|to|step|signal)\\b',
 	},
 	{
 		name: 'storage.type.ludot',

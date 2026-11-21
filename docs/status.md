@@ -20,7 +20,7 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   checks cover flight, the planet camera, riding along with a moving world, ground
   clearance, pause, and orbit visibility. A 54-second Forward+ capture covers the tour.
 - Vendored Godot 4.7.2-stable and Luau 0.743 source with pinned provenance.
-- Engine version 4.7.2-lu.4, set by the `status` field in `engine/version.py`.
+- Engine version 4.7.2-lu.5, set by the `status` field in `engine/version.py`.
 - One `Enum` global for every exposed, non-editor engine enum, modeled on Roblox's:
   `Enum.MouseMode.Captured` with `Name`, `Value`, and `EnumType`, plus `fromName`,
   `fromValue`, `getEnumItems`, and `Enum:getEnums()`. Engine methods and properties
@@ -28,20 +28,21 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   checking, the standalone LSP, and Inspector exports use `Enum.<Name>` types. The
   old `Class.Enums` namespaces, global enum tables, and `Class.Enum` annotations are
   gone. Signal arguments and virtual callback arguments still arrive as numbers.
-- A native `Signal` library modeled on Roblox's RBXScriptSignal: `Signal.new()`,
-  `fire`, `connect`, `once`, `wait`, `disconnectAll`, and `Connection` with
-  `disconnect` and `Connected`. `Signal<T...>` checks fired arguments and infers
-  handler parameters; `typeof` returns `"Signal"` and `"Connection"`. Handlers run in
-  resumable threads from a snapshot, a failing handler is reported with its stack
-  trace without stopping the others, and connections of freed objects are dropped.
-  Engine signals use the same object, typed from ClassDB (`Signal<Node>` for
-  `ChildEnteredTree`). On engine-backed classes, `Signal<...>` fields are script
-  signals: the Node dock lists them with the names passed to `Signal.new`, scenes
-  save their connections, and GDScript `connect`/`emit_signal` share handlers with
-  Luau. The checker rejects exporting or reassigning them, and the
-  `signal_declaration` lint flags unannotated `Signal.new()` and mismatched or
-  non-literal parameter names. The old Godot `Signal` methods (`emit`,
-  `isConnected`) are gone.
+- Native signals created with `signal with (param: Type, ...)` (modeled on Roblox's
+  RBXScriptSignal): `fire`, `connect`, `once`, `wait`, `disconnectAll`, and
+  `Connection` with `disconnect` and `Connected`. `Signal<T...>` is a type that
+  checks fired arguments and infers handler parameters; `typeof` returns `"Signal"`
+  and `"Connection"`. Handlers run in resumable threads from a snapshot, a failing
+  handler is reported with its stack trace without stopping the others, and
+  connections of freed objects are dropped. Engine signals use the same object,
+  typed from ClassDB (`Signal<Node>` for `ChildEnteredTree`). On engine-backed
+  classes, `public` signal fields are script signals: the Node dock lists them with
+  their declared parameter names and types, scenes save their connections, and
+  GDScript `connect`/`emit_signal` share handlers with Luau. `private` signal fields
+  stay class-internal and Luau-only. The checker rejects exporting, `onready`, or
+  reassigning signal fields, and the `signal_declaration` lint flags untyped signal
+  parameters. The old Godot `Signal` methods (`emit`, `isConnected`) and
+  `Signal.new` are gone.
 - A native `task` library (`spawn`, `defer`, `delay`, `wait`, `cancel`) with one
   scheduler per VM, stepped from SceneTree's process frame. Engine callbacks start in
   resumable threads, so `task.wait` works in `_ready`, `_process`, and signal
@@ -55,8 +56,10 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   Unannotated onready properties take their initializer's type.
 - Native parser support for brace classes, implicit `self`, per-instance defaults,
   exported fields, private field checking, and export range metadata.
-- Named, renamed, namespace, side-effect, generic, and erased type imports. Legacy
-  `require` uses the same project and nested `.luaurc` aliases.
+- Path-first imports: side-effect, namespace, and `.{ }` item lists with renames,
+  mixed value and type items, generic types, and erased type imports. The editor
+  and LSP complete item names from the module's exports. Legacy `require` uses the same
+  project and nested `.luaurc` aliases.
 - Native class types support structural table intersections. A field supplied by
   the table shape is accepted; a field missing from a union alternative is rejected.
 - Native engine module: Luau script and shader resources, inspector exports, script

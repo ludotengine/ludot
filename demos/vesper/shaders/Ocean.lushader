@@ -1,6 +1,6 @@
 shader spatial
 import "./Noise"
-import sunlight from "./Light"
+import "./Light".{ sunlight }
 renderMode("unshaded", "cull_back", "blend_mix", "depth_draw_never")
 
 --- A sea-level sphere. Depth behind the water gives shallow shelves, surf, and clarity.

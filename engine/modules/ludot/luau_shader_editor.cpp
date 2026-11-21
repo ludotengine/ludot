@@ -17,7 +17,7 @@ LuauShaderEditor::LuauShaderEditor() {
     Ref<CodeHighlighter> highlighter;
     highlighter.instantiate();
     const Color keyword = EDITOR_GET("text_editor/theme/highlighting/keyword_color");
-    for (const char *word : {"shader", "include", "import", "from", "as", "export", "function", "end", "local", "const", "if", "then", "else", "elseif", "for", "in", "to", "step", "do", "while", "repeat", "until", "return", "break", "continue", "and", "or", "not", "true", "false", "nil", "renderMode"})
+    for (const char *word : {"shader", "include", "import", "as", "export", "function", "end", "local", "const", "if", "then", "else", "elseif", "for", "in", "to", "step", "do", "while", "repeat", "until", "return", "break", "continue", "and", "or", "not", "true", "false", "nil", "renderMode"})
         highlighter->add_keyword_color(word, keyword);
     const Color type = EDITOR_GET("text_editor/theme/highlighting/base_type_color");
     for (const char *word : {"number", "float", "boolean", "bool", "int", "uint", "vec2", "vec3", "vec4", "ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4", "bvec2", "bvec3", "bvec4", "mat2", "mat3", "mat4", "sampler2D", "sampler2DArray", "sampler3D", "samplerCube", "samplerExternalOES", "DepthTexture", "ScreenTexture", "NormalRoughnessTexture"})

@@ -580,10 +580,18 @@ private:
     {
         if (node->syntax != LudotSyntax::None)
             return true;
+        Position furthest = node->body.size > 0 ? node->body.data[0]->location.end : Position{0, 0};
         for (size_t i = 1; i < node->body.size; ++i)
         {
             const Location& last = node->body.data[i - 1]->location;
             const Location& location = node->body.data[i]->location;
+
+            // Ludot import items are lowered statements inside the import's own span
+            bool insideImport = location.begin < furthest;
+            if (furthest < location.end)
+                furthest = location.end;
+            if (insideImport)
+                continue;
 
             if (location.begin.line != last.end.line)
                 continue;
@@ -3569,124 +3577,47 @@ private:
     }
 };
 
-// Ludot Signal declarations: Signal.new() needs a Signal<...> annotation to check its
-// arguments, and parameter names must be string literals that match the type arguments.
+// Ludot Signal declarations: warn when a `signal with (...)` parameter omits its type annotation.
 class LintSignalDeclaration : AstVisitor
 {
 public:
     LUAU_NOINLINE static void process(LintContext& context, const AstNameTable& names)
     {
-        LintSignalDeclaration pass{context, names};
+        LintSignalDeclaration pass{context};
         context.root->visit(&pass);
     }
 
 private:
     LintContext* context;
-    AstName signalName;
-    AstName newName;
 
-    LintSignalDeclaration(LintContext& context, const AstNameTable& names)
+    explicit LintSignalDeclaration(LintContext& context)
         : context(&context)
-        , signalName(names.get("Signal"))
-        , newName(names.get("new"))
     {
     }
 
-    AstExprCall* signalConstructor(AstExpr* expr) const
+    bool visit(AstExprTypeAssertion* node) override
     {
-        while (auto group = expr ? expr->as<AstExprGroup>() : nullptr)
-            expr = group->expr;
-        auto call = expr ? expr->as<AstExprCall>() : nullptr;
-        auto index = call ? call->func->as<AstExprIndexName>() : nullptr;
-        auto global = index ? index->expr->as<AstExprGlobal>() : nullptr;
-        if (!global || global->name != signalName || index->index != newName || index->op != '.')
-            return nullptr;
-        return call;
-    }
-
-    // The number of fired arguments a Signal<...> annotation declares, or nullopt when it is
-    // variadic, generic, or not a Signal annotation.
-    std::optional<size_t> declaredArguments(AstType* annotation) const
-    {
-        auto reference = annotation ? annotation->as<AstTypeReference>() : nullptr;
-        if (!reference || reference->prefix || reference->name != signalName)
-            return std::nullopt;
-        if (reference->parameters.size == 1 && reference->parameters.data[0].typePack)
+        if (node->signalInfo)
         {
-            auto pack = reference->parameters.data[0].typePack->as<AstTypePackExplicit>();
-            if (!pack || pack->typeList.tailType)
-                return std::nullopt;
-            return pack->typeList.types.size;
-        }
-        size_t count = 0;
-        for (const AstTypeOrPack& parameter : reference->parameters)
-        {
-            if (!parameter.type)
-                return std::nullopt;
-            ++count;
-        }
-        return count;
-    }
-
-    void check(AstExpr* value, AstType* annotation, bool field, const Location& location)
-    {
-        AstExprCall* call = signalConstructor(value);
-        if (!call)
-            return;
-        if (!annotation)
-        {
-            emitWarning(
-                *context,
-                LintWarning::Code_SignalDeclaration,
-                location,
-                "Signal.new() has no type annotation, so its arguments are not checked; declare it as Signal<...>"
-            );
-            return;
-        }
-        if (call->args.size == 0)
-            return;
-        for (AstExpr* name : call->args)
-            if (field && !name->is<AstExprConstantString>())
+            for (const AstSignalParam& param : node->signalInfo->params)
             {
-                emitWarning(
-                    *context, LintWarning::Code_SignalDeclaration, name->location, "Signal parameter names in a signal field must be string literals"
-                );
-                return;
+                if (!param.type)
+                    emitWarning(
+                        *context,
+                        LintWarning::Code_SignalDeclaration,
+                        param.nameLocation,
+                        "Signal parameter '%s' has no type annotation, so its type defaults to any",
+                        param.name.value
+                    );
             }
-        std::optional<size_t> expected = declaredArguments(annotation);
-        if (expected && *expected != call->args.size)
-            emitWarning(
-                *context,
-                LintWarning::Code_SignalDeclaration,
-                call->location,
-                "Signal.new() names %zu parameter%s, but the annotation declares %zu argument%s",
-                call->args.size,
-                call->args.size == 1 ? "" : "s",
-                *expected,
-                *expected == 1 ? "" : "s"
-            );
-    }
-
-    bool visit(AstStatLocal* node) override
-    {
-        for (size_t i = 0; i < node->vars.size && i < node->values.size; ++i)
-            check(node->values.data[i], node->vars.data[i]->annotation, false, node->vars.data[i]->location);
-        return true;
-    }
-
-    bool visit(AstStatAssign* node) override
-    {
-        for (size_t i = 0; i < node->vars.size && i < node->values.size; ++i)
-            if (node->vars.data[i]->is<AstExprGlobal>())
-                check(node->values.data[i], nullptr, false, node->vars.data[i]->location);
-        return true;
-    }
-
-    bool visit(AstStatClass* node) override
-    {
-        for (const AstClassMember& member : node->members)
-            if (auto property = get_if<AstClassProperty>(&member))
-                check(property->defaultValue, property->ty, true, property->nameLocation);
+            if (node->signalInfo->hasVariadic && !node->signalInfo->variadicType)
+                emitWarning(
+                    *context,
+                    LintWarning::Code_SignalDeclaration,
+                    node->signalInfo->variadicLocation,
+                    "Variadic signal parameter '...' has no type annotation, so its type defaults to any"
+                );
+        }
         return true;
     }
 };
