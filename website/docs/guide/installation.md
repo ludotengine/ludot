@@ -1,6 +1,6 @@
 # Install Ludot
 
-Run the command again to update to the latest release.
+Run the command for your system. Run it again later to update.
 
 <InstallOptions>
 
@@ -10,7 +10,8 @@ Run the command again to update to the latest release.
 curl -fsSL https://github.com/ludotengine/ludot/releases/latest/download/install.sh | sh
 ```
 
-Linux x86_64 installs to `~/.local/share/ludot`, with the command at `~/.local/bin/ludot`. macOS Apple Silicon installs to `~/Applications/Ludot.app`.
+- **Linux x86_64:** installs to `~/.local/share/ludot`, with the `ludot` command in `~/.local/bin`.
+- **macOS Apple Silicon:** installs to `~/Applications/Ludot.app`.
 
 </div>
 
@@ -20,24 +21,28 @@ Linux x86_64 installs to `~/.local/share/ludot`, with the command at `~/.local/b
 irm https://github.com/ludotengine/ludot/releases/latest/download/install.ps1 | iex
 ```
 
-Windows x86_64. Open a new terminal after installation to use `ludot`.
+For Windows x86_64. Open a new terminal afterwards to use the `ludot` command.
 
 </div>
 
 </InstallOptions>
 
-The scripts verify package checksums. Ludot is experimental; back up projects before updating.
+The scripts verify package checksums. Ludot is experimental, so back up your projects before updating.
 
 ## Windows EXE
 
 <ReleaseDownload suffix="-windows-x86_64-setup.exe">Download EXE</ReleaseDownload>
 
-Installs for the current user and can add Ludot to PATH. The installer is not signed.
+Installs for the current user and can add Ludot to your PATH. The installer isn't signed, so Windows may warn you before running it.
 
 ## macOS DMG
 
 <ReleaseDownload suffix="-macos-arm64.dmg">Download DMG</ReleaseDownload>
 
-Apple Silicon. Open the image and drag Ludot to Applications. The app is not signed or notarized.
+For Apple Silicon. Open the image and drag Ludot to Applications. The app isn't signed or notarized, so macOS may ask you to confirm the first launch.
 
-[Portable archives](https://github.com/ludotengine/ludot/releases/latest) · [Build from source](../reference/building.md) · [Your first project](./first-project.md)
+## Other options
+
+[Portable archives](https://github.com/ludotengine/ludot/releases/latest) · [Build from source](../reference/building.md)
+
+Once it's installed, continue with [your first project](./first-project.md).

@@ -4,9 +4,19 @@
 
 ## Layout a menu
 
-Create a `Control` root and set its layout to fill the viewport. Add a `MarginContainer`, a `VBoxContainer` inside it, and `Label` and `Button` children inside the vertical container.
+Build this scene, and set the root's layout to **Full Rect**:
 
-Containers calculate their children's layout. Use size flags, minimum sizes, spacing, and margins to guide that layout. Avoid setting child positions every frame inside a container. For freely placed controls, anchors define a fraction of the parent's rectangle and offsets add pixel distances.
+```
+Menu (Control)
+└── Margin (MarginContainer)
+    └── Column (VBoxContainer)
+        ├── Status (Label)
+        └── Start (Button)
+```
+
+Containers position their children for you. Control the result with size flags, minimum sizes, spacing, and margins. Don't set positions on a container's children; the container will overwrite them.
+
+Outside containers, position controls with anchors and offsets. Anchors are fractions of the parent's size, and offsets are pixel distances from them.
 
 ## Connect a button
 
@@ -23,25 +33,30 @@ class Menu extends Control = {
 }
 ```
 
-Name the scene nodes to match these paths. The button's `Pressed` property is a `Signal<>`. A handler connected by this script belongs to the script's object and is disconnected when that owner is freed.
+`Pressed` is a `Signal<>`. The handler belongs to the menu, so it's disconnected automatically when the menu is freed.
 
 ## Fonts and text
 
-A [Font](../api/engine/Font.md) is a resource used to draw text. Use [FontFile](../api/engine/FontFile.md) for an imported font or [FontVariation](../api/engine/FontVariation.md) to configure a variation. Font resources can be shared by many labels and buttons.
+- [FontFile](../api/engine/FontFile.md) is an imported font file.
+- [FontVariation](../api/engine/FontVariation.md) adjusts an existing font, such as its weight or spacing.
 
-Set fonts through a theme when they should apply to a whole interface. Use a node's theme override when only that control should differ. Font size is a separate theme value. `Label.Text` displays ordinary text; [RichTextLabel](../api/engine/RichTextLabel.md) supports formatted content and has different parsing and layout options.
+Set a font in a theme to use it everywhere, or with a theme override on a single control. Font size is a separate setting.
+
+`Label` shows plain text. [RichTextLabel](../api/engine/RichTextLabel.md) supports bold, colors, images, and other formatting.
 
 ## Apply a theme
 
-Assign a [Theme](../api/engine/Theme.md) resource to a parent control. Descendants inherit theme values unless a closer theme or override replaces them. Themes hold fonts, font sizes, colors, constants, icons, and style boxes.
+A [Theme](../api/engine/Theme.md) holds fonts, font sizes, colors, icons, and style boxes. Assign it to a control, and every control below it uses the theme unless a closer theme or override replaces a value.
 
-Use the Inspector to set up the initial theme and compare controls at different window sizes. Editor color themes in [Editor themes](../reference/themes.md) affect the Ludot editor, not the controls in your game.
+[Editor themes](../reference/themes.md) change the Ludot editor's colors, not your game's UI.
 
 ## Focus and mouse input
 
-Buttons should be reachable by keyboard and controller focus, not just mouse clicks. Configure focus neighbors for custom layouts. A decorative control can intercept mouse input if its mouse-filter setting allows it; adjust that setting when input should pass through.
+Make buttons reachable with a keyboard or controller, not just a mouse. For custom layouts, set each control's focus neighbors.
 
-Use `_unhandledInput` for gameplay actions that the UI should consume first. See [Input actions](./input.md).
+If clicks don't reach a button, a control on top of it may be catching them. Set that control's **Mouse Filter** to **Ignore**.
+
+Handle gameplay input in `_unhandledInput`, so the UI gets the first chance at each event. See [Input actions](./input.md).
 
 ## Reference
 

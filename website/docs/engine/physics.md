@@ -11,11 +11,17 @@
 | [CharacterBody3D](../api/engine/CharacterBody3D.md) | A character whose velocity and movement logic your script controls. |
 | [Area3D](../api/engine/Area3D.md) | Detect entry and overlap without acting as a solid body. |
 
-Each has a 2D counterpart. Add a collision shape with dimensions that match the intended collision volume. A visible mesh alone does not create a collider.
+Each has a 2D version, such as `CharacterBody2D`.
+
+Every body needs a collision shape child. A visible mesh doesn't collide with anything by itself.
 
 ## Move a 3D character
 
-Create a `CharacterBody3D` with a `CollisionShape3D` child. Give the shape a capsule, add ground with a static body and collision shape, and set up the input actions in [Input actions](./input.md).
+Set up the scene:
+
+1. Add a `CharacterBody3D` with a `CollisionShape3D` child, and give the shape a capsule.
+2. Add a floor: a `StaticBody3D` with its own collision shape.
+3. Create the input actions from [Input actions](./input.md).
 
 ```luau
 class Player extends CharacterBody3D = {
@@ -39,16 +45,39 @@ class Player extends CharacterBody3D = {
 }
 ```
 
-`Velocity` is in units per second. `moveAndSlide` uses the physics step internally; do not multiply the velocity passed through this property by delta. Gravity changes velocity over time, so its acceleration does multiply by delta.
+`Velocity` is in units per second, and `moveAndSlide` applies the time step for you. So:
+
+- **Don't** multiply `Velocity` by `delta`.
+- **Do** multiply gravity by `delta`, because gravity changes the velocity over time.
 
 ## Collision information
 
-After movement, `isOnFloor`, `isOnWall`, and `isOnCeiling` describe the last slide result. Iterate slide collisions when you need contact details. `moveAndCollide` instead accepts a motion vector and returns the collision information for that movement.
+After `moveAndSlide`, `isOnFloor`, `isOnWall`, and `isOnCeiling` report what the last move touched. Loop over the slide collisions for details about each contact.
 
-Layers label where an object belongs. Masks select which layers it tests against. Two overlapping visuals may not collide because the masks exclude one another, because the shape is disabled, or because their collision volumes do not meet.
+`moveAndCollide` is the lower-level option. It takes a motion vector, stops at the first hit, and returns information about that collision.
+
+### Layers and masks
+
+- A body's **layers** are the groups it belongs to.
+- Its **mask** is the set of layers it collides with.
+
+If two objects pass through each other, check their layers and masks, whether a shape is disabled, and whether the collision shapes actually overlap.
 
 ## Rigid bodies and detection
 
-Apply forces or impulses to a rigid body. Repeatedly assigning its transform bypasses the simulation's motion and can produce unstable contacts. Use an area for triggers, then connect its typed body-entry or area-entry signal.
+Move a `RigidBody3D` with forces and impulses. Setting its position every frame fights the simulation and causes jittery collisions.
 
-Connect handlers in `_ready`, and use [signals](./signals.md) for connection ownership and lifetime rules. Read the relevant body reference for callbacks and settings; the physics simulation remains the engine's native implementation.
+Use an `Area3D` for triggers, such as pickups or a goal zone. Connect its `BodyEntered` signal in `_ready`:
+
+```luau
+class Pickup extends Area3D = {
+	function _ready()
+		self.BodyEntered:connect(function(body)
+			print(body.Name, "picked this up")
+			self:queueFree()
+		end)
+	end
+}
+```
+
+See [signals](./signals.md) for how connections are cleaned up.

@@ -1,6 +1,11 @@
 # Contributing
 
-Ludot commits its Godot and Luau forks directly. Edit these source trees in place. Do not turn them into submodules or add automatic upstream updates. `upstreams.json` records the original versions and commits.
+Ludot's Godot and Luau forks are committed directly in the repository. Edit them in place.
+
+- Don't turn them into submodules.
+- Don't add automatic upstream updates.
+
+`upstreams.json` records the original versions and commits.
 
 ## Find the owning component
 
@@ -14,20 +19,37 @@ Ludot commits its Godot and Luau forks directly. Edit these source trees in plac
 | `website/` | VitePress site, source generation, browser runtime, deployment |
 | `mcp/` | Editor MCP server and addon |
 
-Language syntax belongs in the parser and compiler. Do not implement new language behavior with regular-expression preprocessing. GDScript and internal Godot API names stay compatible; Luau casing belongs in the binding layer.
+- New syntax belongs in the parser and compiler. Don't implement language features with regex preprocessing.
+- GDScript and Godot's internal API names stay unchanged. Luau casing is applied in the binding layer.
 
 ## Verify a behavior change
 
-Use the commands in [Build from source](../reference/building.md). Run the relevant language, shader, and LSP regressions. Native integration changes also need an engine build and the headless engine regression. Keep AST and compiler assertions enabled in optimized language tools.
+Use the commands in [Build from source](../reference/building.md), and run the tests for the area you changed:
 
-LSP changes must cover unsaved document overlays and UTF-16/UTF-8 positions. Shader changes must reject unsupported AST nodes with source diagnostics. The engine performs final generated-shader type checking separately.
+| Change | Tests |
+| --- | --- |
+| Language | Language regressions |
+| Shaders | Shader regressions. Unsupported syntax must fail with a source diagnostic. |
+| LSP | LSP regressions, including unsaved documents and UTF-16/UTF-8 positions |
+| Native integration | An engine build and the headless engine regression |
 
-Update `docs/status.md` when a feature becomes usable or a known limit changes. Record what actually ran. A configured or queued CI job is not a verified result.
+Keep AST and compiler assertions on, even in optimized builds of the language tools.
+
+Update `docs/status.md` when a feature becomes usable or a known limit changes. Record only what actually ran: a configured or queued CI job isn't a verified result.
 
 ## Edit these docs
 
-Run `npm ci` in `website/`, then `npm run dev`. The landing page is at `/ludot/` and the manual at `/ludot/docs/` with the default base. See [the site README](https://github.com/ludotengine/ludot/blob/main/website/README.md) for runtime builds and GitHub Pages setup.
+Run `npm ci` in `website/`, then `npm run dev`. The landing page is at `/ludot/` and the manual at `/ludot/docs/`. The [site README](https://github.com/ludotengine/ludot/blob/main/website/README.md) covers runtime builds and GitHub Pages.
 
-Edit existing language, shader, build, status, and theme manuals in `docs/`. The generator publishes those sources into the site and splits the language guide into topic pages. Edit new site-only guides in `website/docs/`. Engine class pages come from `types/engine.api` and class XML, so do not edit generated pages.
+Where to edit:
 
-Preserve copyright notices, dependency licenses, and logo attribution.
+| Pages | Source |
+| --- | --- |
+| Luau language, tasks, signals, naming, hot reload | `docs/language.md`, split into topic pages by the generator |
+| Shaders, building, status, themes | `docs/*.md` |
+| Other guides | `website/docs/` |
+| Engine class reference | Generated from `types/engine.api` and the engine's class XML. Don't edit the output. |
+
+## Licensing
+
+Keep copyright notices, dependency licenses, and logo attribution intact.

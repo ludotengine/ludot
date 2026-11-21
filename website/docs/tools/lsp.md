@@ -10,27 +10,50 @@ Build the [language tools](../reference/building.md#language-tools), then config
 python tools/ludot-lsp
 ```
 
-For a configuration stored outside the checkout, use an absolute path to the script. Keep stdout reserved for the LSP protocol. Assign the server to `.luau` and `.lushader` files.
+- Register the server for `.luau` and `.lushader` files.
+- If your editor config lives outside the repository, use an absolute path to the script.
+- Don't print anything else to stdout; it's reserved for the protocol.
 
-The server accepts `--analyzer`, `--shader-compiler`, and `--definitions`. Use the first two to select explicit tool binaries and the third to add a Luau declaration file. For installation without a development checkout, see [Standalone LSP packaging](../reference/building.md#standalone-lsp).
+To install the server without a checkout, see [Standalone LSP packaging](../reference/building.md#standalone-lsp).
+
+### Options
+
+| Option | Purpose |
+| --- | --- |
+| `--analyzer <path>` | Use a specific analyzer binary |
+| `--shader-compiler <path>` | Use a specific shader compiler binary |
+| `--definitions <path>` | Add a Luau declaration file on top of the engine types |
 
 ## Capabilities
 
-The server supports diagnostics, typed completion, hover, signature help, go-to-definition, references, and rename. Module completion understands `import`, `require`, and `.luaurc` aliases. Set `ludot.requireAutocomplete` to `false` in the client's configuration to turn module path completion off.
+- Diagnostics
+- Typed completion, including module paths in `import`, `require`, and `.luaurc` aliases
+- Hover and signature help
+- Go to definition, find references, and rename
 
-One analyzer process stays alive for the session. It caches type information and module dependencies. An unsaved imported file can therefore update diagnostics in files that depend on it.
+To turn off module path completion, set `ludot.requireAutocomplete` to `false` in your editor's settings.
+
+One analyzer process runs for the whole session and caches types and module dependencies. Editing a module, even without saving, updates diagnostics in the files that import it.
 
 ## Engine types and casing
 
-The server loads `types/engine.api` into the checker. Regenerate that file after native API changes using the [build guide](../reference/building.md#standalone-lsp). `--definitions` supplements it rather than replacing engine signatures.
+Engine types come from `types/engine.api`. Regenerate it after changing the native API; the [build guide](../reference/building.md#standalone-lsp) has the command.
 
-The nearest ancestor `project.godot` supplies API casing settings. Restart the LSP after changing method or property casing. `.luaurc` files supply module aliases and language mode. The native editor's scene-based node inference is not available in a standalone session, so a dynamic or scene-specific lookup may need a type assertion.
+Project settings come from two places:
+
+- **Casing** comes from the nearest `project.godot`. Restart the server after changing it.
+- **Aliases and language mode** come from `.luaurc` files.
+
+The standalone server can't see your scenes, so `getNode` returns a general `Node`. Add a `::` assertion when you need a specific type.
 
 ## Protocol details
 
-The server uses full-document synchronization. LSP positions count UTF-16 code units; the backend converts them to Luau's UTF-8 byte columns. Unsaved buffers take priority over disk files. Requests support cancellation.
+Only relevant if you're writing a custom client:
 
-These details matter when configuring a custom client. Sending incremental edits to a server that advertises full synchronization can produce incorrect document contents.
+- The server uses **full** document sync. Sending incremental edits will corrupt its copy of the document.
+- Positions are in UTF-16 code units, as the LSP spec requires. The server converts them to Luau's UTF-8 byte columns.
+- Unsaved buffers take priority over files on disk.
+- Requests can be cancelled.
 
 ## Troubleshooting
 

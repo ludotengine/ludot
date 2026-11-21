@@ -4,9 +4,11 @@
 
 ## AnimationPlayer
 
-Add an [AnimationPlayer](../api/engine/AnimationPlayer.md), create an animation, and add tracks for the properties you want to animate. Tracks store values at specific times. The player interpolates between compatible keys and applies the values while the animation runs.
+Add an [AnimationPlayer](../api/engine/AnimationPlayer.md), create an animation, and add a track for each property you want to animate. A track stores values at points in time, and the player blends between them while the animation runs.
 
-Use `player:play("walk")` to start a named animation. Keep animation names exact. Use an [AnimationTree](../api/engine/AnimationTree.md) when transitions, blending, or a larger animation state graph should decide which clips contribute.
+Start an animation by name with `player:play("walk")`. Names must match exactly.
+
+For transitions and blending between many clips, use an [AnimationTree](../api/engine/AnimationTree.md).
 
 ## Tween a property
 
@@ -19,19 +21,34 @@ class Slide extends Node2D = {
 }
 ```
 
-The property path is the native string `"position"`, even though direct Luau access uses `self.Position`. API casing changes identifiers, not reflective strings.
+The property is named with Godot's string `"position"`, even though Luau code reads it as `self.Position`. Casing settings change identifiers, not strings.
 
-Create a new tween for a new sequence. A completed tween is not a reusable animation asset. Use the returned property tweener to configure delay, transition, or easing. Bind tweens to the node that owns their behavior so their lifetime follows that node.
+- `tweenProperty` returns a tweener. Use it to set a delay, transition, or easing.
+- A tween runs once. Create a new one for each new animation.
+- Create tweens from the node they animate, so they stop when that node is freed.
 
 ## Coordinate animation ownership
 
-If an animation, a tween, and `_process` all write the same property, the last writer in that frame wins. Give one system ownership of a property at a time. For a character, keep physical movement on its body and animate a visual child when appropriate.
+If an animation, a tween, and `_process` all set the same property, whichever runs last in the frame wins. Let one system control a property at a time.
 
-A character's animation does not automatically move its collision body. Decide whether the motion comes from physics logic, root motion, or a visual-only track.
+For characters, move the physics body in code and animate a visual child node. An animation doesn't move the collision body by itself, so decide whether motion comes from physics code, root motion, or a visual-only track.
 
 ## Completion and events
 
-Use the tween's completion signal or an animation player's event signals when later work must wait for completion. Signal handlers can yield through the engine scheduler; use [tasks](./tasks.md) and [signals](./signals.md) rather than blocking a thread with a busy loop.
+To run code after an animation, use the tween's `Finished` signal or the animation player's signals:
+
+```luau
+class FadeOut extends Node2D = {
+	function _ready()
+		const tween = self:createTween()
+		tween:tweenProperty(self, "modulate:a", 0, 1)
+		tween.Finished:wait()
+		self:queueFree()
+	end
+}
+```
+
+`wait` pauses only the current callback. Don't use a loop to wait. See [tasks](./tasks.md) and [signals](./signals.md).
 
 ## Reference
 

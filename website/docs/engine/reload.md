@@ -6,51 +6,85 @@ source: docs/language.md
 
 ## Hot reload
 
-Saving a script or module reloads it in place. Live instances keep their identity, so
-references held elsewhere stay valid. Fields keep their values. When a field's
-declared type changes, the value is kept if it still fits the new type, converted when
-a lossless conversion exists (between strings and numbers, or between engine value
-types such as `Vector2` and `Vector2i`), and otherwise reset to the new default with a
-warning. Scripts that import a changed module, and scripts that extend a changed
-class, reload with it.
+Saving a script or module reloads it in place, while the game runs.
 
-Functions created by the previous version keep working after a reload and run the
-new code. That includes callbacks connected to signals and functions stored in
-fields or tables. Adding or removing a `Signal` field updates the script's signal
-list; existing connections on the object stay. Functions match by name and position within their enclosing
-function. A function keeps its old code while it is running, or if the variables it
-captures changed. A failed edit leaves the previous version running. A thread
-suspended in `task.wait` is still running, so it finishes with the code it started
-with. Functions it calls later, and new calls, use the new code.
+### Objects and fields
+
+Live instances stay the same objects, so references held elsewhere stay valid.
+Fields keep their values. When you change a field's declared type:
+
+- If the old value still fits the new type, it's kept.
+- If a lossless conversion exists, it's converted. That covers strings and numbers,
+  and engine value types such as `Vector2` and `Vector2i`.
+- Otherwise the field resets to its new default, with a warning.
+
+Scripts that import a changed module, and scripts that extend a changed class,
+reload along with it.
+
+Adding or removing a `Signal` field updates the script's signal list. Existing
+connections on the object stay connected.
+
+### Functions
+
+Functions created by the old version keep working and run the new code. That
+includes signal callbacks and functions stored in fields or tables. Functions are
+matched by name and by position inside their enclosing function.
+
+A function keeps its old code when:
+
+- it is running at the moment of the reload
+- the variables it captures have changed
+
+A thread paused in `task.wait` counts as running, so it finishes with the code it
+started with. Functions it calls later, and all new calls, use the new code.
+
+If the edit has an error, the previous version keeps running.
 
 ## Debugging and profiling
 
-Breakpoints, stepping, stack inspection, and expression evaluation work on the main
-thread, in coroutines, and on worker threads. Expressions are Luau and can read the
-frame's locals, upvalues, and `self`. Constant locals stay inspectable because scripts
-compile without optimization while a debugger is attached.
+### Debugger
 
-All Luau code runs on one VM, guarded by a lock. Calls from different threads run one
-at a time, so while one thread is stopped at a breakpoint, other threads that call
+Breakpoints, stepping, stack inspection, and expression evaluation work on the main
+thread, in coroutines, and on worker threads.
+
+Watch expressions are Luau and can read the frame's locals, upvalues, and `self`.
+Scripts compile without optimization while a debugger is attached, so `const` locals
+stay visible.
+
+The debugger's globals include `[suspended tasks]`. It lists every scheduled thread
+with:
+
+- its kind: `wait`, `delay`, or `defer`
+- where it's paused
+- its owner
+- for waits and delays, the duration and the time elapsed
+
+### Threads and the VM
+
+All Luau code runs on one VM, guarded by a lock. Calls from different threads run
+one at a time. While one thread is stopped at a breakpoint, other threads that call
 into Luau wait for it.
 
-The editor's scripts profiler shows every Luau function, whether the engine called it
-or another Luau function did, including `pcall` targets, metamethods, and coroutine
-bodies. Coroutine time excludes the time spent suspended. With native call profiling
-on, engine methods called from Luau get their own rows. Code resumed by the task
-scheduler is profiled the same way, and time spent waiting is excluded.
+### Profiler
 
-The debugger's globals include `[suspended tasks]`, which lists every scheduled
-thread with its kind (`wait`, `delay`, or `defer`), where it is suspended, its owner,
-and for waits and delays the duration and elapsed time.
+The editor's script profiler shows every Luau function, whether the engine called
+it or another Luau function did. That includes `pcall` targets, metamethods, and
+coroutine bodies.
+
+- Coroutine time excludes time spent suspended.
+- Code resumed by the task scheduler is profiled the same way, and waiting time is
+  excluded.
+- With native call profiling on, engine methods called from Luau get their own rows.
 
 ## Function hover help
 
 Hover over a function in the native editor to see its signature, parameters, return
-types, and documentation. Documented engine methods offer a link to the matching
-Godot API page. The link stays visible below the scrolling description. Luau
-binding names such as `getNode` link to the original `get_node` documentation.
+types, and documentation.
 
-Put adjacent `---` comments above Luau functions to describe them in the card.
-GDScript uses its normal `##` documentation comments. Named script functions use
-the current editor source, including edits that have not been saved.
+For documented engine methods, the card links to the matching Godot API page. The
+link stays visible below the scrolling description. Luau names such as `getNode`
+link to the original `get_node` page.
+
+To document your own Luau functions, put `---` comments directly above them.
+GDScript uses its normal `##` comments. Named script functions use the editor's
+current text, including unsaved edits.

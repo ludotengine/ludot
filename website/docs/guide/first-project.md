@@ -2,23 +2,27 @@
 
 <p class="lead">Create a scene and attach a Luau script that updates a label.</p>
 
-The engine is experimental. Keep a backup of projects you migrate, and expect API changes between revisions. Ludot supports Linux, Windows, and macOS. You need a Ludot editor build; an ordinary Godot editor does not include the Luau runtime.
+::: warning Experimental
+Ludot is experimental, and the API can change between releases. Back up any project you move to it.
+:::
+
+You need the Ludot editor. A regular Godot editor doesn't include the Luau runtime.
 
 ## Get the editor
 
-Use [Install or update](./installation.md) for a desktop release, or follow [Build from source](../reference/building.md#editor). Desktop CI may also have editor artifacts for a recent run, but artifacts expire and an upload can fail independently of the build. Check the run's artifact list rather than assuming a download exists.
+[Install a desktop release](./installation.md), or [build it from source](../reference/building.md#editor).
 
-Start the built editor and create a new project in an empty directory. Choose a renderer suitable for your desktop. The steps below only need a 2D scene.
+Open the editor and create a new project in an empty folder. Any renderer works; this guide only uses a 2D scene.
 
 ## Create the scene
 
 1. Create a **User Interface** root node and name it `Main`.
 2. Add a `Label` child named `Message`.
-3. Give the label enough room to display a short line. Move it away from the top-left edge if you want a margin.
+3. Make the label wide enough for a short line of text.
 4. Save the scene as `Main.tscn`.
 5. Attach a new Luau script to `Main`. Save it as `Main.luau`.
 
-Replace the script with this code. It uses the default API casing, camelCase methods and PascalCase properties.
+Replace the script's contents with this:
 
 ```luau
 class Main extends Control = {
@@ -30,13 +34,15 @@ class Main extends Control = {
 }
 ```
 
-`onready` evaluates the node lookup immediately before `_ready`. The label exists by then. The `:: Label` assertion tells the checker which kind of node to expect. The native editor can also infer literal node paths when it knows the attached scene.
+- `onready` runs the lookup just before `_ready`, when the label exists.
+- `:: Label` tells the checker what kind of node to expect. The editor can often work this out from the scene by itself.
+- The code uses the default casing: camelCase methods (`getNode`) and PascalCase properties (`Text`).
 
 ## Run the scene
 
-Run the current scene with F6, or run the project with F5 and choose `Main.tscn` as its main scene. The label should display `Hello from Luau`. Check the debugger panel if the script reports an error.
+Press F6 to run the current scene. Or press F5 to run the project and pick `Main.tscn` as the main scene.
 
-This example needs the desktop engine. It cannot run in the browser playground because it uses `Control`, `Label`, and a scene tree.
+The label should say `Hello from Luau`. If something goes wrong, check the Debugger panel.
 
 ## Add an exported setting
 
@@ -53,7 +59,7 @@ class Main extends Control = {
 }
 ```
 
-Select `Main`, change `Greeting` in the Inspector, and run again. The scene stores that exported value. Ordinary Luau scripts do not run their lifecycle callbacks while you edit the scene.
+Select `Main`, change `Greeting` in the Inspector, and run again. The new value is saved with the scene.
 
 ## Share code with a module
 
@@ -81,7 +87,7 @@ class Main extends Control = {
 }
 ```
 
-Imports resolve relative to the importing file. For project-wide aliases, see [Modules and imports](../luau/imports.md).
+`./` paths are relative to the importing file. To set up project-wide shortcuts like `@helpers`, see [Modules and imports](../luau/imports.md).
 
 ## Fix common setup errors
 
@@ -95,4 +101,6 @@ Imports resolve relative to the importing file. For project-wide aliases, see [M
 
 ## Continue
 
-Read [Classes and properties](../luau/classes.md) for initialization and inheritance, [Engine scripting](../engine/) for lifecycle and ownership, or [Signals](../engine/signals.md) to connect UI events.
+- [Classes and properties](../luau/classes.md): fields, constructors, and inheritance
+- [Engine scripting](../engine/): callbacks, nodes, and the scene tree
+- [Signals](../engine/signals.md): reacting to buttons and other events

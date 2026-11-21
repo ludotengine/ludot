@@ -6,11 +6,7 @@ source: docs/language.md
 
 ## Enums
 
-Enums declare immutable numeric or string values and a distinct nominal type.
-Numeric members start at 1. An explicit integer resets the sequence for subsequent
-implicit members. Integer values must fit exactly in Luau's number representation.
-String enums require an explicit string for every member. Mixed numeric/string
-enums are errors.
+An enum declares a fixed set of named values and gives them their own type.
 
 ```luau
 enum Action = {
@@ -18,29 +14,53 @@ enum Action = {
 	Chat,
 	Leave = 10,
 }
+
 enum Message = {
 	Join = "join",
 	Chat = "chat",
 }
+
 const action: Action = Action.Chat
 const checked: Action? = Action.from(2)
 ```
 
-`Action.from(value)` checks membership and returns an enum value or nil. Assigning
-an arbitrary number/string to an enum, or assigning one enum to another enum, is a
-type error. Enum values remain ordinary numbers/strings at runtime, including when
-passed to Godot. Equality with the underlying number/string is permitted. Member
-aliases with equal underlying values compare equal and represent the same case
-for matching. The name `from` is reserved for checked conversion.
+### Values
 
-Use `export enum` with the existing module import forms. Enum types can annotate
-class fields, including exported Inspector fields. Numeric and string exports use
-dropdowns with member names; scene files store the underlying values. String
-values may contain commas or colons. Inspector dropdowns keep the names and values
-separate rather than parsing the display text.
+- Numeric members start at 1 and count up.
+- An explicit integer, like `Leave = 10`, restarts the count for the members after
+  it. Integers must fit exactly in a Luau number.
+- In a string enum, every member needs an explicit string.
+- An enum can't mix numbers and strings.
 
-Direct iteration yields members in declaration order, including aliases. It does
-not expose the `from` method:
+### Type safety
+
+An enum is a distinct type. These are type errors:
+
+- assigning a plain number or string to an enum variable
+- assigning one enum type to another
+
+To turn an unchecked value into an enum, use `Action.from(value)`. It returns the
+matching member or `nil`. Because of this, `from` is reserved and can't be a member
+name.
+
+At runtime, members are still plain numbers or strings, including when they're
+passed to Godot. Comparing a member with its underlying value using `==` is allowed.
+Two members with the same value are aliases. They compare equal and count as the
+same case in a `match`.
+
+### Exporting and the Inspector
+
+- Use `export enum` to share an enum, then import it like any other module export.
+- Enum types can annotate class fields, including `export` fields.
+- Exported enum fields show a dropdown of member names. Scenes store the underlying
+  values.
+- String values can contain commas or colons. The dropdown keeps names and values
+  separate instead of parsing display text.
+
+### Iteration
+
+Looping over an enum yields its members in declaration order, aliases included. The
+`from` function isn't part of the loop:
 
 ```luau
 for name, value in Action do
@@ -55,65 +75,93 @@ an `Enum` object, and each value is an `EnumItem`:
 
 ```luau
 Input:setMouseMode(Enum.MouseMode.Captured)
-print(Enum.MouseMode.Captured) -- Enum.MouseMode.Captured
-print(Enum.MouseMode.Captured.Name) -- Captured
-print(Enum.MouseMode.Captured.Value) -- 2
+
+print(Enum.MouseMode.Captured)          -- Enum.MouseMode.Captured
+print(Enum.MouseMode.Captured.Name)     -- Captured
+print(Enum.MouseMode.Captured.Value)    -- 2
 print(Enum.MouseMode.Captured.EnumType) -- Enum.MouseMode
 
 print(Enum.MouseMode:fromName("Captured")) -- Enum.MouseMode.Captured, or nil
-print(Enum.MouseMode:fromValue(2)) -- Enum.MouseMode.Captured, or nil
-print(#Enum.MouseMode:getEnumItems()) -- 6
-print(#Enum:getEnums()) -- every engine enum
+print(Enum.MouseMode:fromValue(2))         -- Enum.MouseMode.Captured, or nil
+print(#Enum.MouseMode:getEnumItems())      -- 6
+print(#Enum:getEnums())                    -- every engine enum
 
 for name, item in Enum.MouseMode do
 	print(name, item.Value)
 end
 ```
 
-`typeof` returns `"EnumItem"` and `"Enum"`. Each item is a single shared value, so
-`==` compares identity, and `Enum.MouseMode.Captured.EnumType.Captured` is the same
-item. Indexing a missing enum or item is an error. User `enum` declarations are not
-part of `Enum`.
+- `typeof` returns `"EnumItem"` or `"Enum"`.
+- Each item is a single shared value, so `==` compares identity.
+  `Enum.MouseMode.Captured.EnumType.Captured` is the same item.
+- Indexing a missing enum or item is an error.
+- Your own `enum` declarations are separate and don't appear under `Enum`.
 
-Item names drop the words shared by every constant of the enum and use PascalCase:
-`MOUSE_MODE_CONFINED_HIDDEN` becomes `ConfinedHidden`. A name that would start with a
-digit keeps the last shared word, so `KEY_0` is `Enum.Key.Key0`. An enum keeps its
-Godot name when the name is unique, such as `Enum.Key`, `Enum.MouseButton`, and
-`Enum.LayoutPreset`. Same-named enums with the same items are one enum:
-`Input.MouseMode` and `DisplayServer.MouseMode` are both `Enum.MouseMode`, and
-`Control`, `Input`, and `DisplayServer` share `Enum.CursorShape`. Different enums with
-the same name take their class as a prefix, such as `Enum.Light3DParam`,
-`Enum.NodeProcessMode`, and `Enum.VariantType`. Editor-only enums are left out, so
-editor and exported builds see the same names.
+#### How names are built
 
-Engine methods and properties that take an enum accept an `EnumItem` or its number.
-Those that return a non-bitfield enum return the `EnumItem`, such as
-`Input:getMouseMode()` and `node.ProcessMode`. A value with no matching item, such as a
-key code with modifier bits, stays a number. Bitfield enums, such as
-`Enum.MouseButtonMask`, return numbers, because their values combine. Use `.Value`
-with `bit32` to combine items.
+Item names drop the words every constant in the enum shares, then use PascalCase.
+`MOUSE_MODE_CONFINED_HIDDEN` becomes `ConfinedHidden`. A name that would start with
+a digit keeps the last shared word, so `KEY_0` becomes `Enum.Key.Key0`.
 
-Annotate engine enum types as `Enum.<Name>`, such as `Enum.MouseMode`. `EnumItem`
-and `Enum` are the general types. Engine methods, properties, `fromName`, and
-`getEnumItems` are typed with the specific enum, and matches over engine enums check
-exhaustiveness. An `export` field typed `Enum.<Name>` shows a dropdown and stores the
-number in scenes.
+Enum names follow these rules:
 
-Class enum constants keep Godot's original names, such as
-`Input.MOUSE_MODE_CAPTURED`. Non-bitfield ones are the matching `EnumItem`, so
-`Input.MOUSE_MODE_CAPTURED == Enum.MouseMode.Captured`. Bitfield constants, such as
-`Control.SIZE_EXPAND_FILL`, and builtin value type constants, such as
-`Vector3.AXIS_Z`, stay numbers. The class enum namespaces (`Input.Enums.MouseMode`),
-the global enum tables (`Key.KEY_W`, `MouseButton`, `Variant.Type`), and the
-`Input.MouseMode` style annotations are replaced by `Enum`. Method names follow the
-project method casing and `Name`, `Value`, and `EnumType` follow the property
-casing. Enum and item names do not change with casing. Native bitfield
-parameters/properties continue to accept numeric masks.
+| Case | Result | Examples |
+| --- | --- | --- |
+| The Godot name is unique | Kept as is | `Enum.Key`, `Enum.MouseButton`, `Enum.LayoutPreset` |
+| Same name, same items | Merged into one enum | `Input.MouseMode` and `DisplayServer.MouseMode` are both `Enum.MouseMode` |
+| Same name, different items | Prefixed with the class | `Enum.Light3DParam`, `Enum.NodeProcessMode`, `Enum.VariantType` |
+
+`Control`, `Input`, and `DisplayServer` all share `Enum.CursorShape`. Editor-only
+enums are left out, so the editor and exported games see the same names.
+
+#### Passing and returning enums
+
+- Engine methods and properties that take an enum accept an `EnumItem` or its number.
+- Those that return an ordinary enum return the `EnumItem`, for example
+  `Input:getMouseMode()` and `node.ProcessMode`.
+- A value with no matching item, such as a key code with modifier bits, stays a
+  number.
+- Bitfield enums such as `Enum.MouseButtonMask` return numbers, because their values
+  combine. Use `.Value` with `bit32` to combine items. Bitfield parameters and
+  properties still accept numeric masks.
+
+#### Types
+
+Annotate engine enums as `Enum.<Name>`, such as `Enum.MouseMode`. `EnumItem` and
+`Enum` are the general types.
+
+Engine methods, properties, `fromName`, and `getEnumItems` are typed with the
+specific enum, and a `match` over an engine enum checks that every case is covered.
+An `export` field typed `Enum.<Name>` shows a dropdown and stores the number in the
+scene.
+
+#### Class constants
+
+Class constants keep Godot's names, such as `Input.MOUSE_MODE_CAPTURED`.
+
+- Non-bitfield constants are the matching `EnumItem`, so
+  `Input.MOUSE_MODE_CAPTURED == Enum.MouseMode.Captured`.
+- Bitfield constants, such as `Control.SIZE_EXPAND_FILL`, stay numbers.
+- Value type constants, such as `Vector3.AXIS_Z`, stay numbers.
+
+#### Casing
+
+Method names (`fromName`, `getEnumItems`) follow the project's method casing.
+`Name`, `Value`, and `EnumType` follow the property casing. Enum and item names
+never change with casing.
+
+#### Replaced forms
+
+`Enum` replaces these older forms, which no longer exist:
+
+- class enum namespaces, such as `Input.Enums.MouseMode`
+- global enum tables, such as `Key.KEY_W`, `MouseButton`, and `Variant.Type`
+- annotations in the `Input.MouseMode` style
 
 ## Match expressions and statements
 
-A match evaluates its subject once and tests arms in source order. Only the first
-matching arm runs. There is no fallthrough.
+A `match` compares one value against a list of cases, top to bottom. Only the first
+matching case runs, and there is no fallthrough.
 
 ```luau
 const text = match action with
@@ -132,17 +180,41 @@ match health with
 end
 ```
 
-Expression arms contain one expression and produce one value. Their types form a
-union. Value cases accept literals and enum members. Guards use `case if` and do
-not establish exhaustive coverage. Expressions require exhaustive coverage or
-`otherwise`. The diagnostic lists missing enum members. Statements report a
-`match_exhaustiveness` warning when cases are missing. Duplicate values, invalid
-case domains, and arms after `otherwise` are diagnosed. Equal-valued aliases count
-as the same case. A guard that always evaluates true makes subsequent arms
-unreachable, but still does not replace explicit exhaustive coverage.
+The value after `match` is evaluated once.
 
-Match statements keep ordinary `return`, `break`, and `continue` behavior in the
-enclosing function/loop. Match expressions have their own expression boundary.
-`case` and `otherwise` mark arms at statement boundaries inside a match; they are
-contextual names elsewhere. An ordinary function named `match` can still be
-called with parentheses.
+### Cases
+
+| Case | Matches when |
+| --- | --- |
+| `case 0`, `case "idle"`, `case Action.Join` | The value equals this literal or enum member |
+| `case if condition` | The condition is true (a guard) |
+| `otherwise` | Nothing above matched |
+
+### Expressions and statements
+
+**Match expressions** produce a value. Each case holds one expression, and the
+result type is the union of all of them. An expression must cover every case or end
+with `otherwise`. If it doesn't, the error lists the missing enum members.
+
+**Match statements** run code. Missing cases produce a `match_exhaustiveness`
+warning instead of an error. `return`, `break`, and `continue` inside a statement
+act on the enclosing function or loop as usual. A match expression is its own
+boundary.
+
+### Checks
+
+The checker reports:
+
+- duplicate values
+- values that can't match the subject's type
+- cases written after `otherwise`
+
+Aliases with the same value count as one case. Guards never count toward complete
+coverage, even a guard that is always true. Such a guard does make every later case
+unreachable.
+
+### Reserved words
+
+`case` and `otherwise` are only keywords at the start of a case inside a match.
+Elsewhere they are ordinary names. A function named `match` can still be called with
+parentheses.

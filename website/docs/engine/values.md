@@ -4,11 +4,16 @@
 
 ## Primitive values
 
-Luau has `nil`, booleans, numbers, strings, functions, threads, tables, and userdata. Integers and floating-point engine arguments both use Luau `number`. Engine `String`, `StringName`, and `NodePath` arguments accept Luau strings through the binding.
+Luau has `nil`, booleans, numbers, strings, functions, threads, tables, and userdata.
 
-Only `nil` and `false` are falsey. Zero, an empty string, an empty collection, and a zero vector are all truthy. Do not carry GDScript's truthiness rules into Luau.
+- Engine `int` and `float` are both Luau `number`.
+- Engine `String`, `StringName`, and `NodePath` all accept Luau strings.
 
-Use `value ?? fallback` when false is a valid value. `value or fallback` replaces false too.
+### Truthiness
+
+Only `nil` and `false` count as false. Unlike GDScript, `0`, `""`, empty collections, and zero vectors are all **true** in Luau.
+
+When `false` is a valid value, use `value ?? fallback`. `value or fallback` also replaces `false`.
 
 ## Native value types
 
@@ -21,11 +26,23 @@ const tint = Color.new(0.3, 0.6, 1.0, 1.0)
 print(offset.X, direction.Z, tint.A)
 ```
 
-Engine value properties use the project property casing. With defaults, vector components are `X`, `Y`, and `Z`. Methods use camelCase, such as `direction:normalized()`.
+With the default casing, components are `X`, `Y`, and `Z`, and methods are camelCase, like `direction:normalized()`.
 
-Value properties crossing the engine boundary are values, not live views into an object's property. To change a node position, assign the result back to `node.Position`. Prefer `node.Position = node.Position + offset` over assuming a nested component write changes the node.
+### Values are copies
 
-The VM's lower-case `vector` library is separate from engine `Vector2` and `Vector3`. The standalone playground has `vector`; engine mode can check native vector code without executing an engine.
+Reading `node.Position` gives you a copy of the value, not a live link to the node. To move the node, assign a new value back:
+
+```luau
+class Nudge extends Node2D = {
+	function _ready()
+		self.Position = self.Position + Vector2.new(10, 0)
+	end
+}
+```
+
+### `vector` vs `Vector3`
+
+Luau's lowercase `vector` library is a different type from the engine's `Vector2` and `Vector3`. Use the engine types for anything you pass to the engine.
 
 ## Tables and native collections
 
@@ -38,7 +55,7 @@ for index, score in scores do
 end
 ```
 
-Engine [Array](../api/engine/Array.md), [Dictionary](../api/engine/Dictionary.md), and packed arrays are native collection values. Ludot supports indexing, `#`, and iteration on them. Sequential collection indexes start at **1** in the Luau binding, including collections returned by engine methods.
+Engine [Array](../api/engine/Array.md), [Dictionary](../api/engine/Dictionary.md), and packed arrays support indexing, `#`, and iteration, like tables. Indexes start at **1**, including in arrays returned by engine methods.
 
 ```luau
 class Inspector extends Node = {
@@ -51,19 +68,23 @@ class Inspector extends Node = {
 }
 ```
 
-Engine methods that take integer indexes are still ordinary method calls. Their argument semantics come from the method reference; do not blindly add or subtract one for every numeric argument.
+Methods that take an index, like `getChild`, still use Godot's numbering, which starts at 0. Only indexing with `[]` starts at 1. Check the method's reference instead of adding or subtracting 1 everywhere.
 
 ## Objects and resources
 
-Nodes and resources expose reflected methods and properties. A native object reference identifies the same engine object across property reads and calls. Nodes follow scene ownership and explicit deletion. Ref-counted resources have a different lifetime and can be shared among many nodes.
+A variable holding a node or resource refers to the engine object itself, not a copy.
 
-Tables and plain Luau class objects that cross into engine code travel as `LuauValue` references. They do not automatically turn into independent copies of every nested field. See [signals](./signals.md) for values crossing between Luau and GDScript.
+- **Nodes** live until they're freed, usually with `queueFree`.
+- **Resources** are reference counted. They're freed when nothing uses them, and many nodes can share one.
+
+Tables and Luau class objects passed to the engine travel as `LuauValue` references, not copies. See [signals](./signals.md) for how they reach GDScript.
 
 ## Call syntax and strings
 
-Call instance methods with a colon, such as `node:getName()`. Call static methods and constructors with a dot, such as `Vector3.new(1, 2, 3)` or `FileAccess.open(path, mode)`.
+- Instance methods use a colon: `node:getName()`
+- Static methods and constructors use a dot: `Vector3.new(1, 2, 3)`, `FileAccess.open(path, mode)`
 
-Identifier casing does not rewrite strings. Native reflective paths such as `"position"`, shader uniform names, node paths, and action names keep the spelling their API expects. A tween targets `"position"`, even though identifier access is `node.Position`.
+Casing settings don't change strings. Property paths, shader uniforms, node paths, and action names keep their original spelling. A tween animates `"position"`, even though code reads `node.Position`.
 
 ## Reference
 

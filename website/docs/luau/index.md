@@ -2,7 +2,7 @@
 
 <p class="lead">Luau with native classes, imports, enums, pattern matching, and a direct connection to the engine.</p>
 
-Ludot's language fork derives from Luau 0.743. Its parser, analyzer, compiler, and VM implement the extensions directly. There is no source rewriting or transpiler between your code and the compiler.
+Ludot's language is a fork of Luau 0.743. Its parser, analyzer, compiler, and VM implement every extension directly, so there's no transpiler between your code and the compiler.
 
 ## A small example
 
@@ -20,7 +20,9 @@ counter:add(3)
 print(counter.Value)
 ```
 
-Each instance gets its own field defaults. Methods receive `self` implicitly. A `const` binding cannot be reassigned, but the object or table it points to can still change. Use `const function` for functions and `local` when a binding must change.
+- Each instance gets its own copy of the field defaults.
+- Methods receive `self` automatically.
+- A `const` binding can't be reassigned, but the table or object it points to can still change. Use `local` when a variable needs to change, and `const function` for functions.
 
 ## Language map
 
@@ -35,7 +37,7 @@ Each instance gets its own field defaults. Methods receive `self` implicitly. A 
 
 ## Types and existing Luau
 
-Unions, intersections, generics, type packs, refinements, and type functions remain available. Annotate function parameters and public contracts. Inferred local variables do not need redundant types.
+Everything from standard Luau still works: unions, intersections, generics, type packs, refinements, and type functions. Annotate function parameters. Local variables can usually rely on inference.
 
 ```lua
 const function displayName(name: string?)
@@ -48,10 +50,10 @@ for index, name in names do
 end
 ```
 
-Keep `false` distinct from `nil`. `value ?? fallback` uses the fallback only for nil, while `value or fallback` also replaces false.
+`value ?? fallback` only uses the fallback for `nil`. `value or fallback` also replaces `false`, which is usually not what you want for settings.
 
 ## Try a class
 
 <Playground example="Classes" />
 
-The [playground](../playground.md) runs standalone code. Engine classes, scene lifecycle, tasks, and signals need the desktop runtime.
+The [playground](../playground.md) runs plain Luau in the browser. Engine classes, scenes, tasks, and signals need the desktop engine.

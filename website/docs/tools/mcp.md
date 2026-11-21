@@ -2,7 +2,11 @@
 
 <p class="lead">Ludot includes a fork of Godot Editor MCP for inspecting and editing a live desktop editor from an MCP client.</p>
 
-Use the server and addon in this repository's `mcp/` tree for Ludot-specific tools. The upstream package name is still `godot-editor-mcp`, and tool names keep their `godot_` prefix for compatibility. Installing upstream releases alone does not provide this fork's Luau additions.
+The server and addon live in the repository's `mcp/` folder. The package is still named `godot-editor-mcp`, and tool names keep their `godot_` prefix.
+
+::: tip
+Install from the `mcp/` folder. The upstream release doesn't include Ludot's Luau tools.
+:::
 
 ## Install the local fork
 
@@ -13,15 +17,24 @@ python -m venv build/mcp-venv
 build/mcp-venv/bin/pip install ./mcp
 ```
 
-On Windows, use the virtual environment's `Scripts` directory. Install the matching addon from the local `mcp/godot/addons/godot_mcp/` tree into your project and enable it in Project Settings > Plugins. Configure your MCP client to run the environment's `godot-editor-mcp` command. See the [server README](https://github.com/ludotengine/ludot/blob/main/mcp/README.md) for bridge and client configuration.
+On Windows, use `build\mcp-venv\Scripts\pip` instead.
 
-The fork discovers `ludot` on PATH. Keep editor and server versions matched.
+Then:
+
+1. Copy `mcp/godot/addons/godot_mcp/` into your project's `addons/` (or `Addons/`) folder.
+2. Enable it in Project Settings > Plugins.
+3. Point your MCP client at the virtual environment's `godot-editor-mcp` command.
+
+The server finds `ludot` on your PATH. Use a server and editor from the same Ludot version. The [server README](https://github.com/ludotengine/ludot/blob/main/mcp/README.md) covers client configuration in detail.
 
 ## Read before editing
 
-`get_ludot_conventions` returns the project API casing, naming rules, lint and formatting preferences, module aliases, and relevant configuration files. `list_settings` inspects project settings or editor preferences by prefix, withholding credential-like values.
+Two tools give an agent the context it needs before changing anything:
 
-Toolsets gate mutation tools. Enable the required toolset before trying to call a tool that is not exposed. Inspect the connected editor and current project before changing scene or script state.
+- `get_ludot_conventions` returns the project's API casing, naming rules, lint and formatting settings, module aliases, and config files.
+- `list_settings` reads project settings or editor preferences by prefix. It hides values that look like credentials.
+
+Tools that change things are grouped into toolsets, which are off by default. Enable a toolset before calling its tools.
 
 ## Luau tools
 
@@ -35,8 +48,9 @@ Toolsets gate mutation tools. Enable the required toolset before trying to call 
 | `luau_format` | Apply StyLua using editor settings; `dry_run` returns a diff. |
 | `create_luau_script` | Create a script using the built-in templates. |
 
-The API and inspection tools answer without running game code. Script editing and checking go through the native `LuauScript` integration. The addon can also live in an `Addons/` directory.
+The API and inspection tools never run game code. Script editing and checking go through the engine's own `LuauScript` support.
 
 ## More detail
 
-The full MCP tool catalog and architecture remain in [the repository's MCP docs](https://github.com/ludotengine/ludot/tree/main/mcp/docs/site). Ludot's [implementation status](../reference/status.md) records which integration tests have passed and which runtime limits remain.
+- [Full tool catalog and architecture](https://github.com/ludotengine/ludot/tree/main/mcp/docs/site)
+- [Implementation status](../reference/status.md): which integration tests pass, and known limits

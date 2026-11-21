@@ -4,9 +4,12 @@
 
 ## Configure actions
 
-Open Project Settings > Input Map. Add `move_left`, `move_right`, `move_forward`, and `move_back`. Assign keyboard keys or gamepad controls to each action. Add `jump` if your character needs it.
+Open Project Settings > Input Map and add these actions:
 
-An action can have several bindings. Gameplay code depends on the action name rather than a physical key, so keyboard and controller input use the same movement code.
+- `move_left`, `move_right`, `move_forward`, `move_back`
+- `jump`, if your character jumps
+
+Bind keys or gamepad controls to each one. An action can have several bindings. Your code only checks the action name, so keyboard and controller share the same code.
 
 ## Poll continuous input
 
@@ -21,9 +24,15 @@ class Mover extends Node2D = {
 }
 ```
 
-`getVector` combines four actions, applies its dead zone, and limits vector length to 1. For a physics character, read this input in `_physicsProcess` and assign its velocity instead of directly changing position.
+`getVector` combines four actions into one direction, applies a dead zone, and keeps the length at 1 or less. For a physics character, read input in `_physicsProcess` and set its velocity instead of its position.
 
-`isActionPressed` stays true while an action is held. `isActionJustPressed` and `isActionJustReleased` detect transitions in the current frame or physics tick. Poll once in the update loop that owns the behavior.
+| Method | True when |
+| --- | --- |
+| `isActionPressed` | The action is held down |
+| `isActionJustPressed` | The action was pressed this frame |
+| `isActionJustReleased` | The action was released this frame |
+
+"This frame" means the current physics tick when called from `_physicsProcess`.
 
 ## Handle individual events
 
@@ -38,13 +47,31 @@ class MenuInput extends Node = {
 }
 ```
 
-Use `_unhandledInput` for gameplay shortcuts that UI controls should be able to consume first. Use `_input` when the earlier event phase is intentional. Marking the event handled prevents later handlers from acting on it.
+- `_unhandledInput` runs after UI controls have had a chance to use the event. Use it for gameplay.
+- `_input` runs before the UI. Use it only when you need the event first.
+
+`setInputAsHandled` stops the event from reaching anything else.
 
 ## Mouse capture
 
-`Input:setMouseMode(Enum.MouseMode.Captured)` captures the mouse for a look controller. Restore `Enum.MouseMode.Visible` when opening a menu or releasing the pointer. Mouse motion is an [InputEventMouseMotion](../api/engine/InputEventMouseMotion.md); use an `isA` check to narrow a general input event before reading motion-specific properties.
+For a mouse-look camera, capture the mouse, and release it when a menu opens:
 
-The browser playground does not receive engine input events. Use engine mode for completion and type checking, then run the scene in the desktop engine.
+```luau
+Input:setMouseMode(Enum.MouseMode.Captured) -- hide and lock the cursor
+Input:setMouseMode(Enum.MouseMode.Visible)  -- give it back
+```
+
+Mouse movement arrives as an [InputEventMouseMotion](../api/engine/InputEventMouseMotion.md). Check for it with `isA` before reading its properties:
+
+```luau
+class MouseLook extends Node3D = {
+	function _unhandledInput(event: InputEvent)
+		if event:isA("InputEventMouseMotion") then
+			print(event.Relative)
+		end
+	end
+}
+```
 
 ## Reference
 

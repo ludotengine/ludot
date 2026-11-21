@@ -6,21 +6,15 @@ source: docs/language.md
 
 ## Engine naming
 
-Project Settings > Luau > Api provides two independent settings:
+Godot's API uses snake_case. Ludot lets you pick how engine methods and properties
+are spelled in Luau. Set it under Project Settings > Luau > Api:
 
 | Setting | Choices | Default |
 | --- | --- | --- |
 | `luau/api/method_casing` | `camelCase`, `PascalCase`, `snake_case` | `camelCase` |
 | `luau/api/property_casing` | `camelCase`, `PascalCase`, `snake_case` | `PascalCase` |
 
-The property setting also controls signal names (`self.TreeExiting`) and builtin value
-components. Signal methods follow the method setting, as described in Signals. Static
-methods use the method setting. Native class/type names retain their original
-engine spelling, including acronym names such as `HTTPClient`, `RID`, and `AABB`.
-Constructors always use `.new()`. Native enum constants use their original Godot spelling and retain existing
-PascalCase aliases. Other builtin constants keep their fixed PascalCase spelling. GDScript and engine internals keep Godot's original API names.
-
-Examples for each selected style:
+### Examples
 
 | Godot member | camelCase | PascalCase | snake_case |
 | --- | --- | --- | --- |
@@ -31,50 +25,87 @@ Examples for each selected style:
 | Vector3 `x`, `y`, `z` | `x`, `y`, `z` | `X`, `Y`, `Z` | `x`, `y`, `z` |
 | `_physics_process` | `_physicsProcess` | `_PhysicsProcess` | `_physics_process` |
 
-Naming splits ASCII identifiers at underscores, lowercase-to-uppercase boundaries,
-and acronym boundaries such as `HTTPResponse` into `HTTP` + `Response`. Words are
-lowercased before applying the chosen style: `get_rid` becomes `getRid`, `GetRid`,
-or `get_rid`, not `getRID`. Digits stay in their word. Leading underscores are
-preserved. Thus `_ready` stays `_ready` with camelCase/snake_case, and becomes
-`_Ready` with PascalCase. This conversion is shared by the native binding and the
-standalone analyzer, using raw reflected member names rather than converting
-already-renamed completions.
+### What each setting covers
+
+**Method casing** covers instance methods, static methods, and signal methods such
+as `connect`.
+
+**Property casing** covers properties, signal names such as `self.TreeExiting`, and
+value type components such as `Vector3.X`.
+
+These never change:
+
+- Class and type names keep their engine spelling, including acronyms like
+  `HTTPClient`, `RID`, and `AABB`.
+- Constructors are always `.new()`.
+- Enum constants keep Godot's spelling and their existing PascalCase aliases.
+- Other built-in constants keep their fixed PascalCase spelling.
+- GDScript and the engine's internals keep Godot's original names.
+
+### How names are converted
+
+1. Split the name into words at underscores, at lowercase-to-uppercase changes, and
+   at acronym boundaries (`HTTPResponse` becomes `HTTP` + `Response`).
+2. Lowercase every word. Digits stay with their word.
+3. Join the words in the chosen style.
+
+So `get_rid` becomes `getRid`, `GetRid`, or `get_rid`, never `getRID`. Leading
+underscores are kept: `_ready` stays `_ready` in camelCase and snake_case, and
+becomes `_Ready` in PascalCase.
+
+The engine and the standalone analyzer share this conversion. Both start from the
+raw engine names, never from already-converted ones.
 
 ### Compatibility and setting changes
 
-Existing projects without these settings keep the defaults above. Each engine
-method/property exposes only its selected spelling, except the documented
-`isA`/`IsA` compatibility pair. Completions do not list alternate spellings. Changing a style can therefore
-require source edits. Existing source is never automatically renamed.
+Projects without these settings use the defaults.
 
-The editor and game take an immutable naming snapshot when their language runtime
-starts. The settings are marked as requiring an editor restart; restart running
-games as well. Reloading a script or changing ProjectSettings in a running process
-does not switch its API midway through execution. The standalone LSP reads the
-nearest ancestor `project.godot`, takes a per-project snapshot, and requires an LSP
-restart after casing changes. Different projects can use different styles in one
-LSP session. Invalid manually configured style names use the corresponding default
-and report a warning.
+Each engine method and property has exactly one spelling, the selected one, except
+the `isA`/`IsA` pair. Completion doesn't list other spellings. That means changing a
+setting can require edits to your code. Ludot never renames your source for you.
 
-Custom user-declared class, function, method, property, parameter, and table-key
-names remain exactly as written. Naming lint preferences are independent and do
-not configure the engine API. Native virtual callbacks are the engine boundary:
-Godot dispatches its original callback name to the selected Luau spelling. An exact
-user declaration takes precedence when both names exist. Only actual native
-callbacks receive this bridge; arbitrary user methods have no casing aliases.
-Builtin script templates and generated native callback stubs use the selected
-engine style, while custom handler names are preserved.
+Settings are read once, when the language runtime starts:
 
-Names passed as string arguments to Godot's reflective APIs keep Godot's original
-semantics. For example, `EmitSignal("ready")` uses the original signal name even
-when the signal property is `Ready`. User method/property names passed as strings
-remain exact too. The selected member styles affect identifier access, not string
-contents or resource/node paths.
+- **Editor:** restart the editor after changing a casing setting.
+- **Running games:** restart them too. Reloading a script or changing
+  ProjectSettings at runtime doesn't switch the spelling midway.
+- **Standalone LSP:** it reads the nearest `project.godot` and needs a restart after
+  a change. One LSP session can serve projects with different styles.
 
-The native binding reflects methods, properties, signals, static methods, and
-constants. Property reads and writes go straight to the engine object, so
-`self.Name = "x"` is visible to `self:getName()` on the next line. Member lookups use
-a per-class cache built from ClassDB. Scripted and dynamic properties fall back to a
-reflective scan. Luau functions convert to engine `Callable` values. Signals are
-`Signal` objects, so `timer.Timeout:connect(onTimeout)` returns a `Connection`.
-Arrays, dictionaries, and packed arrays support indexing (from 1), `#`, and iteration.
+An invalid style name in the settings falls back to the default with a warning.
+
+### Your own names
+
+Names you declare yourself, such as classes, functions, methods, properties,
+parameters, and table keys, stay exactly as written. Naming lint preferences are
+separate and don't affect the engine API.
+
+### Engine callbacks
+
+Native virtual callbacks, such as `_ready` and `_physics_process`, are where the two
+naming worlds meet. Godot calls its original name, and Ludot forwards the call to
+your Luau spelling. If you declare both spellings, the exact match wins.
+
+Only real engine callbacks get this forwarding. Your own methods have no casing
+aliases. Script templates and generated callback stubs use your selected style.
+
+### Names inside strings
+
+Strings passed to Godot's reflective APIs keep Godot's original names.
+`EmitSignal("ready")` uses the original signal name even when the property is
+`Ready`. The same goes for your own method and property names passed as strings,
+node paths, and resource paths. Casing only changes identifiers in code.
+
+### How the binding works
+
+The binding reflects methods, properties, signals, static methods, and constants.
+
+- Property reads and writes go straight to the engine object, so `self.Name = "x"`
+  is visible to `self:getName()` on the next line.
+- Member lookups use a per-class cache built from ClassDB. Script and dynamic
+  properties fall back to a slower reflective scan.
+- Luau functions convert to engine `Callable` values.
+- Signals are `Signal` objects, so `timer.Timeout:connect(onTimeout)` returns a
+  `Connection`.
+- Arrays, dictionaries, and packed arrays support indexing from 1, `#`, and
+  iteration.

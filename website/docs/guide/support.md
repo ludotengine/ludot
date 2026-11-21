@@ -1,6 +1,6 @@
 # Support and limits
 
-The engine is experimental. Breaking changes are expected.
+Ludot is experimental. Expect breaking changes.
 
 ## Platforms
 
@@ -14,14 +14,16 @@ The engine is experimental. Breaking changes are expected.
 
 ## Scripting
 
-- Luau and GDScript run alongside each other. Luau editor tool scripts are unsupported.
-- Luau shares one VM. Calls enter it one at a time; a breakpoint can block other threads waiting for Luau.
-- Hot reload preserves compatible values. Running and suspended functions can finish with their old code.
-- Scene-based node inference requires the native editor's active scene. The standalone LSP uses general native return types.
-- The shader CLI checks the Luau subset. Final GPU type validation happens in the engine.
+- Luau and GDScript can be used in the same project. Luau editor tool scripts aren't supported.
+- All Luau code shares one VM, and calls enter it one at a time. A breakpoint can block other threads waiting for Luau.
+- Hot reload keeps compatible field values. Functions that are running or paused finish with their old code.
+- Node types inferred from the scene need the native editor with that scene open. The standalone LSP falls back to general types such as `Node`.
+- The standalone shader tool checks the Luau subset only. GPU type checking happens in the engine.
 
 ## Browser tools
 
-The playground runs standalone Luau. Engine mode provides completion and checking, without running a scene or resolving project imports. The live Vesper demo runs a separate experimental engine build.
+- The playground runs plain Luau.
+- Its engine mode adds completion and type checking for engine APIs, but can't run scenes or resolve project imports.
+- The Vesper demo runs on a separate, experimental web build of the engine.
 
 [Verification record](../reference/status.md) · [Report an issue](https://github.com/ludotengine/ludot/issues)

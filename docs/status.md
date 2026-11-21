@@ -275,7 +275,7 @@ separate. Native bindings, editor checking/completion/hover/signature help, and
 the standalone LSP use the same member-name conversion. Completion lists canonical spellings. The `isA`/`IsA` identity method and native
 constant compatibility aliases follow the policy documented in the language guide. Casing snapshots require
 an editor/game/LSP restart after setting changes; active bindings are not mutated.
-See [language.md](language.md#engine-naming) for acronym rules and compatibility.
+See [language.md](language.md#how-names-are-converted) for acronym rules and compatibility.
 
 The Linux native build and headless nine-combination runtime/editor-query matrix
 passed locally on 2026-11-12. The LSP matrix, including hover and signature help,

@@ -1,8 +1,12 @@
 # Ludot language
 
-Ludot derives from Luau 0.743. Its native parser accepts the examples below.
-Luau's unions, intersections, generics, type packs, refinements, and type functions
-remain available. `const` retains Luau's immutable binding semantics.
+Ludot's language is a fork of Luau 0.743. The parser, analyzer, compiler, and VM
+implement every extension on this page directly, so there is no transpiler between
+your code and the compiler.
+
+Everything from standard Luau still works: unions, intersections, generics, type
+packs, refinements, and type functions. `const` keeps Luau's meaning: the binding
+can't be reassigned, but the table or object it points to can still change.
 
 ## Classes
 
@@ -21,17 +25,52 @@ class Player extends CharacterBody2D = {
 }
 ```
 
-Brace classes are extensible. Methods receive `self` implicitly. An optional
-`__init` method runs after field defaults. Defaults run per instance, so table
-initializers do not share a table between instances. Constructor arguments use
-the `__init` signature. Classes use the fork's native class bytecode and VM objects.
-The original experimental `class ... end` syntax remains available internally.
+A class is a brace block of fields and methods.
+
+- Methods receive `self` automatically. You don't declare it.
+- Field defaults run once per instance, so a `{}` default gives each instance its
+  own table.
+- An optional `__init` method runs after the field defaults. Its parameters become
+  the constructor's parameters.
+- Classes compile to native class bytecode and VM objects, not tables with
+  metatables.
+
+The older experimental `class ... end` syntax still exists internally.
+
+### Creating instances
+
+Use `.new()` for Luau classes, native nodes and resources, and value types:
+
+```lua
+const node = Node3D.new()
+const position = Vector3.new(1, 2, 3)
+const player = Player.new()
+```
+
+The checker and completion know the instance type `.new()` returns and the
+arguments it takes. Because of this, `new` is reserved and can't be used as a member
+name. Older direct calls such as `Vector3(1, 2, 3)` still work.
+
+### Field visibility
+
+| Keyword | Inspector | Access |
+| --- | --- | --- |
+| `export` | Shown and editable | Anywhere |
+| `public` | Hidden | Anywhere |
+| `private` | Hidden | Only inside the declaring class |
+
+Privacy is a type-checking rule. It doesn't stop reflective engine calls or
+unchecked bytecode from reaching the field.
+
+Range hints such as `in 0 to 1 step 0.1` only work on `export` fields, since they
+only affect the Inspector. Ludot has no decorators; `export`, `onready`, and the
+visibility words are plain keywords.
 
 ### Onready properties
 
-`onready` delays a property's initializer until the node is ready, like
-GDScript's `@onready`. The initializer can use `self`, so it can look up nodes
-that do not exist yet when the instance is constructed:
+`onready` delays a field's initializer until the node is ready, like GDScript's
+`@onready`. The initializer can use `self`, so it can look up child nodes that don't
+exist yet when the instance is created:
 
 ```lua
 class Player extends CharacterBody3D = {
@@ -45,53 +84,53 @@ class Player extends CharacterBody3D = {
 }
 ```
 
-`getNode` accepts Godot node paths, so `"Arm/Hand/Muzzle"` reaches a
-great-grandchild. Onready initializers run in declaration order immediately
-before `_ready`, so a later initializer can read an earlier one and `_ready`
-sees every value. Base class initializers run before those of a derived class.
-They also run when the class defines no `_ready` method. Until then the
-properties are `nil`.
+`getNode` takes a Godot node path, so `"Arm/Hand/Muzzle"` reaches a
+great-grandchild.
 
-An onready property without a type annotation takes its initializer's type. A
-`::` assertion, such as `:: Node3D` above, narrows `getNode`'s `Node` result.
-When the editor knows the attached scene, `getNode` with a literal path already
-returns the node's type. An annotation, such as `onready public Head: Node3D =
-...`, must match the initializer's type.
+**When they run:**
 
-`onready` comes before `public` or `private` and requires an initializer. It is
-only allowed in brace classes. Exported properties cannot be onready, since the
-initializer would replace the value set in the inspector. Hot reload keeps the
-current values of onready properties; their initializers run again only when
-the node is next ready.
+- Immediately before `_ready`, in declaration order. A later initializer can read an
+  earlier one, and `_ready` sees all of them.
+- Base class initializers run before derived class initializers.
+- They run even if the class has no `_ready` method.
+- Until then, the fields are `nil`.
 
-Construct native nodes, resources, value types, and Luau classes with `.new()`:
+**Types:**
 
-```lua
-const node = Node3D.new()
-const position = Vector3.new(1, 2, 3)
-const player = Player.new()
-```
+- Without an annotation, the field takes its initializer's type.
+- A `::` assertion, such as `:: Node3D`, narrows `getNode`'s general `Node` result.
+- When the editor knows the attached scene, `getNode` with a literal path already
+  returns the right node type, so the assertion is optional.
+- An annotation such as `onready public Head: Node3D = ...` must match the
+  initializer's type.
 
-The checker and completion understand `.new()` and preserve its instance type and
-initializer arguments. `new` is reserved as a class member. Direct calls such as
-`Vector3(1, 2, 3)` remain compatible with older scripts.
+**Rules:**
 
-Normal Luau node scripts do not instantiate or run lifecycle callbacks while a
-scene is being edited. The editor uses placeholders for exported properties;
-scripts execute when the project runs. No `Engine:isEditorHint()` guard is needed
-in `_ready`, `_process`, or input callbacks. Editor tool scripts are not currently
-supported.
+- Write `onready` before `public` or `private`, and always give it an initializer.
+- It only works in brace classes.
+- `export` fields can't be onready, because the initializer would overwrite the
+  value set in the Inspector.
+- Hot reload keeps current onready values. The initializers run again only the next
+  time the node becomes ready.
 
-`export` properties appear in the engine inspector. `private` properties are hidden
-from the inspector, and the checker rejects accesses outside the declaring class.
-Privacy is a type-checking rule, not a sandbox against reflective engine access or
-unchecked bytecode. Editor range hints are permitted only on exported properties.
-No decorators are introduced; `onready` is a property keyword.
+### Scripts in the editor
 
-An attached engine script extends a native engine class, such as `Node`,
-`CharacterBody2D`, or `Resource`, or another Luau script class imported from its
-module. Derived scripts inherit fields, defaults, and methods, and reloading a base
-script reloads its live derived instances. General Luau modules can return tables,
+Luau node scripts don't run while you edit a scene. The editor shows placeholders
+for exported fields, and your code runs only when the project runs. You don't need
+`Engine:isEditorHint()` checks in `_ready`, `_process`, or input callbacks.
+
+Editor tool scripts aren't supported yet.
+
+### Inheritance
+
+A script attached to an object extends either a native engine class, such as
+`Node`, `CharacterBody2D`, or `Resource`, or another Luau script class imported from
+its module.
+
+Derived scripts inherit fields, defaults, and methods. Reloading a base script also
+reloads every live instance of its derived scripts.
+
+Ordinary Luau modules that aren't attached to anything can return tables,
 functions, or classes.
 
 ## Imports
@@ -108,31 +147,47 @@ import "@helpers/personutils" as personutils
 import "@helpers/setup"
 ```
 
-Named values lower to immutable local bindings. Each import statement loads the
-module once. Namespace value imports also expose the module's exported types.
-Type imports participate in checking and emit no runtime module load. A type-only
-namespace cannot be read as a value. A module exports types with `export type`
-and values through a returned table or Luau's value export syntax.
+| Form | What you get |
+| --- | --- |
+| `import a, b from "path"` | Named values, as immutable locals |
+| `import (a as b) from "path"` | A named value under a different local name |
+| `import "path" as name` | The whole module, including its exported types |
+| `import type A from "path"` | Types only, with no runtime load |
+| `import type "path" as name` | A type-only namespace, which can't be read as a value |
+| `import "path"` | Runs the module for its side effects |
 
-Define aliases in `.luaurc` at the project root:
+Each import statement loads its module once.
+
+A module exports types with `export type`. It exports values by returning a table or
+with Luau's value export syntax.
+
+### Aliases
+
+Define aliases in a `.luaurc` file at the project root:
 
 ```json
-{"languageMode": "strict", "aliases": {"helpers": "./src/helpers", "pkgs": "./packages"}}
+{
+	"languageMode": "strict",
+	"aliases": {
+		"helpers": "./src/helpers",
+		"pkgs": "./packages"
+	}
+}
 ```
 
-The native runtime also accepts a `luau/modules/aliases` dictionary in project
-settings. Both `import` and legacy `require()` use these aliases. The native runtime
-resolves `.luau` files and directory `init.luau` modules. The engine and the CLI tools
-both read `.luaurc` files in the importing file's directory and its ancestors, and
-nearer files override outer ones. The engine applies the project setting first.
+The engine also reads a `luau/modules/aliases` dictionary from Project Settings.
+Both `import` and the older `require()` use these aliases.
+
+### Module resolution
+
+- A path resolves to a `.luau` file, or to `init.luau` inside a directory.
+- The engine and the CLI tools read every `.luaurc` from the importing file's
+  directory up through its ancestors. Nearer files override outer ones.
+- The engine applies the Project Settings aliases first.
 
 ## Enums
 
-Enums declare immutable numeric or string values and a distinct nominal type.
-Numeric members start at 1. An explicit integer resets the sequence for subsequent
-implicit members. Integer values must fit exactly in Luau's number representation.
-String enums require an explicit string for every member. Mixed numeric/string
-enums are errors.
+An enum declares a fixed set of named values and gives them their own type.
 
 ```lua
 enum Action = {
@@ -140,29 +195,53 @@ enum Action = {
 	Chat,
 	Leave = 10,
 }
+
 enum Message = {
 	Join = "join",
 	Chat = "chat",
 }
+
 const action: Action = Action.Chat
 const checked: Action? = Action.from(2)
 ```
 
-`Action.from(value)` checks membership and returns an enum value or nil. Assigning
-an arbitrary number/string to an enum, or assigning one enum to another enum, is a
-type error. Enum values remain ordinary numbers/strings at runtime, including when
-passed to Godot. Equality with the underlying number/string is permitted. Member
-aliases with equal underlying values compare equal and represent the same case
-for matching. The name `from` is reserved for checked conversion.
+### Values
 
-Use `export enum` with the existing module import forms. Enum types can annotate
-class fields, including exported Inspector fields. Numeric and string exports use
-dropdowns with member names; scene files store the underlying values. String
-values may contain commas or colons. Inspector dropdowns keep the names and values
-separate rather than parsing the display text.
+- Numeric members start at 1 and count up.
+- An explicit integer, like `Leave = 10`, restarts the count for the members after
+  it. Integers must fit exactly in a Luau number.
+- In a string enum, every member needs an explicit string.
+- An enum can't mix numbers and strings.
 
-Direct iteration yields members in declaration order, including aliases. It does
-not expose the `from` method:
+### Type safety
+
+An enum is a distinct type. These are type errors:
+
+- assigning a plain number or string to an enum variable
+- assigning one enum type to another
+
+To turn an unchecked value into an enum, use `Action.from(value)`. It returns the
+matching member or `nil`. Because of this, `from` is reserved and can't be a member
+name.
+
+At runtime, members are still plain numbers or strings, including when they're
+passed to Godot. Comparing a member with its underlying value using `==` is allowed.
+Two members with the same value are aliases. They compare equal and count as the
+same case in a `match`.
+
+### Exporting and the Inspector
+
+- Use `export enum` to share an enum, then import it like any other module export.
+- Enum types can annotate class fields, including `export` fields.
+- Exported enum fields show a dropdown of member names. Scenes store the underlying
+  values.
+- String values can contain commas or colons. The dropdown keeps names and values
+  separate instead of parsing display text.
+
+### Iteration
+
+Looping over an enum yields its members in declaration order, aliases included. The
+`from` function isn't part of the loop:
 
 ```lua
 for name, value in Action do
@@ -177,78 +256,107 @@ an `Enum` object, and each value is an `EnumItem`:
 
 ```lua
 Input:setMouseMode(Enum.MouseMode.Captured)
-print(Enum.MouseMode.Captured) -- Enum.MouseMode.Captured
-print(Enum.MouseMode.Captured.Name) -- Captured
-print(Enum.MouseMode.Captured.Value) -- 2
+
+print(Enum.MouseMode.Captured)          -- Enum.MouseMode.Captured
+print(Enum.MouseMode.Captured.Name)     -- Captured
+print(Enum.MouseMode.Captured.Value)    -- 2
 print(Enum.MouseMode.Captured.EnumType) -- Enum.MouseMode
 
 print(Enum.MouseMode:fromName("Captured")) -- Enum.MouseMode.Captured, or nil
-print(Enum.MouseMode:fromValue(2)) -- Enum.MouseMode.Captured, or nil
-print(#Enum.MouseMode:getEnumItems()) -- 6
-print(#Enum:getEnums()) -- every engine enum
+print(Enum.MouseMode:fromValue(2))         -- Enum.MouseMode.Captured, or nil
+print(#Enum.MouseMode:getEnumItems())      -- 6
+print(#Enum:getEnums())                    -- every engine enum
 
 for name, item in Enum.MouseMode do
 	print(name, item.Value)
 end
 ```
 
-`typeof` returns `"EnumItem"` and `"Enum"`. Each item is a single shared value, so
-`==` compares identity, and `Enum.MouseMode.Captured.EnumType.Captured` is the same
-item. Indexing a missing enum or item is an error. User `enum` declarations are not
-part of `Enum`.
+- `typeof` returns `"EnumItem"` or `"Enum"`.
+- Each item is a single shared value, so `==` compares identity.
+  `Enum.MouseMode.Captured.EnumType.Captured` is the same item.
+- Indexing a missing enum or item is an error.
+- Your own `enum` declarations are separate and don't appear under `Enum`.
 
-Item names drop the words shared by every constant of the enum and use PascalCase:
-`MOUSE_MODE_CONFINED_HIDDEN` becomes `ConfinedHidden`. A name that would start with a
-digit keeps the last shared word, so `KEY_0` is `Enum.Key.Key0`. An enum keeps its
-Godot name when the name is unique, such as `Enum.Key`, `Enum.MouseButton`, and
-`Enum.LayoutPreset`. Same-named enums with the same items are one enum:
-`Input.MouseMode` and `DisplayServer.MouseMode` are both `Enum.MouseMode`, and
-`Control`, `Input`, and `DisplayServer` share `Enum.CursorShape`. Different enums with
-the same name take their class as a prefix, such as `Enum.Light3DParam`,
-`Enum.NodeProcessMode`, and `Enum.VariantType`. Editor-only enums are left out, so
-editor and exported builds see the same names.
+#### How names are built
 
-Engine methods and properties that take an enum accept an `EnumItem` or its number.
-Those that return a non-bitfield enum return the `EnumItem`, such as
-`Input:getMouseMode()` and `node.ProcessMode`. A value with no matching item, such as a
-key code with modifier bits, stays a number. Bitfield enums, such as
-`Enum.MouseButtonMask`, return numbers, because their values combine. Use `.Value`
-with `bit32` to combine items.
+Item names drop the words every constant in the enum shares, then use PascalCase.
+`MOUSE_MODE_CONFINED_HIDDEN` becomes `ConfinedHidden`. A name that would start with
+a digit keeps the last shared word, so `KEY_0` becomes `Enum.Key.Key0`.
 
-Annotate engine enum types as `Enum.<Name>`, such as `Enum.MouseMode`. `EnumItem`
-and `Enum` are the general types. Engine methods, properties, `fromName`, and
-`getEnumItems` are typed with the specific enum, and matches over engine enums check
-exhaustiveness. An `export` field typed `Enum.<Name>` shows a dropdown and stores the
-number in scenes.
+Enum names follow these rules:
 
-Class enum constants keep Godot's original names, such as
-`Input.MOUSE_MODE_CAPTURED`. Non-bitfield ones are the matching `EnumItem`, so
-`Input.MOUSE_MODE_CAPTURED == Enum.MouseMode.Captured`. Bitfield constants, such as
-`Control.SIZE_EXPAND_FILL`, and builtin value type constants, such as
-`Vector3.AXIS_Z`, stay numbers. The class enum namespaces (`Input.Enums.MouseMode`),
-the global enum tables (`Key.KEY_W`, `MouseButton`, `Variant.Type`), and the
-`Input.MouseMode` style annotations are replaced by `Enum`. Method names follow the
-project method casing and `Name`, `Value`, and `EnumType` follow the property
-casing. Enum and item names do not change with casing. Native bitfield
-parameters/properties continue to accept numeric masks.
+| Case | Result | Examples |
+| --- | --- | --- |
+| The Godot name is unique | Kept as is | `Enum.Key`, `Enum.MouseButton`, `Enum.LayoutPreset` |
+| Same name, same items | Merged into one enum | `Input.MouseMode` and `DisplayServer.MouseMode` are both `Enum.MouseMode` |
+| Same name, different items | Prefixed with the class | `Enum.Light3DParam`, `Enum.NodeProcessMode`, `Enum.VariantType` |
+
+`Control`, `Input`, and `DisplayServer` all share `Enum.CursorShape`. Editor-only
+enums are left out, so the editor and exported games see the same names.
+
+#### Passing and returning enums
+
+- Engine methods and properties that take an enum accept an `EnumItem` or its number.
+- Those that return an ordinary enum return the `EnumItem`, for example
+  `Input:getMouseMode()` and `node.ProcessMode`.
+- A value with no matching item, such as a key code with modifier bits, stays a
+  number.
+- Bitfield enums such as `Enum.MouseButtonMask` return numbers, because their values
+  combine. Use `.Value` with `bit32` to combine items. Bitfield parameters and
+  properties still accept numeric masks.
+
+#### Types
+
+Annotate engine enums as `Enum.<Name>`, such as `Enum.MouseMode`. `EnumItem` and
+`Enum` are the general types.
+
+Engine methods, properties, `fromName`, and `getEnumItems` are typed with the
+specific enum, and a `match` over an engine enum checks that every case is covered.
+An `export` field typed `Enum.<Name>` shows a dropdown and stores the number in the
+scene.
+
+#### Class constants
+
+Class constants keep Godot's names, such as `Input.MOUSE_MODE_CAPTURED`.
+
+- Non-bitfield constants are the matching `EnumItem`, so
+  `Input.MOUSE_MODE_CAPTURED == Enum.MouseMode.Captured`.
+- Bitfield constants, such as `Control.SIZE_EXPAND_FILL`, stay numbers.
+- Value type constants, such as `Vector3.AXIS_Z`, stay numbers.
+
+#### Casing
+
+Method names (`fromName`, `getEnumItems`) follow the project's method casing.
+`Name`, `Value`, and `EnumType` follow the property casing. Enum and item names
+never change with casing.
+
+#### Replaced forms
+
+`Enum` replaces these older forms, which no longer exist:
+
+- class enum namespaces, such as `Input.Enums.MouseMode`
+- global enum tables, such as `Key.KEY_W`, `MouseButton`, and `Variant.Type`
+- annotations in the `Input.MouseMode` style
 
 ## Tasks
 
-The `task` library schedules threads, modeled on Roblox's:
+The `task` library schedules threads. It's modeled on Roblox's.
 
-| Function | Behavior |
+| Function | What it does |
 | --- | --- |
-| `task.spawn(fnOrThread, ...)` | Runs it now in a new thread, or resumes the given thread, and returns the thread. |
-| `task.defer(fnOrThread, ...)` | Same, but runs it after the current engine callback returns, later in the same frame. |
-| `task.delay(seconds, fnOrThread, ...)` | Resumes it after the delay and returns the thread. |
-| `task.wait(seconds?)` | Yields the current thread and returns the time that actually passed. With no argument, waits one frame. |
-| `task.cancel(thread)` | Stops a scheduled or suspended thread. It cannot cancel a running thread. |
+| `task.spawn(fnOrThread, ...)` | Runs it now in a new thread, or resumes the given thread. Returns the thread. |
+| `task.defer(fnOrThread, ...)` | Same as `spawn`, but runs after the current engine callback returns, later in the same frame. |
+| `task.delay(seconds, fnOrThread, ...)` | Resumes it after the delay. Returns the thread. |
+| `task.wait(seconds?)` | Pauses the current thread and returns how much time actually passed. With no argument, waits one frame. |
+| `task.cancel(thread)` | Stops a scheduled or suspended thread. It can't cancel a thread that is running. |
 
 ```lua
 class Door extends Node3D = {
 	function _ready()
 		task.wait(1)
 		self:open()
+
 		task.delay(5, function()
 			self:close()
 		end)
@@ -256,38 +364,55 @@ class Door extends Node3D = {
 }
 ```
 
-Engine callbacks, such as `_ready`, `_process`, and signal handlers, start in a
-resumable thread, so they can call `task.wait` directly. When a callback yields, the
-engine gets `nil` back and the rest of the callback runs when the thread resumes.
-Module top-level code and field initializers cannot yield.
+### Waiting inside callbacks
 
-Each VM has one scheduler, stepped at the start of every SceneTree process frame,
-before `_process`. Waits and delays use game time: they follow `Engine.time_scale`
-and stop like a Timer while their node cannot process, such as during a pause. A
-node with `PROCESS_MODE_ALWAYS` keeps waiting through a pause. Threads with no node
-stop during a pause. Deferred threads that defer again run in the next round, for at
-most 64 rounds a frame.
+Engine callbacks such as `_ready`, `_process`, and signal handlers each start in a
+thread that can pause, so they can call `task.wait` directly. When a callback pauses,
+the engine gets `nil` back right away, and the rest of the callback runs when the
+thread resumes.
+
+Module top-level code and field initializers can't pause.
+
+### Timing
+
+- Each VM has one scheduler. It steps at the start of every SceneTree process frame,
+  before `_process`.
+- Waits and delays use game time. They follow `Engine.time_scale`.
+- Like a Timer, they stop while their node can't process, such as during a pause. A
+  node with `PROCESS_MODE_ALWAYS` keeps waiting through a pause.
+- Threads that don't belong to a node stop during a pause.
+- A deferred thread that defers again runs in the next round, up to 64 rounds a
+  frame.
+
+### Ownership
 
 A thread belongs to the object whose callback started it. Threads it spawns, and
-signal handlers connected from its code, belong to the same object. When the object
-is freed, its scheduled threads are dropped, never resumed with a freed `self`. An
-error in a resumed thread is printed with its stack trace, and the debugger breaks on
-it when one is attached.
+signal handlers its code connects, belong to the same object.
 
-Starting callbacks in threads costs little. Finished threads are reused, so a plain
-callback allocates nothing. On Linux, a GDScript call to a Luau method measured
+When the object is freed, its scheduled threads are dropped. They never resume with
+a freed `self`.
+
+An error in a resumed thread prints with its stack trace. If a debugger is attached,
+it breaks on the error.
+
+### Cost
+
+Starting callbacks in threads is cheap. Finished threads are reused, so an ordinary
+callback allocates nothing. On Linux, a GDScript call into a Luau method measured
 0.74 µs, against 0.69 µs with the previous `pcall` path.
 
 ## Signals
 
-`Signal` is a global, modeled on Roblox's RBXScriptSignal. It is both the
-constructor table and the type. The type's arguments are what the signal fires:
+`Signal` is a global modeled on Roblox's RBXScriptSignal. It's both the constructor
+and the type. The type arguments list what the signal fires with:
 
 ```lua
 const HealthChanged: Signal<number, number> = Signal.new()
+
 const connection: Connection = HealthChanged:connect(function(previous, current)
 	print(previous, current)
 end)
+
 HealthChanged:fire(100, 75)
 print(connection.Connected) --> true
 connection:disconnect()
@@ -296,43 +421,54 @@ const Saved: Signal<> = Signal.new()
 const Debug: Signal<...any> = Signal.new()
 ```
 
-| Member | Behavior |
+| Member | What it does |
 | --- | --- |
 | `Signal.new(...names)` | Creates a signal. The optional names label its arguments for the engine. |
-| `signal:connect(handler)` | Runs `handler` on every fire and returns a `Connection`. |
-| `signal:once(handler)` | Runs `handler` on the next fire only and returns a `Connection`. |
+| `signal:connect(handler)` | Runs `handler` on every fire. Returns a `Connection`. |
+| `signal:once(handler)` | Runs `handler` on the next fire only. Returns a `Connection`. |
 | `signal:fire(...)` | Calls every connected handler with the arguments. |
-| `signal:wait()` | Yields the current thread until the next fire and returns its arguments. |
+| `signal:wait()` | Pauses the current thread until the next fire, then returns its arguments. |
 | `signal:disconnectAll()` | Disconnects every handler connected through this API. |
-| `connection:disconnect()` | Disconnects the handler. Disconnecting twice does nothing. |
+| `connection:disconnect()` | Disconnects the handler. Calling it twice does nothing. |
 | `connection.Connected` | Whether the handler is still connected. |
 
-Method names follow `luau/api/method_casing` (`Fire`, `Connect` in PascalCase) and
-`Connected` follows `luau/api/property_casing`. There is no `emit`. `typeof` returns
-`"Signal"` and `"Connection"`. Handler parameter types are inferred from the signal,
-so they can be left off. Without an annotation, `Signal.new()` fires anything, and
-the `signal_declaration` warning asks for a `Signal<...>` type.
+### Names and types
 
-Each handler runs in its own resumable thread, so it can call `task.wait`. Handlers
-run in connection order, from a snapshot taken when the fire starts, so a handler can
-connect or disconnect others while it runs. The same function connected twice runs
-twice. A failing handler is printed with its stack trace and the remaining handlers
-still run. `wait` errors outside a yieldable thread, such as module top-level code. A
-handler belongs to the object whose code connected it; when that object is freed, its
-connections are dropped.
+- Methods follow `luau/api/method_casing`, so they become `Fire` and `Connect` in
+  PascalCase. `Connected` follows `luau/api/property_casing`.
+- The method is `fire`. There is no `emit`.
+- `typeof` returns `"Signal"` or `"Connection"`.
+- Handler parameter types come from the signal, so you can leave them off.
+- A `Signal.new()` without a type annotation accepts anything. The
+  `signal_declaration` warning asks you to add a `Signal<...>` type.
+
+### How handlers run
+
+- Each handler runs in its own thread, so it can call `task.wait`.
+- Handlers run in connection order. The list is copied when a fire starts, so a
+  handler can connect or disconnect others safely.
+- Connecting the same function twice makes it run twice.
+- If a handler errors, the error prints with its stack trace and the remaining
+  handlers still run.
+- `wait` errors outside a thread that can pause, such as module top-level code.
+- A handler belongs to the object whose code connected it. When that object is
+  freed, its connections are dropped.
 
 ### Engine signals
 
 Engine signals use the same type. `self.TreeExiting` is a `Signal<>`, and
 `self.ChildEnteredTree` is a `Signal<Node>`, typed from the engine's argument
-information. `connect` returns a `Connection`, and `fire` emits the engine signal, so
-GDScript handlers run too. `disconnectAll` on an engine signal removes only the
-connections made through this API, never editor or GDScript connections.
+information.
+
+- `connect` returns a `Connection`.
+- `fire` emits the engine signal, so GDScript handlers run too.
+- `disconnectAll` removes only connections made through this API. It never touches
+  editor or GDScript connections.
 
 ### Signal fields
 
-On a class that extends an engine class, a field declared as `Signal<...>` is also a
-script signal, named exactly as the field:
+In a class that extends an engine class, a field typed `Signal<...>` also becomes a
+script signal with the same name:
 
 ```lua
 class Player extends CharacterBody3D = {
@@ -347,25 +483,33 @@ class Player extends CharacterBody3D = {
 }
 ```
 
-The Node dock lists these signals, scenes save their connections, and GDScript can
-`connect("Died", ...)` and `emit_signal("HealthChanged", 1.0, 2.0)`. Firing from Luau
-and emitting from GDScript reach the same handlers. Argument types come from the type
-arguments and names from the string literals passed to `Signal.new`, or `arg1`,
-`arg2`, and so on. The checker warns when the names don't match the type arguments or
-aren't string literals.
+These signals work everywhere a GDScript signal does:
 
-These fields are read-only after construction, cannot be `export`ed, and are hidden
-from the inspector property list. Plain Luau classes keep ordinary fields: each
-instance gets its own signal, and it can be replaced.
+- The Node dock lists them, and scenes save their connections.
+- GDScript can call `connect("Died", ...)` and `emit_signal("HealthChanged", 1.0, 2.0)`.
+- Firing from Luau and emitting from GDScript reach the same handlers.
 
-Values cross an engine signal as engine values, like any engine call. Tables and plain
-class objects travel as `LuauValue` references, so Luau handlers receive the same table
-or object and GDScript handlers receive a `LuauValue` with `to_variant()`.
+Argument types come from the type arguments. Argument names come from the strings
+passed to `Signal.new`, or default to `arg1`, `arg2`, and so on. The checker warns
+when the names don't match the type arguments or aren't string literals.
+
+Signal fields are read-only after construction, can't be `export`ed, and don't
+appear in the Inspector.
+
+In plain Luau classes that don't extend an engine class, a signal field is an
+ordinary field. Each instance gets its own signal, and it can be replaced.
+
+### Passing values
+
+Values passed through an engine signal convert like any other engine call. Tables
+and plain class objects travel as `LuauValue` references. Luau handlers receive the
+same table or object. GDScript handlers receive a `LuauValue` and can call
+`to_variant()` on it.
 
 ## Match expressions and statements
 
-A match evaluates its subject once and tests arms in source order. Only the first
-matching arm runs. There is no fallthrough.
+A `match` compares one value against a list of cases, top to bottom. Only the first
+matching case runs, and there is no fallthrough.
 
 ```lua
 const text = match action with
@@ -384,93 +528,260 @@ match health with
 end
 ```
 
-Expression arms contain one expression and produce one value. Their types form a
-union. Value cases accept literals and enum members. Guards use `case if` and do
-not establish exhaustive coverage. Expressions require exhaustive coverage or
-`otherwise`. The diagnostic lists missing enum members. Statements report a
-`match_exhaustiveness` warning when cases are missing. Duplicate values, invalid
-case domains, and arms after `otherwise` are diagnosed. Equal-valued aliases count
-as the same case. A guard that always evaluates true makes subsequent arms
-unreachable, but still does not replace explicit exhaustive coverage.
+The value after `match` is evaluated once.
 
-Match statements keep ordinary `return`, `break`, and `continue` behavior in the
-enclosing function/loop. Match expressions have their own expression boundary.
-`case` and `otherwise` mark arms at statement boundaries inside a match; they are
-contextual names elsewhere. An ordinary function named `match` can still be
-called with parentheses.
+### Cases
+
+| Case | Matches when |
+| --- | --- |
+| `case 0`, `case "idle"`, `case Action.Join` | The value equals this literal or enum member |
+| `case if condition` | The condition is true (a guard) |
+| `otherwise` | Nothing above matched |
+
+### Expressions and statements
+
+**Match expressions** produce a value. Each case holds one expression, and the
+result type is the union of all of them. An expression must cover every case or end
+with `otherwise`. If it doesn't, the error lists the missing enum members.
+
+**Match statements** run code. Missing cases produce a `match_exhaustiveness`
+warning instead of an error. `return`, `break`, and `continue` inside a statement
+act on the enclosing function or loop as usual. A match expression is its own
+boundary.
+
+### Checks
+
+The checker reports:
+
+- duplicate values
+- values that can't match the subject's type
+- cases written after `otherwise`
+
+Aliases with the same value count as one case. Guards never count toward complete
+coverage, even a guard that is always true. Such a guard does make every later case
+unreachable.
+
+### Reserved words
+
+`case` and `otherwise` are only keywords at the start of a case inside a match.
+Elsewhere they are ordinary names. A function named `match` can still be called with
+parentheses.
 
 ## Optional access and nil coalescing
 
 ```lua
 const parentName = node?:getParent()?.Name ?? "No parent"
 const enabled = settings.Enabled ?? true
+
 local value: boolean? = nil
 value ??= false
 ```
 
-`?.` accesses a property and `?:` calls a method. A nil receiver skips the rest of
-its uninterrupted chain, including argument expressions. Each optional receiver
-is evaluated once. A nonexistent member on a valid receiver remains a type error.
-An ordinary access later in the chain still requires its own receiver to be valid:
-`node?.Child.Name` guards `node`; `node?.Child?.Name` also guards `Child`.
-Parentheses end the chain, so `(node?.Child).Name` performs an ordinary access on
-the parenthesized result.
+| Operator | Meaning |
+| --- | --- |
+| `a?.b` | Read `b`, or skip if `a` is nil |
+| `a?:m()` | Call `m`, or skip if `a` is nil |
+| `a ?? b` | `a`, unless it's nil, then `b` |
+| `a ??= b` | Assign `b` only if `a` is nil |
 
-`??` evaluates the fallback only for nil. False is preserved. `??=` reads the
-target once and assigns only when it is nil. Indexed receivers and keys are
-calculated once. Const bindings and invalid assignment targets are rejected.
-Analysis refines assigned locals and stable indexed locations; it does not assume
-an effectful receiver expression denotes the same object on a later evaluation.
+### Optional chains
+
+When the receiver is nil, the rest of the chain is skipped, including any argument
+expressions, and the result is nil. Each optional receiver is evaluated once.
+
+Only receivers marked with `?` are guarded:
+
+- `node?.Child.Name` guards `node`, but `Child` must exist.
+- `node?.Child?.Name` guards both.
+- Parentheses end a chain. `(node?.Child).Name` reads `Name` from the result
+  normally.
+
+Reading a member that doesn't exist on a valid receiver is still a type error.
+
+### Nil coalescing
+
+`??` only uses the fallback for `nil`. Unlike `or`, it keeps `false`:
+
+```lua
+const settings = { Sound = false }
+print(settings.Sound ?? true) --> false
+print(settings.Sound or true) --> true
+```
+
+The fallback is only evaluated when it's needed.
+
+`??=` reads its target once and assigns only when the target is nil. Indexed targets
+compute their table and key once. Assigning to a `const` or to something that isn't
+assignable is an error.
+
+The checker narrows assigned locals and stable indexed locations after `??=`. It
+doesn't assume that an expression with side effects returns the same object twice.
 
 ## Inclusive ranges
 
 ```lua
 for i in 1 to 10 do
-	print(i)
+	print(i) -- 1, 2, ..., 10
 end
+
 for i in 1 to 10 step 5 do
 	print(i) -- 1, then 6
 end
+
 for i in 10 to 1 step -3 do
 	print(i) -- 10, 7, 4, 1
 end
 ```
 
-Bounds and step are evaluated once, in that order. The default step is 1. A zero
-step raises a runtime error before the body runs, in both the VM and JIT. Existing
-numeric `for i = start, limit, step` and generic iteration forms remain available.
-Range variables have ordinary numeric-for scope and closure capture behavior.
+- Both ends are included.
+- The start, end, and step are evaluated once, in that order. The default step is 1.
+- A step of zero raises a runtime error before the loop body runs.
+- The loop variable has the same scope and closure behavior as a numeric `for`.
+
+The classic `for i = start, limit, step` and generic `for` loops still work.
 
 ## Pipelines and precedence
 
-A pipeline passes its input as the first argument of an ordinary function:
+The pipeline operator `|>` is a convenience. It doesn't add anything you couldn't
+write before. It changes the order you write function calls in, so a chain of steps
+reads in the order it runs.
 
 ```lua
-const result = enemies
+x |> f(a, b)   -- same as f(x, a, b)
+x |> f()       -- same as f(x)
+x |> f         -- same as f(x)
+```
+
+The value on the left becomes the first argument of the function on the right.
+
+### What it replaces
+
+Say you want the closest living enemy. With three small functions, `filter`, `sort`,
+and `first`, you'd usually write one of these:
+
+```lua
+-- Nested calls: read from the inside out.
+const target = first(sort(filter(enemies, isAlive), byDistance))
+
+-- Temporary variables: clear, but every step needs a name.
+const alive = filter(enemies, isAlive)
+const sorted = sort(alive, byDistance)
+const target = first(sorted)
+```
+
+The pipeline version makes the same calls in the same order:
+
+```lua
+const target = enemies
 	|> filter(isAlive)
 	|> sort(byDistance)
 	|> first()
 ```
 
-`x |> f(a, b)` calls `f(x, a, b)`. `x |> f` calls `f(x)`. Inputs are evaluated
-once, before the stage's function reference and explicit arguments. Stages may be
-ordinary function references or calls, including parenthesized references and
-explicit generic instantiation. Method-call stages and placeholder syntax are
-rejected. Each stage consumes one input value and produces one output value;
-ordinary Lua expansion of a stage's final explicit argument is preserved. Varargs
-inside a lazy fallback, optional method, or pipeline stage keep their enclosing
-function's values.
+It reads top to bottom: take the enemies, keep the living ones, sort them by
+distance, take the first. You can add, remove, or reorder a step by editing one line.
 
-`|>` and `??` share the lowest precedence tier and associate left to right.
-Existing arithmetic, concatenation, comparisons, `and`, and `or` bind more tightly.
-Thus:
+<details>
+<summary>The helper functions used above</summary>
+
+```lua
+type Enemy = { Name: string, Alive: boolean, Distance: number }
+
+const function filter<T>(values: { T }, keep: (T) -> boolean): { T }
+	const result: { T } = {}
+	for _, value in values do
+		if keep(value) then
+			table.insert(result, value)
+		end
+	end
+	return result
+end
+
+const function sort<T>(values: { T }, before: (T, T) -> boolean): { T }
+	table.sort(values, before)
+	return values
+end
+
+const function first<T>(values: { T }): T?
+	return values[1]
+end
+
+const function isAlive(enemy: Enemy)
+	return enemy.Alive
+end
+
+const function byDistance(a: Enemy, b: Enemy)
+	return a.Distance < b.Distance
+end
+```
+
+</details>
+
+### Another example: damage
+
+Pipelines work for any value, not just lists. Here a hit's damage goes through
+armor, a critical bonus, rounding, and a cap:
+
+```lua
+-- Without a pipeline
+const damage = math.clamp(math.floor(applyCritical(applyArmor(40, 25), true)), 0, 999)
+
+-- With a pipeline
+const damage = 40
+	|> applyArmor(25)
+	|> applyCritical(true)
+	|> math.floor()
+	|> math.clamp(0, 999)
+```
+
+In the nested version, the `25` and `true` are far from the functions they belong
+to, and the closing parentheses pile up. The pipeline keeps each argument next to
+its step.
+
+### When to use one
+
+A pipeline helps when:
+
+- you apply three or more steps to one value
+- the steps are plain functions that take that value first
+- you expect to add or reorder steps later
+
+### When to skip it
+
+- **One or two calls.** `first(alive)` is already clear.
+- **The value has methods.** Use `:` instead. `name:lower():sub(1, 12)` already
+  reads left to right. Pipelines are for free functions, which can't chain that way.
+  Method calls aren't allowed as stages, so `x |> obj:method()` is a compile error.
+- **The value isn't the first argument.** There's no placeholder syntax for putting
+  it anywhere else, so write a normal call.
+
+### Evaluation rules
+
+- The input is evaluated once, before the stage's function and its other arguments.
+- A stage can be a function name, a call, a parenthesized function reference, or a
+  call with explicit generic arguments.
+- Each stage takes one value and returns one value. If a function returns several
+  values, the next stage only gets the first.
+- If a stage's last explicit argument is a call or `...`, it expands normally, as in
+  any Lua call.
+- `...` inside a pipeline stage, a `??` fallback, or an optional method call refers
+  to the enclosing function's varargs.
+
+### Precedence
+
+`|>` and `??` share the lowest precedence and group left to right. Arithmetic,
+`..`, comparisons, `and`, and `or` all bind more tightly. That lets you put a
+fallback in the middle of a chain:
 
 ```lua
 enemies |> filter(isAlive) ?? {} |> sort(byDistance)
 -- ((enemies |> filter(isAlive)) ?? {}) |> sort(byDistance)
+```
 
+Use parentheses to keep later steps inside the fallback:
+
+```lua
 enemies |> filter(isAlive) ?? (fallback |> sort(byDistance))
--- Parentheses keep sorting inside the fallback.
 ```
 
 ## Godot class identity
@@ -481,54 +792,75 @@ if event:IsA("InputEventMouseMotion") then
 end
 ```
 
-Every Godot Object subclass supports class identity checks, including nodes,
-resources, input events, and extension classes registered in ClassDB. Both `isA`
-and `IsA` are accepted. Completion shows only the spelling selected by method
-casing, including `is_a` in snake_case projects. This is a deliberate compatibility
-exception to the single-spelling rule for ordinary engine methods.
+`isA` checks whether an object is an instance of a class or inherits from it. Every
+Godot object supports it: nodes, resources, input events, and extension classes
+registered in ClassDB.
 
-A valid literal name narrows the receiver using inheritance information. Invalid
-literal class names are diagnosed, and completion offers known class names inside
-the string. Dynamic strings return booleans without selecting a narrowed class.
-Negative branches retain alternatives that could still match at runtime.
-Imported Godot-backed script classes and script classes visible to the current
-analysis context use their declared class names, not import aliases. Runtime
-checks follow native class identity, the attached script inheritance chain, and
-Luau object class ancestry. Pure Luau classes without a Godot Object base do not
-receive this engine method automatically.
+### Type narrowing
+
+With a literal class name, the checker narrows the object's type inside the `if`, so
+`event.Relative` above is known to exist.
+
+- Misspelled class names are reported, and completion suggests class names inside
+  the string.
+- A string built at runtime still returns a boolean, but doesn't narrow the type.
+- In the `else` branch, the checker keeps every type that could still match.
+
+Imported script classes are checked by their declared class name, not their import
+alias.
+
+### Runtime behavior
+
+At runtime, `isA` checks the native class, the attached script's inheritance chain,
+and Luau class ancestry. Pure Luau classes that don't extend a Godot class don't get
+`isA` automatically.
+
+### Spelling
+
+Both `isA` and `IsA` work in every project. Completion only shows the spelling that
+matches your method casing, which is `is_a` in snake_case projects. This is the one
+exception to the rule that each engine method has a single spelling.
 
 ## Tooling for the extended syntax
 
-The editor and standalone LSP share parser and analysis support for these
-constructs. Match block/arm entry supports indentation and auto-end completion.
-StyLua preserves statements containing syntax its parser does not understand,
-byte for byte, while formatting surrounding statements. Selene receives a
-line-preserving compatibility view; the native checker validates the protected
-constructs. Existing StyLua ignore comments remain effective.
+The native editor and the standalone LSP share the same parser and analyzer, so both
+understand everything on this page. Typing a `match` block indents its cases and
+completes the closing `end`.
 
-Use `-- selene: allow(match_exhaustiveness)` for the next statement, or
-`--# selene: allow(match_exhaustiveness)` at the start of a file, to suppress the
-native editor or LSP warning. `signal_declaration` works the same way. Naming rules remain separate from engine casing settings.
-The shader subset rejects these new constructs with source diagnostics; its
-existing numeric-for syntax remains supported.
+### Formatting and linting
+
+- **StyLua** formats the statements it understands and leaves statements with Ludot
+  syntax byte for byte. StyLua ignore comments still work.
+- **Selene** gets a copy of the file with Ludot syntax hidden and line numbers kept.
+  The native checker validates the hidden parts.
+
+Naming lint rules are separate from the engine casing settings.
+
+### Suppressing warnings
+
+To silence `match_exhaustiveness` or `signal_declaration`:
+
+```lua
+-- selene: allow(match_exhaustiveness)    -- for the next statement
+--# selene: allow(match_exhaustiveness)   -- for the whole file, at the top
+```
+
+### Shaders
+
+The shader subset rejects these extensions with a source diagnostic. Its numeric
+`for` loop still works.
 
 ## Engine naming
 
-Project Settings > Luau > Api provides two independent settings:
+Godot's API uses snake_case. Ludot lets you pick how engine methods and properties
+are spelled in Luau. Set it under Project Settings > Luau > Api:
 
 | Setting | Choices | Default |
 | --- | --- | --- |
 | `luau/api/method_casing` | `camelCase`, `PascalCase`, `snake_case` | `camelCase` |
 | `luau/api/property_casing` | `camelCase`, `PascalCase`, `snake_case` | `PascalCase` |
 
-The property setting also controls signal names (`self.TreeExiting`) and builtin value
-components. Signal methods follow the method setting, as described in Signals. Static
-methods use the method setting. Native class/type names retain their original
-engine spelling, including acronym names such as `HTTPClient`, `RID`, and `AABB`.
-Constructors always use `.new()`. Native enum constants use their original Godot spelling and retain existing
-PascalCase aliases. Other builtin constants keep their fixed PascalCase spelling. GDScript and engine internals keep Godot's original API names.
-
-Examples for each selected style:
+### Examples
 
 | Godot member | camelCase | PascalCase | snake_case |
 | --- | --- | --- | --- |
@@ -539,101 +871,172 @@ Examples for each selected style:
 | Vector3 `x`, `y`, `z` | `x`, `y`, `z` | `X`, `Y`, `Z` | `x`, `y`, `z` |
 | `_physics_process` | `_physicsProcess` | `_PhysicsProcess` | `_physics_process` |
 
-Naming splits ASCII identifiers at underscores, lowercase-to-uppercase boundaries,
-and acronym boundaries such as `HTTPResponse` into `HTTP` + `Response`. Words are
-lowercased before applying the chosen style: `get_rid` becomes `getRid`, `GetRid`,
-or `get_rid`, not `getRID`. Digits stay in their word. Leading underscores are
-preserved. Thus `_ready` stays `_ready` with camelCase/snake_case, and becomes
-`_Ready` with PascalCase. This conversion is shared by the native binding and the
-standalone analyzer, using raw reflected member names rather than converting
-already-renamed completions.
+### What each setting covers
+
+**Method casing** covers instance methods, static methods, and signal methods such
+as `connect`.
+
+**Property casing** covers properties, signal names such as `self.TreeExiting`, and
+value type components such as `Vector3.X`.
+
+These never change:
+
+- Class and type names keep their engine spelling, including acronyms like
+  `HTTPClient`, `RID`, and `AABB`.
+- Constructors are always `.new()`.
+- Enum constants keep Godot's spelling and their existing PascalCase aliases.
+- Other built-in constants keep their fixed PascalCase spelling.
+- GDScript and the engine's internals keep Godot's original names.
+
+### How names are converted
+
+1. Split the name into words at underscores, at lowercase-to-uppercase changes, and
+   at acronym boundaries (`HTTPResponse` becomes `HTTP` + `Response`).
+2. Lowercase every word. Digits stay with their word.
+3. Join the words in the chosen style.
+
+So `get_rid` becomes `getRid`, `GetRid`, or `get_rid`, never `getRID`. Leading
+underscores are kept: `_ready` stays `_ready` in camelCase and snake_case, and
+becomes `_Ready` in PascalCase.
+
+The engine and the standalone analyzer share this conversion. Both start from the
+raw engine names, never from already-converted ones.
 
 ### Compatibility and setting changes
 
-Existing projects without these settings keep the defaults above. Each engine
-method/property exposes only its selected spelling, except the documented
-`isA`/`IsA` compatibility pair. Completions do not list alternate spellings. Changing a style can therefore
-require source edits. Existing source is never automatically renamed.
+Projects without these settings use the defaults.
 
-The editor and game take an immutable naming snapshot when their language runtime
-starts. The settings are marked as requiring an editor restart; restart running
-games as well. Reloading a script or changing ProjectSettings in a running process
-does not switch its API midway through execution. The standalone LSP reads the
-nearest ancestor `project.godot`, takes a per-project snapshot, and requires an LSP
-restart after casing changes. Different projects can use different styles in one
-LSP session. Invalid manually configured style names use the corresponding default
-and report a warning.
+Each engine method and property has exactly one spelling, the selected one, except
+the `isA`/`IsA` pair. Completion doesn't list other spellings. That means changing a
+setting can require edits to your code. Ludot never renames your source for you.
 
-Custom user-declared class, function, method, property, parameter, and table-key
-names remain exactly as written. Naming lint preferences are independent and do
-not configure the engine API. Native virtual callbacks are the engine boundary:
-Godot dispatches its original callback name to the selected Luau spelling. An exact
-user declaration takes precedence when both names exist. Only actual native
-callbacks receive this bridge; arbitrary user methods have no casing aliases.
-Builtin script templates and generated native callback stubs use the selected
-engine style, while custom handler names are preserved.
+Settings are read once, when the language runtime starts:
 
-Names passed as string arguments to Godot's reflective APIs keep Godot's original
-semantics. For example, `EmitSignal("ready")` uses the original signal name even
-when the signal property is `Ready`. User method/property names passed as strings
-remain exact too. The selected member styles affect identifier access, not string
-contents or resource/node paths.
+- **Editor:** restart the editor after changing a casing setting.
+- **Running games:** restart them too. Reloading a script or changing
+  ProjectSettings at runtime doesn't switch the spelling midway.
+- **Standalone LSP:** it reads the nearest `project.godot` and needs a restart after
+  a change. One LSP session can serve projects with different styles.
 
-The native binding reflects methods, properties, signals, static methods, and
-constants. Property reads and writes go straight to the engine object, so
-`self.Name = "x"` is visible to `self:getName()` on the next line. Member lookups use
-a per-class cache built from ClassDB. Scripted and dynamic properties fall back to a
-reflective scan. Luau functions convert to engine `Callable` values. Signals are
-`Signal` objects, so `timer.Timeout:connect(onTimeout)` returns a `Connection`.
-Arrays, dictionaries, and packed arrays support indexing (from 1), `#`, and iteration.
+An invalid style name in the settings falls back to the default with a warning.
+
+### Your own names
+
+Names you declare yourself, such as classes, functions, methods, properties,
+parameters, and table keys, stay exactly as written. Naming lint preferences are
+separate and don't affect the engine API.
+
+### Engine callbacks
+
+Native virtual callbacks, such as `_ready` and `_physics_process`, are where the two
+naming worlds meet. Godot calls its original name, and Ludot forwards the call to
+your Luau spelling. If you declare both spellings, the exact match wins.
+
+Only real engine callbacks get this forwarding. Your own methods have no casing
+aliases. Script templates and generated callback stubs use your selected style.
+
+### Names inside strings
+
+Strings passed to Godot's reflective APIs keep Godot's original names.
+`EmitSignal("ready")` uses the original signal name even when the property is
+`Ready`. The same goes for your own method and property names passed as strings,
+node paths, and resource paths. Casing only changes identifiers in code.
+
+### How the binding works
+
+The binding reflects methods, properties, signals, static methods, and constants.
+
+- Property reads and writes go straight to the engine object, so `self.Name = "x"`
+  is visible to `self:getName()` on the next line.
+- Member lookups use a per-class cache built from ClassDB. Script and dynamic
+  properties fall back to a slower reflective scan.
+- Luau functions convert to engine `Callable` values.
+- Signals are `Signal` objects, so `timer.Timeout:connect(onTimeout)` returns a
+  `Connection`.
+- Arrays, dictionaries, and packed arrays support indexing from 1, `#`, and
+  iteration.
 
 ## Hot reload
 
-Saving a script or module reloads it in place. Live instances keep their identity, so
-references held elsewhere stay valid. Fields keep their values. When a field's
-declared type changes, the value is kept if it still fits the new type, converted when
-a lossless conversion exists (between strings and numbers, or between engine value
-types such as `Vector2` and `Vector2i`), and otherwise reset to the new default with a
-warning. Scripts that import a changed module, and scripts that extend a changed
-class, reload with it.
+Saving a script or module reloads it in place, while the game runs.
 
-Functions created by the previous version keep working after a reload and run the
-new code. That includes callbacks connected to signals and functions stored in
-fields or tables. Adding or removing a `Signal` field updates the script's signal
-list; existing connections on the object stay. Functions match by name and position within their enclosing
-function. A function keeps its old code while it is running, or if the variables it
-captures changed. A failed edit leaves the previous version running. A thread
-suspended in `task.wait` is still running, so it finishes with the code it started
-with. Functions it calls later, and new calls, use the new code.
+### Objects and fields
+
+Live instances stay the same objects, so references held elsewhere stay valid.
+Fields keep their values. When you change a field's declared type:
+
+- If the old value still fits the new type, it's kept.
+- If a lossless conversion exists, it's converted. That covers strings and numbers,
+  and engine value types such as `Vector2` and `Vector2i`.
+- Otherwise the field resets to its new default, with a warning.
+
+Scripts that import a changed module, and scripts that extend a changed class,
+reload along with it.
+
+Adding or removing a `Signal` field updates the script's signal list. Existing
+connections on the object stay connected.
+
+### Functions
+
+Functions created by the old version keep working and run the new code. That
+includes signal callbacks and functions stored in fields or tables. Functions are
+matched by name and by position inside their enclosing function.
+
+A function keeps its old code when:
+
+- it is running at the moment of the reload
+- the variables it captures have changed
+
+A thread paused in `task.wait` counts as running, so it finishes with the code it
+started with. Functions it calls later, and all new calls, use the new code.
+
+If the edit has an error, the previous version keeps running.
 
 ## Debugging and profiling
 
-Breakpoints, stepping, stack inspection, and expression evaluation work on the main
-thread, in coroutines, and on worker threads. Expressions are Luau and can read the
-frame's locals, upvalues, and `self`. Constant locals stay inspectable because scripts
-compile without optimization while a debugger is attached.
+### Debugger
 
-All Luau code runs on one VM, guarded by a lock. Calls from different threads run one
-at a time, so while one thread is stopped at a breakpoint, other threads that call
+Breakpoints, stepping, stack inspection, and expression evaluation work on the main
+thread, in coroutines, and on worker threads.
+
+Watch expressions are Luau and can read the frame's locals, upvalues, and `self`.
+Scripts compile without optimization while a debugger is attached, so `const` locals
+stay visible.
+
+The debugger's globals include `[suspended tasks]`. It lists every scheduled thread
+with:
+
+- its kind: `wait`, `delay`, or `defer`
+- where it's paused
+- its owner
+- for waits and delays, the duration and the time elapsed
+
+### Threads and the VM
+
+All Luau code runs on one VM, guarded by a lock. Calls from different threads run
+one at a time. While one thread is stopped at a breakpoint, other threads that call
 into Luau wait for it.
 
-The editor's scripts profiler shows every Luau function, whether the engine called it
-or another Luau function did, including `pcall` targets, metamethods, and coroutine
-bodies. Coroutine time excludes the time spent suspended. With native call profiling
-on, engine methods called from Luau get their own rows. Code resumed by the task
-scheduler is profiled the same way, and time spent waiting is excluded.
+### Profiler
 
-The debugger's globals include `[suspended tasks]`, which lists every scheduled
-thread with its kind (`wait`, `delay`, or `defer`), where it is suspended, its owner,
-and for waits and delays the duration and elapsed time.
+The editor's script profiler shows every Luau function, whether the engine called
+it or another Luau function did. That includes `pcall` targets, metamethods, and
+coroutine bodies.
+
+- Coroutine time excludes time spent suspended.
+- Code resumed by the task scheduler is profiled the same way, and waiting time is
+  excluded.
+- With native call profiling on, engine methods called from Luau get their own rows.
 
 ## Function hover help
 
 Hover over a function in the native editor to see its signature, parameters, return
-types, and documentation. Documented engine methods offer a link to the matching
-Godot API page. The link stays visible below the scrolling description. Luau
-binding names such as `getNode` link to the original `get_node` documentation.
+types, and documentation.
 
-Put adjacent `---` comments above Luau functions to describe them in the card.
-GDScript uses its normal `##` documentation comments. Named script functions use
-the current editor source, including edits that have not been saved.
+For documented engine methods, the card links to the matching Godot API page. The
+link stays visible below the scrolling description. Luau names such as `getNode`
+link to the original `get_node` page.
+
+To document your own Luau functions, put `---` comments directly above them.
+GDScript uses its normal `##` comments. Named script functions use the editor's
+current text, including unsaved edits.

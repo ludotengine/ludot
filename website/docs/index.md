@@ -15,6 +15,10 @@
 
 ## Project status
 
-The engine is experimental. These docs follow the latest source. Desktop releases support Linux, Windows, and macOS; web export is experimental and mobile is unsupported.
+Ludot is experimental, and these docs follow the latest source.
+
+- **Supported:** Linux, Windows, and macOS
+- **Experimental:** web export
+- **Unsupported:** mobile
 
 [Known limits and verification](./guide/support.md) · [Build from source](./reference/building.md)

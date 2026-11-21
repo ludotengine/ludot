@@ -4,7 +4,10 @@
 
 ## 2D coordinates
 
-The 2D X axis points right and Y points down. [Node2D.Position](../api/engine/Node2D.md#property-position) is relative to its parent. `GlobalPosition` is in world coordinates after ancestor transforms apply.
+In 2D, X points right and **Y points down**.
+
+- [`Position`](../api/engine/Node2D.md#property-position) is relative to the parent node.
+- `GlobalPosition` is relative to the world.
 
 ```luau
 class Marker extends Node2D = {
@@ -17,13 +20,15 @@ class Marker extends Node2D = {
 }
 ```
 
-Parent rotation and scale affect children. Use local coordinates to arrange a scene internally and global coordinates to compare objects in different branches.
+Children move, rotate, and scale with their parent. Use local positions to arrange parts of one object, and global positions to compare objects in different parts of the tree.
 
 ## 3D coordinates
 
-Ludot uses the inherited right-handed 3D coordinate system: X is right, Y is up, and a camera looks along negative Z. A model may have its own visual forward direction. Keep that distinction explicit when moving a character or aiming a mesh.
+3D uses Godot's right-handed axes: X is right, Y is up, and cameras look toward −Z. Imported models may face a different way, so check which way a model's front points before moving or aiming it.
 
-`Position`, `Rotation`, and `Scale` are local properties of [Node3D](../api/engine/Node3D.md). Rotation values use radians. `GlobalPosition` and `GlobalTransform` include ancestor transforms.
+- `Position`, `Rotation`, and `Scale` on a [Node3D](../api/engine/Node3D.md) are relative to the parent.
+- `GlobalPosition` and `GlobalTransform` are relative to the world.
+- Rotations are in **radians**. Use `math.rad(90)` to convert from degrees.
 
 ## Direction and distance
 
@@ -35,15 +40,21 @@ const direction = start:directionTo(target)
 print(distance, direction)
 ```
 
-A position is a point. A direction is a displacement without an origin. Normalize a direction when only its orientation matters. Multiplying a unit direction by a speed and a time step gives displacement.
+A position is a point. A direction only says which way, and is usually normalized to length 1. Direction × speed × `delta` gives how far to move this frame.
 
-For repeated range tests, compare `distanceSquaredTo` with the square of the range to avoid a square root. Use approximate comparisons for floating-point results when exact equality is not part of the algorithm.
+Tips:
+
+- For range checks that run often, compare `distanceSquaredTo` against the range squared. It skips a square root.
+- Floating-point math is rarely exact. Use `isEqualApprox` instead of `==` for computed vectors.
 
 ## Basis and transforms
 
-[Basis](../api/engine/Basis.md) describes 3D orientation, scale, and shear. [Transform3D](../api/engine/Transform3D.md) combines a basis and origin. Applying a transform to a position includes translation; applying only its basis to a direction does not.
+- A [Basis](../api/engine/Basis.md) holds rotation and scale.
+- A [Transform3D](../api/engine/Transform3D.md) is a basis plus a position (its origin). In 2D, use [Transform2D](../api/engine/Transform2D.md).
 
-Use `Node3D:toLocal` and `toGlobal` when converting node-relative points. Avoid adding parent position by hand, which misses rotation and scale. The 2D counterpart is [Transform2D](../api/engine/Transform2D.md).
+Transform a point with the whole transform, which moves it. Transform a direction with only the basis, which doesn't.
+
+To convert between a node's local space and world space, use `toLocal` and `toGlobal`. Adding the parent's position by hand ignores its rotation and scale.
 
 ## Frame-independent motion
 
@@ -57,4 +68,4 @@ class Drift extends Node3D = {
 }
 ```
 
-This direct transform update is appropriate for a visual object. A collision-controlled character should move through the physics API instead. See [Physics and character movement](./physics.md).
+Setting the position directly is fine for things that don't collide. Characters and other physics bodies should move through the physics API instead. See [Physics and character movement](./physics.md).

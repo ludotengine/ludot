@@ -10,7 +10,7 @@
 | [AudioStreamPlayer2D](../api/engine/AudioStreamPlayer2D.md) | Positional audio in a 2D scene. |
 | [AudioStreamPlayer3D](../api/engine/AudioStreamPlayer3D.md) | Positional audio with 3D distance and direction. |
 
-Import an audio file, assign it to the player's `Stream`, and select a bus. A player without a stream has no audio to play.
+Import an audio file, assign it to the player's `Stream` property, and pick a bus.
 
 ## Start playback
 
@@ -24,20 +24,31 @@ class Music extends Node = {
 }
 ```
 
-Add an `AudioStreamPlayer` child named `Player` and assign a music stream in the Inspector. Calling `play` starts playback at the requested position, or at the beginning if no argument is supplied. `stop` stops it. Configure looping through the stream's import or resource settings where the format supports it.
+Add an `AudioStreamPlayer` child named `Player` and assign a stream to it in the Inspector.
+
+- `play()` starts from the beginning. `play(seconds)` starts from that position.
+- `stop()` stops playback.
+- Looping is set in the audio file's import settings, for formats that support it.
 
 ## Buses and volume
 
-The audio bus layout routes streams through effects and gain stages. Route music and effects separately if users need independent volume controls. Bus names are strings and must match the bus layout.
+The audio bus layout sends sound through effects and volume controls. Put music and sound effects on separate buses so players can adjust them separately. Bus names are strings and must match the layout exactly.
 
-Decibels are logarithmic. A change in `VolumeDb` is not the same as multiplying a linear amplitude by that number. Use the property's documented units when saving and restoring volume settings.
+`VolumeDb` is in decibels, which are logarithmic: −6 dB is roughly half the amplitude, not 6 less. For a 0–1 volume slider, convert with `20 * math.log10(value)`.
 
 ## Playback lifetime
 
-A positional player's location follows its node transform. Freeing the node stops its playback. A short sound attached to an object that is immediately freed may be cut off; let an audio-owning node live until playback ends when the sound should finish independently.
+A positional player moves with its node, and freeing the node stops the sound. That cuts off sounds like an explosion on an enemy that's freed right away. Play those sounds from a separate node that frees itself when the sound ends.
 
-Use completion signals for one-shot cleanup. A looping stream does not reach an ordinary end each time through its loop.
+The `Finished` signal fires when playback ends. Looping streams never fire it.
 
 ## Troubleshooting
 
-Check that the stream is assigned, the bus is not muted, the selected device is valid, and the player is actually playing. For positional audio, also check listener position, distance attenuation, and the scene's active camera or listener.
+If you hear nothing, check that:
+
+- the player has a stream
+- the bus isn't muted
+- the output device is correct
+- the player is actually playing
+
+For positional audio, also check the listener or active camera position and the player's distance settings.

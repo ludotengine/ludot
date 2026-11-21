@@ -4,9 +4,9 @@
 
 ## Build templates
 
-Follow [Build from source](../reference/building.md#export-templates) for the platform dependencies and template commands. Build both debug and release templates when your workflow needs both. An editor binary and an export template serve different purposes.
+An export template is the game executable your project ships with. It's a separate build from the editor. Follow [Build from source](../reference/building.md#export-templates) to build debug and release templates.
 
-Ludot currently supports Linux, Windows, and macOS. Mobile is unsupported. Web export is experimental; see the [build guide](../reference/building.md) for the single-threaded template used by the Vesper demo.
+Linux, Windows, and macOS are supported. Web export is experimental; the [build guide](../reference/building.md) covers the single-threaded template used by the Vesper demo. Mobile is unsupported.
 
 ## Create a preset
 
@@ -16,19 +16,25 @@ Ludot currently supports Linux, Windows, and macOS. Mobile is unsupported. Web e
 4. Configure the export destination and resource filters.
 5. Set the project's main scene and export the game.
 
-Choose a template from the same Ludot revision as the editor when possible. A `.pck` contains project content; it still needs a compatible executable to run.
+Use templates from the same Ludot version as your editor. A `.pck` file only holds your project's content; it needs a matching executable to run.
 
 ## Include dynamic resources
 
-Scenes referenced directly by other scenes are easier for export dependency discovery to follow. Assets loaded by paths constructed at runtime may need explicit export filters. Include Luau modules and `.lushader` dependencies used by the project, including imported libraries.
+The exporter finds files that scenes reference directly. It can't follow paths your code builds at runtime, like `"res://levels/" .. name .. ".tscn"`. Add those with an export filter.
 
-`res://` can refer to packed resources in an export. Use `user://` for data the game writes, rather than trying to modify the application bundle or packed project.
+Also make sure the export includes every Luau module and `.lushader` file the project uses, including imported libraries.
+
+In an exported game, `res://` is read-only. Write save data and settings to `user://`.
 
 ## Check the exported build
 
-Launch the exported game from a directory outside the development checkout. Check its main scene, script loading, shader compilation, input, audio, and any dynamically loaded assets. Verify writable data paths under a normal user account.
+A game that works in the editor can still be missing files when exported. Run the exported build from a folder outside your project and check:
 
-A game working in the editor does not prove its export includes every dependency. The repository's desktop regressions include exported-pack checks, but your project's own resource and platform behavior still needs verification.
+- the main scene loads
+- scripts load and shaders compile
+- input and audio work
+- assets loaded at runtime are found
+- saving works under a normal user account
 
 ## Reference
 

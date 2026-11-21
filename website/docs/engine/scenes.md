@@ -4,9 +4,16 @@
 
 ## Build a scene tree
 
-A node has one parent and any number of children. Names must be unique among siblings. A path such as `"HUD/Score"` starts at the receiver of `getNode`; it is not a filesystem path.
+A node has one parent and any number of children, and siblings must have different names. A node path like `"HUD/Score"` starts from the node you call `getNode` on. It's not a file path.
 
-For a small game, create a `Node2D` root named `World`, a `CharacterBody2D` child named `Player`, and a `CanvasLayer` child named `HUD`. Add a `Label` named `Score` under `HUD`. Save the root as `World.tscn`.
+As an example, build this scene and save it as `World.tscn`:
+
+```
+World (Node2D)
+├── Player (CharacterBody2D)
+└── HUD (CanvasLayer)
+    └── Score (Label)
+```
 
 ```luau
 class World extends Node2D = {
@@ -18,13 +25,15 @@ class World extends Node2D = {
 }
 ```
 
-Attach the script to `World`. `onready` waits until the node is ready, so the lookup sees the scene's children. Use exact node names, including capitalization.
+Attach the script to `World`. `onready` waits until the scene's children exist before looking them up. Node names are case-sensitive.
 
 ## Lifecycle order
 
-When a branch enters the tree, parents receive `_enterTree` before their children. Readiness goes in the opposite direction: children receive `_ready` before their parent. An `onready` initializer runs immediately before its object's `_ready`.
+- `_enterTree` runs on parents first, then children.
+- `_ready` runs the other way: children first, then the parent. So when a parent's `_ready` runs, all its children are ready.
+- `onready` fields are set just before their own node's `_ready`.
 
-Use `_process(delta)` for visual updates. Use `_physicsProcess(delta)` for physics movement. Both receive seconds. The default names here assume camelCase method casing. [API naming](./naming.md) explains other styles.
+Use `_process(delta)` for visuals and `_physicsProcess(delta)` for physics movement. `delta` is in seconds.
 
 ## Instantiate a saved scene
 
@@ -41,19 +50,42 @@ class Spawner extends Node2D = {
 }
 ```
 
-Create `Enemy.tscn` first, with a `Node2D` root. Loading a resource and creating its instance are separate operations. Multiple instances share scene resources unless you duplicate or localize those resources.
+This assumes an `Enemy.tscn` with a `Node2D` root.
+
+Loading and instantiating are separate steps. Load the scene once, then call `instantiate` for each copy. All copies share the scene's resources, such as materials, unless you duplicate them.
 
 ## Ownership and deletion
 
-`addChild` establishes parenting. `Owner` establishes which scene saves a node. Nodes created during gameplay usually need parenting only. Tools that construct a scene for saving must also set ownership to an ancestor in that scene.
+`addChild` sets a node's parent. `Owner` decides which scene saves the node. Nodes you create during gameplay only need a parent. Code that builds a scene to save it must also set `Owner`.
 
-Call `queueFree` for normal deferred deletion. Freeing a node also frees its children. References to freed native objects are not usable; keep object lifetimes clear rather than assuming a stored reference keeps a node alive.
+Delete nodes with `queueFree`, which frees them at the end of the frame, along with their children. Holding a reference to a node doesn't keep it alive. Once it's freed, the reference can't be used.
 
 ## Groups and scene changes
 
-Groups label nodes independently of their parent. `addToGroup("enemies")` adds a label; `self:getTree():getNodesInGroup("enemies")` returns the current members. Group names are strings and keep their spelling.
+### Groups
 
-Use `self:getTree():changeSceneToFile("res://NextLevel.tscn")` to replace the current scene. Check the returned error value when the path comes from configuration or user input. Persist data that must survive a scene change outside the outgoing scene, such as in an autoload configured in Project Settings.
+Groups tag nodes no matter where they are in the tree:
+
+```luau
+class Enemy extends Node2D = {
+	function _ready()
+		self:addToGroup("enemies")
+	end
+}
+
+class EnemyCounter extends Node = {
+	function _ready()
+		const enemies = self:getTree():getNodesInGroup("enemies")
+		print(enemies:size(), "enemies left")
+	end
+}
+```
+
+### Changing scenes
+
+`self:getTree():changeSceneToFile("res://NextLevel.tscn")` replaces the current scene. It returns an error code, so check it when the path comes from a setting or player input.
+
+Everything in the old scene is freed. Keep data that must survive, like the score, in an autoload (Project Settings > Globals).
 
 ## Reference
 

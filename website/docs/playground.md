@@ -12,12 +12,24 @@
 | Indent | Tab |
 | Leave the editor | Escape, then Tab |
 
-Errors appear inline. Reset restores the selected example; Stop terminates execution.
+Errors show up inline. **Reset** restores the selected example, and **Stop** ends a running program.
 
 ## Environments
 
-**Standalone Luau** runs this fork's compiler and VM. It supports Ludot classes, enums, matching, ranges, pipelines, and standard libraries.
+| Mode | What it does |
+| --- | --- |
+| **Standalone Luau** | Runs your code with Ludot's compiler and VM. Classes, enums, `match`, ranges, pipelines, and the standard library all work. |
+| **Engine API · check only** | Adds engine types, methods, signals, tasks, and enums to completion and type checking. It can't run scenes. |
 
-**Engine API · check only** adds native types, methods, signals, tasks, and enums to completion and checking. It does not execute a scene. Both modes lack project file imports.
+Neither mode can import other files.
 
-Code stays in the browser and is not saved between visits. Runs stop after 10 seconds; WebAssembly memory is limited to 256 MiB, source to 50,000 characters, and output to 16,000 characters.
+## Limits
+
+Your code stays in the browser and isn't saved between visits.
+
+| Limit | Value |
+| --- | --- |
+| Run time | 10 seconds |
+| Memory | 256 MiB |
+| Source size | 50,000 characters |
+| Output | 16,000 characters |
