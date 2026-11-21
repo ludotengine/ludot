@@ -16,6 +16,9 @@ def disabled_class_builder(target, source, env):
 
 # Generate version info
 def version_info_builder(target, source, env):
+    data = dict(source[0].read())
+    build = data.get("build", "")
+    data["build_suffix"] = "" if not build or build == "official" else f".{build}"
     with methods.generated_wrapper(str(target[0])) as file:
         file.write(
             """\
@@ -26,11 +29,12 @@ def version_info_builder(target, source, env):
 #define GODOT_VERSION_PATCH {patch}
 #define GODOT_VERSION_STATUS "{status}"
 #define GODOT_VERSION_BUILD "{build}"
+#define GODOT_VERSION_BUILD_SUFFIX "{build_suffix}"
 #define GODOT_VERSION_MODULE_CONFIG "{module_config}"
 #define GODOT_VERSION_WEBSITE "{website}"
 #define GODOT_VERSION_DOCS_BRANCH "{docs_branch}"
 #define GODOT_VERSION_DOCS_URL "https://docs.godotengine.org/en/" GODOT_VERSION_DOCS_BRANCH
-""".format(**source[0].read())
+""".format(**data)
         )
 
 

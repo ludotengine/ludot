@@ -64,15 +64,15 @@
 // and double-precision status.
 // Example: "3.1.4.stable.mono.double"
 #ifdef REAL_T_IS_DOUBLE
-#define GODOT_VERSION_FULL_CONFIG GODOT_VERSION_NUMBER "." GODOT_VERSION_STATUS GODOT_VERSION_MODULE_CONFIG ".double"
+#define GODOT_VERSION_FULL_CONFIG GODOT_VERSION_NUMBER "-" GODOT_VERSION_STATUS GODOT_VERSION_MODULE_CONFIG ".double"
 #else
-#define GODOT_VERSION_FULL_CONFIG GODOT_VERSION_NUMBER "." GODOT_VERSION_STATUS GODOT_VERSION_MODULE_CONFIG
+#define GODOT_VERSION_FULL_CONFIG GODOT_VERSION_NUMBER "-" GODOT_VERSION_STATUS GODOT_VERSION_MODULE_CONFIG
 #endif
 
 // Similar to GODOT_VERSION_FULL_CONFIG, but also includes the (potentially custom) GODOT_VERSION_BUILD
-// description (e.g. official, custom_build, etc.).
-// Example: "3.1.4.stable.mono.double.official"
-#define GODOT_VERSION_FULL_BUILD GODOT_VERSION_FULL_CONFIG "." GODOT_VERSION_BUILD
+// description (omitted for official builds).
+// Example: "4.7.2-lu.8" or "4.7.2-lu.8.custom_build"
+#define GODOT_VERSION_FULL_BUILD GODOT_VERSION_FULL_CONFIG GODOT_VERSION_BUILD_SUFFIX
 
 // Same as above, but prepended with Godot's name and a cosmetic "v" for "version".
 // Example: "Godot v3.1.4.stable.official.mono.double"
