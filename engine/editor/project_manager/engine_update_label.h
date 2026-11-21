@@ -32,6 +32,7 @@
 
 #include "scene/gui/link_button.h"
 
+class ConfirmationDialog;
 class HTTPRequest;
 
 class EngineUpdateLabel : public LinkButton {
@@ -47,17 +48,6 @@ public:
 	};
 
 private:
-	static constexpr int DEV_VERSION = 9999; // Version index for unnumbered builds (assumed to always be newest).
-
-	enum class VersionType {
-		STABLE,
-		RC,
-		BETA,
-		ALPHA,
-		DEV,
-		UNKNOWN,
-	};
-
 	enum class UpdateStatus {
 		NONE,
 		OFFLINE,
@@ -75,20 +65,24 @@ private:
 	} theme_cache;
 
 	HTTPRequest *http = nullptr;
+	HTTPRequest *installer_http = nullptr;
+	ConfirmationDialog *update_dialog = nullptr;
 
 	UpdateStatus status = UpdateStatus::NONE;
 	bool checked_update = false;
 	String available_newer_version;
+	String available_release_tag;
+	String available_release_url;
 
 	bool _can_check_updates() const;
 	void _check_update();
 	void _http_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
+	void _installer_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
+	void _start_update();
+	void _dialog_custom_action(const StringName &p_action);
 
 	void _set_message(const String &p_message, const Color &p_color);
 	void _set_status(UpdateStatus p_status);
-
-	VersionType _get_version_type(const String &p_string, int *r_index = nullptr) const;
-	String _extract_sub_string(const String &p_line) const;
 
 protected:
 	void _notification(int p_what);
@@ -97,5 +91,7 @@ protected:
 	virtual void pressed() override;
 
 public:
+	static bool is_newer_version(const String &p_remote_tag, int p_current_major, int p_current_minor, int p_current_patch, const String &p_current_status, UpdateMode p_mode, String *r_display_version = nullptr);
+
 	EngineUpdateLabel();
 };
