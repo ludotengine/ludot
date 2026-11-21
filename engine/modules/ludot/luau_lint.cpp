@@ -132,22 +132,27 @@ void ludot_lint(const String &source, const Luau::ParseResult &parsed, List<Scri
 	parsed.root->visit(&naming);
 	if (bool(EDITOR_GET(prefix + "selene_enabled"))) {
 		Error temp_error;
-		Ref<FileAccess> file = FileAccess::create_temp(FileAccess::WRITE, "ludot-selene", "luau", false, &temp_error);
-		Ref<FileAccess> config = FileAccess::create_temp(FileAccess::WRITE, "ludot-selene", "toml", false, &temp_error);
+		Ref<FileAccess> file = FileAccess::create_temp(FileAccess::READ_WRITE, "ludot-selene", "luau", false, &temp_error);
+		Ref<FileAccess> config = FileAccess::create_temp(FileAccess::READ_WRITE, "ludot-selene", "toml", false, &temp_error);
 		if (file.is_valid() && config.is_valid()) {
 			file->store_string(LuauFormatter::selene_source(source));
 			file->flush();
 			// The native checker already validates engine globals and their types.
 			config->store_string("std = \"luau\"\n[lints]\nundefined_variable = \"allow\"\nincorrect_standard_library_use = \"allow\"\n");
 			config->flush();
+			const String input_path = file->get_path_absolute();
+			const String default_config_path = config->get_path_absolute();
+			// Release write handles before Selene reopens the files on Windows.
+			file->close();
+			config->close();
 			String config_path = EDITOR_GET(prefix + "selene_config");
 			List<String> args;
 			args.push_back("--display-style");
 			args.push_back("Json");
 			args.push_back("--no-summary");
 			args.push_back("--config");
-			args.push_back(config_path.is_empty() ? config->get_path_absolute() : config_path);
-			args.push_back(file->get_path_absolute());
+			args.push_back(config_path.is_empty() ? default_config_path : config_path);
+			args.push_back(input_path);
 			String executable = EDITOR_GET(prefix + "selene_executable");
 			if (executable == "selene") {
 				String bundled = OS::get_singleton()->get_executable_path().get_base_dir().path_join("ludot.selene");

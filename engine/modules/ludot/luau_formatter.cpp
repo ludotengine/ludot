@@ -265,7 +265,7 @@ static bool run_stylua(const String &original, String &r_result, String &r_error
 	// Temporary files are unique and removed by FileAccess when released.
 	Error temp_error;
 	Ref<FileAccess> file = FileAccess::create_temp(FileAccess::READ_WRITE, "ludot-stylua", "luau", false, &temp_error);
-	Ref<FileAccess> config = FileAccess::create_temp(FileAccess::WRITE, "ludot-stylua", "toml", false, &temp_error);
+	Ref<FileAccess> config = FileAccess::create_temp(FileAccess::READ_WRITE, "ludot-stylua", "toml", false, &temp_error);
 	if (file.is_null() || config.is_null()) {
 		r_error = "Could not create StyLua temporary files.";
 		return false;
@@ -280,11 +280,16 @@ static bool run_stylua(const String &original, String &r_result, String &r_error
 	settings += "[sort_requires]\nenabled = " + String(bool(EDITOR_GET(prefix + "sort_requires")) ? "true" : "false") + "\n";
 	config->store_string(settings);
 	config->flush();
+	const String input_path = file->get_path_absolute();
+	const String config_path = config->get_path_absolute();
+	// External tools must reopen these files. Windows denies access while our write handles remain open.
+	file->close();
+	config->close();
 	List<String> args;
 	args.push_back("--config-path");
-	args.push_back(config->get_path_absolute());
+	args.push_back(config_path);
 	args.push_back("--no-editorconfig");
-	args.push_back(file->get_path_absolute());
+	args.push_back(input_path);
 	if (p_range) {
 		p_range(adapter, args);
 	}
@@ -305,7 +310,7 @@ static bool run_stylua(const String &original, String &r_result, String &r_error
 		r_error = "StyLua formatting failed. Check the executable in Editor Settings. " + output;
 		return false;
 	}
-	String result = FileAccess::get_file_as_string(file->get_path_absolute());
+	String result = FileAccess::get_file_as_string(input_path);
 	for (size_t i = 0; i < adapter.edits.size(); ++i) {
 		String id = String::utf8((adapter.marker + std::to_string(i) + "__").c_str());
 		int at = result.find("--" + id);

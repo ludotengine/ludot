@@ -19,7 +19,41 @@ env:
   CCACHE_MAXSIZE: 500M
   SCCACHE_GHA_ENABLED: 'true'
 jobs:
+  release-info:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      publish: ${{ steps.release.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Prepare a draft for a new version
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ALLOWED: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+        shell: bash
+        run: |
+          version=$(python tools/package_release.py --print-version)
+          tag="v$version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publish=false" >> "$GITHUB_OUTPUT"
+          if [ "$RELEASE_ALLOWED" != "true" ]; then exit 0; fi
+          if gh release view "$tag" --json isDraft > release-state.json 2>/dev/null; then
+            if [ "$(python -c 'import json; print(str(json.load(open("release-state.json"))["isDraft"]).lower())')" != "true" ]; then
+              echo "Version $tag is already published; bump engine/version.py for another release."
+              exit 0
+            fi
+            gh release edit "$tag" --target "$GITHUB_SHA"
+          else
+            gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Ludot $version" --notes "Experimental engine release. Breaking changes are expected. Includes Linux x86_64, macOS Apple Silicon, and Windows x86_64 packages."
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
   desktop:
+    needs: release-info
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +138,13 @@ jobs:
           key: language-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
       - name: Language, shader, and LSP tests
         run: ctest --test-dir build --output-on-failure
+      - name: Installer regressions
+        if: runner.os == 'Linux'
+        run: python tests/test_install.py
+      - name: PowerShell installer regressions
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/test_install_windows.ps1
       - name: Package standalone LSP
         run: |
           python -m pip install pyinstaller==6.22.3
@@ -191,6 +232,22 @@ jobs:
       - name: Archive macOS app
         if: runner.os == 'macOS'
         run: ditto -c -k --sequesterRsrc --keepParent engine/bin/ludot_macos_editor.app dist/ludot-macos-editor.zip
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows' && needs.release-info.outputs.publish == 'true'
+        shell: powershell
+        run: |
+          choco install innosetup --yes --no-progress
+          "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Package desktop release
+        if: needs.release-info.outputs.publish == 'true'
+        run: python tools/package_release.py
+      - name: Upload tested release packages to the draft
+        if: needs.release-info.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-info.outputs.tag }}
+        run: gh release upload "$RELEASE_TAG" dist/release/* --clobber
       # The free plan stores 500 MB of artifacts and one run uploads about 390 MB.
       # A full quota leaves the build and tests green and skips the download.
       - name: Upload standalone LSP
@@ -217,3 +274,20 @@ jobs:
             build/luau/luau*
             tools/ludot_lsp/*.py
             tools/ludot-lsp
+
+  publish-release:
+    needs: [release-info, desktop]
+    if: needs.release-info.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Publish after every desktop regression passes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-info.outputs.tag }}
+        run: |
+          gh release upload "$RELEASE_TAG" install.sh install.ps1 --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest --target "$GITHUB_SHA"

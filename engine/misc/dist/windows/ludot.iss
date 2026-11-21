@@ -1,10 +1,20 @@
 #define MyAppName "Ludot Engine"
-#define MyAppVersion "4.7.2"
+#ifndef MyAppVersion
+  #define MyAppVersion "4.7.2-lu.4"
+#endif
+#ifndef SourceDirectory
+  #define SourceDirectory "."
+#endif
 #define MyAppPublisher "Ludot Engine contributors"
 #define MyAppURL "https://github.com/ludotengine/ludot"
 #define MyAppExeName "ludot.exe"
 
+#ifndef MyAppNumericVersion
+  #define MyAppNumericVersion "4.7.2.4"
+#endif
+
 [Setup]
+VersionInfoVersion={#MyAppNumericVersion}
 AppId={{744739A1-6AD3-5FA4-8457-AECF5E8052D0}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
@@ -40,7 +50,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "modifypath"; Description: "Add Ludot to PATH environment variable"
 
 [Files]
-Source: "{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDirectory}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -56,7 +66,7 @@ const
 
 function ModPathDir(): TArrayOfString;
 begin
-    setArrayLength(Result, 1)
+    setArrayLength(Result, 1);
     Result[0] := ExpandConstant('{app}');
 end;
 
