@@ -10,21 +10,11 @@ Run the command again to update to the latest release.
 curl -fsSL https://github.com/ludotengine/ludot/releases/latest/download/install.sh | sh
 ```
 
-Linux x86_64. Installs to `~/.local/share/ludot`; command at `~/.local/bin/ludot`.
+Linux x86_64 installs to `~/.local/share/ludot`, with the command at `~/.local/bin/ludot`. macOS Apple Silicon installs to `~/Applications/Ludot.app`.
 
 </div>
 
 <div id="install-panel-1" class="install-panel" role="tabpanel" aria-labelledby="install-tab-1">
-
-```bash
-curl -fsSL https://github.com/ludotengine/ludot/releases/latest/download/install.sh | sh
-```
-
-macOS Apple Silicon. Installs to `~/Applications/Ludot.app`.
-
-</div>
-
-<div id="install-panel-2" class="install-panel" role="tabpanel" aria-labelledby="install-tab-2">
 
 ```powershell
 irm https://github.com/ludotengine/ludot/releases/latest/download/install.ps1 | iex

@@ -138,8 +138,8 @@ const facts = [
 			<div class="landing-actions">
 				<a
 					class="landing-button primary"
-					:href="withBase('/docs/reference/building.html')"
-					>Build from source</a
+					:href="withBase('/docs/guide/installation.html')"
+					>Install</a
 				>
 				<a class="landing-button" :href="withBase('/docs/')"
 					>Documentation</a

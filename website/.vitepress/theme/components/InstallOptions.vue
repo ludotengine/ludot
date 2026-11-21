@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-const platforms = ['Linux', 'macOS', 'Windows']
+const platforms = ['Linux & macOS', 'Windows']
 const selected = ref(0)
 function move(direction: number, event: KeyboardEvent) {
 	selected.value =
@@ -10,8 +10,7 @@ function move(direction: number, event: KeyboardEvent) {
 		[selected.value].focus()
 }
 onMounted(() => {
-	if (/Mac/.test(navigator.platform)) selected.value = 1
-	if (/Win/.test(navigator.platform)) selected.value = 2
+	if (/Win/.test(navigator.platform)) selected.value = 1
 })
 </script>
 

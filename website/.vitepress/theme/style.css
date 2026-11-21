@@ -1456,8 +1456,7 @@ textarea:focus-visible {
 	display: none;
 }
 .install-options[data-platform='0'] #install-panel-0,
-.install-options[data-platform='1'] #install-panel-1,
-.install-options[data-platform='2'] #install-panel-2 {
+.install-options[data-platform='1'] #install-panel-1 {
 	display: block;
 }
 .install-panel > p {
