@@ -5,12 +5,17 @@ import type World from "@sim/System"
 
 --- Builds the whole system at startup: sun, sky, worlds, air, rings, belt, and orbits.
 
+-- Shaders that read scene depth need to know its range. The Compatibility renderer,
+-- used on the web, stores 0 to 1 with the far plane at 1. Forward+ stores reversed NDC z.
+const COMPATIBILITY_DEPTH = if RenderingServer:getCurrentRenderingMethod() == "gl_compatibility" then 1 else 0
+
 const function material(path: string, priority: number?): ShaderMaterial
     const shader = ResourceLoader:load(path) :: LuauShader
     assert(shader:getDiagnostics() == "", shader:getDiagnostics())
     const surface = ShaderMaterial.new()
     surface.Shader = shader
     surface.RenderPriority = priority or 0
+    surface:setShaderParameter("CompatibilityDepth", COMPATIBILITY_DEPTH)
     return surface
 end
 
@@ -27,7 +32,7 @@ const function shell(parent: Node3D, mesh: Mesh, skin: ShaderMaterial): MeshInst
     const node = MeshInstance3D.new()
     node.Mesh = mesh
     node.MaterialOverride = skin
-    node.CastShadow = 0
+    node.CastShadow = Enum.ShadowCastingSetting.Off
     parent:addChild(node)
     return node
 end
@@ -51,24 +56,45 @@ class SolarSystem extends Node3D = {
         orbits.Name = "Orbits"
         self:addChild(orbits)
         self.Orbits = orbits
+        -- On the web the system is built over several frames. Build the world the page
+        -- shows first, so it appears right away.
+        const first = if OS:hasFeature("web") then tostring(JavaScriptBridge:eval("window.vesperFocus || location.hash.slice(1)", true)) else ""
+        const order: {World} = {}
         for _, world in System.Worlds do
-            self:addWorld(world, self)
+            if world.Name == first then table.insert(order, 1, world) else table.insert(order, world) end
         end
+        for _, world in order do
+            self:addWorld(world, self)
+            Scene.breathe()
+        end
+        -- The number keys follow System order, so put the bodies back in it.
+        const rank: {[string]: number} = { Sun = 0 }
+        local count = 0
+        for _, world in System.Worlds do
+            count += 1
+            rank[world.Name] = count
+            for _, moon in world.Moons or {} do
+                count += 1
+                rank[moon.Name] = count
+            end
+        end
+        table.sort(Scene.Bodies, function(a, b) return rank[a.Name] < rank[b.Name] end)
         self:addBelt()
+        Scene.Built = true
     end
 
     function addEnvironment()
         const environment = Environment.new()
-        environment.BackgroundMode = 1 -- clear color
+        environment.BackgroundMode = Enum.BGMode.Color
         environment.BackgroundColor = Color.new(0, 0, 0)
-        environment.TonemapMode = 3 -- ACES
+        environment.TonemapMode = Enum.ToneMapper.Aces
         environment.TonemapExposure = 1.05
         environment.GlowEnabled = true
         environment.GlowIntensity = 0.9
         environment.GlowStrength = 1.1
         environment.GlowBloom = 0.08
         environment.GlowHdrThreshold = 1.0
-        environment.GlowBlendMode = 1 -- screen
+        environment.GlowBlendMode = Enum.GlowBlendMode.Screen
         const world = WorldEnvironment.new()
         world.Environment = environment
         self:addChild(world)
@@ -155,7 +181,7 @@ class SolarSystem extends Node3D = {
         const mesh = ImmediateMesh.new()
         const skin = material("res://shaders/Rings.lushader", 2)
         skin:setShaderParameter("PlanetRadius", radius)
-        mesh:surfaceBegin(4, skin) -- triangle strip
+        mesh:surfaceBegin(Enum.PrimitiveType.TriangleStrip, skin)
         for i = 0, 256 do
             const a = i / 256 * math.pi * 2
             const direction = Vector3.new(math.cos(a), 0, math.sin(a))
@@ -172,7 +198,7 @@ class SolarSystem extends Node3D = {
     function addOrbitLine(world: World, body: Node3D, center: Node3D)
         const skin = material("res://shaders/Orbit.lushader", 1)
         const mesh = ImmediateMesh.new()
-        mesh:surfaceBegin(1, skin) -- lines
+        mesh:surfaceBegin(Enum.PrimitiveType.Lines, skin)
         const steps = 512
         for i = 0, steps - 1 do
             for _, k in {i, i + 1} do
@@ -207,7 +233,7 @@ class SolarSystem extends Node3D = {
             const rock = Terrain.build({ Radius = 1, Relief = 0.32, Resolution = 24, Seed = 100 + kind,
                 Frequency = 2.4, Mountains = 0.3, Terraces = 0, Canyons = 0, Craters = 2, CraterSize = 0.45 })
             const field = MultiMesh.new()
-            field.TransformFormat = 1 -- 3D
+            field.TransformFormat = Enum.TransformFormat.Transform3D
             field.InstanceCount = spec.Count // kinds
             field.Mesh = rock.Mesh
             for i = 0, field.InstanceCount - 1 do
@@ -233,8 +259,9 @@ class SolarSystem extends Node3D = {
             trail.Material:setShaderParameter("Phase", (math.atan2(p.Z, p.X) / (math.pi * 2)) % 1)
             trail.Material:setShaderParameter("Strength", Scene.OrbitStrength)
         end
-        const belt = self.Belt :: Node3D
-        belt:rotateY(delta * 0.004)
+        -- On the web the belt appears last, a few frames after the first one.
+        const belt = self.Belt
+        if belt ~= nil then belt:rotateY(delta * 0.004) end
     end
 }
 return SolarSystem

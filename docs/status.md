@@ -5,17 +5,6 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 
 ## Implemented
 
-- `demos/vesper-roblox` ports Vesper to Roblox with exported original terrain,
-  EditableMeshes, procedural EditableImages, point-sun vertex/texture lighting,
-  orbiting worlds, oceans, clouds, rings, a tiled starfield, 1,800 shared-mesh
-  asteroids, and the free/planet/tour cameras. Strict Roblox Luau analysis and
-  edit-mode geometry, orbit, pause, clearance, and camera checks pass. The scene
-  was visually inspected in Studio. Client playtests verify startup, free flight,
-  Earth focus, pause, and orbit visibility. Fixed-size terrain streaming bounds
-  editable terrain to six patches. Two client rounds through all five terrain worlds
-  verify mesh release and ground raycasts. Distant terrain and sky use published original
-  assets. Production clients and lower-memory devices remain unverified; Roblox
-  atmosphere/ocean effects approximate lushaders.
 - `.new()` constructors for Luau classes, native nodes/resources, and native value
   types, with typed results and initializer arguments in the editor and LSP.
   Normal Luau scripts use editor placeholders and do not run lifecycle callbacks
@@ -160,7 +149,12 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   plain class objects travel as `LuauValue` references; other Luau values become
   engine values. `disconnectAll` on an engine signal also removes pending `wait`s made
   through the API, which leaves those threads suspended until their owner is freed.
-- Mobile and web targets inherited from Godot are not supported.
+- Mobile targets inherited from Godot are not supported. The web target is
+  experimental. A single-threaded `template_release` web build compiles with
+  Emscripten 4.0.23, using native wasm exceptions for Luau, and the exported Vesper
+  demo runs in headless Chromium on WebGL 2 with the Compatibility renderer. Nothing
+  else has been tested on the web: no threaded or debug templates, no other
+  projects, no real GPUs or other browsers.
 
 ## Verification
 
@@ -323,3 +317,36 @@ The detailed checklist is
 [language-features-checklist.md](development/language-features-checklist.md).
 Cross-platform CI for the combined revision is pending. No queued or unrun job
 is counted as verified.
+
+## Documentation website
+
+`website/` provides a custom VitePress landing page and manual, with generated
+references for the 1,070 classes and 774 native enum groups in the current API
+manifest. The engine is labeled experimental and the site follows latest source
+without a version picker. Luau and lushader use dedicated syntax highlighting.
+
+The browser playground compiles the committed Luau compiler, VM, and analyzer to
+WebAssembly. It runs and checks standalone examples in a worker; it does not run
+the engine or resolve project imports. A separate engine checking mode loads
+the API manifest for typed completion, hover, and diagnostics without executing
+a scene. Runs have a
+10-second time limit and a 256 MiB WebAssembly memory limit.
+
+Local verification on 2026-11-21 passed the static production build and 13 site
+regressions, covering runtime output, type errors, highlighting, reference
+coverage, inherited documentation conversion, search entries, IntelliSense,
+UTF-16/UTF-8 positions, and 27 maintained engine examples. Browser checks
+verified execution and type checking with the built runtime. The GitHub Pages
+workflow is configured; no deployed Pages result is claimed here.
+
+
+## Desktop release automation
+
+The desktop workflow packages checked builds into a draft release and publishes
+only after all platform jobs pass. It includes Linux and macOS shell installation,
+a macOS DMG, and Windows PowerShell and EXE installation, with package checksums.
+Local Linux install/update and checksum-failure fixtures pass. A Linux editor
+package was produced locally. Native builds and all eight desktop regression
+suites pass locally after closing formatter/linter temporary files before calling
+external tools. Windows and macOS packaging and release publication are not yet
+verified; configured steps are not published releases.

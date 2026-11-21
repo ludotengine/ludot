@@ -55,12 +55,18 @@ CI keeps this compiler cache on Linux and macOS. Windows uses sccache with MSVC
 and GitHub's cache backend, configured through the same CMake launcher options.
 
 Use `platform=windows` with an MSVC developer environment on Windows and
-`platform=macos` on macOS. Ludot's module is desktop-only. GDScript stays enabled.
+`platform=macos` on macOS. GDScript stays enabled.
 Luau sources use MSVC's `/fp:precise` mode, since their VM arithmetic pragmas cannot
 compile with the floating-point exception mode enabled by Godot's `/fp:strict`.
 Godot and the native binding keep their existing compilation settings.
-The fork includes mobile and web source inherited from Godot, but Ludot does not
-support or build those targets.
+The fork includes mobile and web source inherited from Godot. Mobile is not built.
+The web target is experimental: activate the Emscripten SDK and run
+`.venv/bin/scons -C engine platform=web target=template_release threads=no optimize=speed`.
+Godot's web default, `optimize=size`, saves about 1.5 MB gzipped but runs Luau about
+15% slower. The
+template lands in `engine/bin/godot.web.template_release.wasm32.nothreads.zip`.
+Single-threaded builds run on hosts such as GitHub Pages that cannot send the
+cross-origin isolation headers threads need.
 
 On macOS, add `generate_bundle=yes` to produce
 `engine/bin/ludot_macos_editor.app`. The bundle uses the Ludot executable and icon.
@@ -293,3 +299,42 @@ metadata is unavailable.
 style combinations in temporary headless projects. It is part of the desktop
 suite. The LSP suite covers project casing, completion uniqueness, hovers,
 signature help, unsaved overlays, and the restart policy.
+
+## Documentation website
+
+The VitePress site lives in `website/`. Use Node 22 or newer and Python 3.12 or
+newer. From that directory, run `npm ci` and `npm run dev`. The default local
+landing page is `/ludot/` and the manual is `/ludot/docs/`.
+
+The site generates its engine reference from `types/engine.api` and committed
+class XML. It publishes the existing manuals from `docs/` without maintaining a
+second tracked copy. Its browser playground uses this repository's compiler, VM,
+and analyzer compiled with Emscripten 4.0.23. Build that runtime before running
+site tests or publishing; see [the site README](../website/README.md).
+
+`.github/workflows/docs.yml` builds and tests the site for relevant pull requests
+and deploys the default branch through GitHub Pages. Select GitHub Actions as the
+repository's Pages source. A configured workflow does not establish that a public
+deployment has succeeded.
+
+## Desktop releases and installers
+
+The desktop workflow prepares a draft release for an unpublished version from
+`engine/version.py`. Each platform packages its tested editor with the bundled
+formatter/linter and license notices. Linux publishes a tar archive, macOS an app
+ZIP and DMG, and Windows a portable ZIP and Inno Setup EXE. Per-platform SHA-256
+lists accompany the packages. The final job publishes the release only after
+all three desktop jobs, including packaging, pass. An already published version
+is immutable in this workflow; bump the Ludot release number to publish another.
+
+`install.sh` and `install.ps1` are attached to the release. Both resolve the latest
+published version and verify its package checksum. See the
+[installation guide](../website/docs/guide/installation.md) for the one-line
+commands. Failed builds can leave a draft but do not advance the latest release.
+
+The Windows formatting regression was traced to external tools reopening files
+that Ludot still held open. Formatter and linter temporary files now use
+`READ_WRITE` to avoid safe-save rename paths, and close their handles before
+launching StyLua/Selene. The native Linux build and complete desktop regressions
+passed locally on 2026-11-21. Windows verification requires the updated workflow;
+the failing run linked in the task is not counted as a passing result.

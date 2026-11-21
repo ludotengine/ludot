@@ -1,9 +1,10 @@
+import "@sim/Scene" as Scene
 import type Shape from "@sim/System"
 
 --- Planet surfaces: a cube puffed into a sphere, then displaced by layered noise,
 --- ridges, terraces, canyons, and craters.
 
-type Grid = { Directions: {Vector3}, Indices: PackedInt32Array }
+type Grid = { Directions: {Vector3}, Xs: {number}, Ys: {number}, Zs: {number}, Indices: PackedInt32Array }
 
 const grids: {[number]: Grid} = {}
 
@@ -49,6 +50,7 @@ const function grid(resolution: number): Grid
     for axis = 1, 3 do
         for _, side in {-n, n} do
             for i = 0, n - 1 do
+                Scene.breathe()
                 for j = 0, n - 1 do
                     const v00, v10 = corner(axis, side, i, j), corner(axis, side, i + 1, j)
                     const v01, v11 = corner(axis, side, i, j + 1), corner(axis, side, i + 1, j + 1)
@@ -60,17 +62,17 @@ const function grid(resolution: number): Grid
     end
     const directions: {Vector3} = {}
     for i = 1, #xs do directions[i] = Vector3.new(xs[i], ys[i], zs[i]) end
-    const result = { Directions = directions, Indices = PackedInt32Array.new(indices) }
+    const result = { Directions = directions, Xs = xs, Ys = ys, Zs = zs, Indices = PackedInt32Array.new(indices) }
     grids[resolution] = result
     return result
 end
 
-const function noise(seed: number, frequency: number, octaves: number, kind: number): FastNoiseLite
+const function noise(seed: number, frequency: number, octaves: number, kind: Enum.FractalType): FastNoiseLite
     const field = FastNoiseLite.new()
     field.Seed = seed
-    field.NoiseType = 1 -- smooth simplex
+    field.NoiseType = Enum.NoiseType.SimplexSmooth
     field.Frequency = frequency / 100 -- samples are taken at direction * 100
-    field.FractalType = kind -- 1 fBm, 2 ridged
+    field.FractalType = kind
     field.FractalOctaves = octaves
     return field
 end
@@ -80,7 +82,8 @@ const function smoothstep(a: number, b: number, x: number): number
     return t * t * (3 - 2 * t)
 end
 
-type Crater = { X: number, Y: number, Z: number, Size: number, Depth: number }
+-- Reach is the smallest facing (dot product with the center) the crater still touches.
+type Crater = { X: number, Y: number, Z: number, Size: number, Depth: number, Reach: number }
 
 const function craters(shape: Shape): {Crater}
     const list: {Crater} = {}
@@ -90,21 +93,35 @@ const function craters(shape: Shape): {Crater}
         const r = math.sqrt(1 - y * y)
         -- Many small craters, a few large ones.
         const size = shape.CraterSize * (0.25 + math.random() ^ 3 * 0.9)
-        table.insert(list, { X = math.cos(a) * r, Y = y, Z = math.sin(a) * r, Size = size, Depth = 0.35 + math.random() * 0.4 })
+        table.insert(list, {
+            X = math.cos(a) * r, Y = y, Z = math.sin(a) * r, Size = size, Depth = 0.35 + math.random() * 0.4,
+            -- Craters shape the ground out to 1.8 sizes: sqrt(2 * (1 - facing)) < 1.8 * size.
+            Reach = 1 - (1.8 * size) ^ 2 / 2,
+        })
     end
     return list
 end
 
 --- Height above the base radius, roughly -1 to 1, and a mask for flat plains or crater floors.
-const function sampler(shape: Shape): (direction: Vector3) -> (number, number)
-    const base = noise(shape.Seed, shape.Frequency, 6, 1)
-    const ridge = noise(shape.Seed + 1, shape.Frequency * 1.7, 5, 2)
-    const canyon = noise(shape.Seed + 2, shape.Frequency * 0.9, 3, 1)
+--- Takes a unit direction as three numbers, which keeps native property reads out of the
+--- per-vertex loop.
+const function sampler(shape: Shape): (dx: number, dy: number, dz: number) -> (number, number)
+    const base = noise(shape.Seed, shape.Frequency, 6, Enum.FractalType.Fbm)
+    const ridge = noise(shape.Seed + 1, shape.Frequency * 1.7, 5, Enum.FractalType.Ridged)
+    const canyon = noise(shape.Seed + 2, shape.Frequency * 0.9, 3, Enum.FractalType.Fbm)
     const holes = craters(shape)
-    const plains = if shape.Plains ~= nil then shape.Plains:normalized() else nil
+    -- Two overlapping lobes make a heart-shaped ice plain.
+    const hasPlains = shape.Plains ~= nil
+    local ax, ay, az, bx, by, bz = 0, 0, 0, 0, 0, 0
+    if shape.Plains ~= nil then
+        const plains = shape.Plains:normalized()
+        const side = plains:cross(Vector3.new(0, 1, 0)):normalized() * 0.13
+        const a, b = (plains + side):normalized(), (plains - side):normalized()
+        ax, ay, az, bx, by, bz = a.X, a.Y, a.Z, b.X, b.Y, b.Z
+    end
     const scale = 100
-    return function(direction: Vector3): (number, number)
-        const x, y, z = direction.X * scale, direction.Y * scale, direction.Z * scale
+    return function(dx: number, dy: number, dz: number): (number, number)
+        const x, y, z = dx * scale, dy * scale, dz * scale
         local height = base:getNoise3d(x, y, z) * 1.2
         local mask = 0
         if shape.Mountains > 0 then
@@ -122,7 +139,8 @@ const function sampler(shape: Shape): (direction: Vector3) -> (number, number)
             height = (math.floor(t) + smoothstep(0.3, 0.7, t - math.floor(t))) / shape.Terraces * 2 - 1
         end
         for _, crater in holes do
-            const facing = direction.X * crater.X + direction.Y * crater.Y + direction.Z * crater.Z
+            const facing = dx * crater.X + dy * crater.Y + dz * crater.Z
+            if facing <= crater.Reach then continue end
             const distance = math.sqrt(math.max(2 * (1 - facing), 0)) / crater.Size
             if distance < 1.8 then
                 const bowl = math.max(distance * distance - 1, -0.55)
@@ -131,10 +149,8 @@ const function sampler(shape: Shape): (direction: Vector3) -> (number, number)
                 if distance < 0.9 then mask = math.max(mask, 0.6) end
             end
         end
-        if plains ~= nil then
-            -- Two overlapping lobes make a heart-shaped ice plain.
-            const side = plains:cross(Vector3.new(0, 1, 0)):normalized() * 0.13
-            const lobe = math.max((plains + side):normalized():dot(direction), (plains - side):normalized():dot(direction))
+        if hasPlains then
+            const lobe = math.max(ax * dx + ay * dy + az * dz, bx * dx + by * dy + bz * dz)
             const plain = smoothstep(0.955, 0.975, lobe)
             height = height * (1 - plain * 0.85) + plain * 0.15
             mask = math.max(mask, plain)
@@ -161,8 +177,10 @@ const function build(shape: Shape): Surface
     const heights: {number} = {}
     const masks: {number} = {}
     local low: number, high: number = math.huge, -math.huge
-    for i, direction in cube.Directions do
-        const h, m = height(direction)
+    const xs, ys, zs = cube.Xs, cube.Ys, cube.Zs
+    for i = 1, #xs do
+        if i % 512 == 0 then Scene.breathe() end
+        const h, m = height(xs[i], ys[i], zs[i])
         heights[i], masks[i] = h, m
         if h < low then low = h end
         if h > high then high = h end
@@ -171,6 +189,7 @@ const function build(shape: Shape): Surface
     const positions: {Vector3} = {}
     const colors: {Color} = {}
     for i, direction in cube.Directions do
+        if i % 2048 == 0 then Scene.breathe() end
         const h: number = heights[i]
         positions[i] = direction * (shape.Radius * (1 + shape.Relief * h))
         colors[i] = Color.new((h - low) / span, masks[i], 0)
@@ -181,7 +200,8 @@ const function build(shape: Shape): Surface
     arrays:set(3, PackedColorArray.new(colors)) -- Mesh.ARRAY_COLOR
     arrays:set(12, cube.Indices) -- Mesh.ARRAY_INDEX
     const tool = SurfaceTool.new()
-    tool:createFromArrays(arrays, 3) -- triangles
+    tool:createFromArrays(arrays, Enum.PrimitiveType.Triangles)
+    Scene.breathe()
     tool:generateNormals()
     const seaLevel: number? = shape.SeaLevel
     const sea = if seaLevel ~= nil then (seaLevel - low) / span else -1
@@ -192,7 +212,8 @@ const function build(shape: Shape): Surface
         Radius = shape.Radius * (1 + shape.Relief * (seaLevel or 0)),
         -- Distance from the center to the ground (or sea) in a local direction.
         Ground = function(direction: Vector3): number
-            const h = height(direction:normalized())
+            const unit = direction:normalized()
+            const h = height(unit.X, unit.Y, unit.Z)
             return math.max(shape.Radius * (1 + shape.Relief * h), seaRadius)
         end,
     }

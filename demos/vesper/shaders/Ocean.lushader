@@ -6,6 +6,7 @@ renderMode("unshaded", "cull_back", "blend_mix", "depth_draw_never")
 --- A sea-level sphere. Depth behind the water gives shallow shelves, surf, and clarity.
 
 export SceneDepth: DepthTexture
+export CompatibilityDepth: number = 0
 export Shallow: vec3 = vec3(0.16, 0.58, 0.62)
 export Abyss: vec3 = vec3(0.02, 0.09, 0.2)
 export Foam: vec3 = vec3(0.92, 0.95, 0.94)
@@ -21,7 +22,8 @@ function vertex()
 end
 
 function fragment()
-    local depth: number = texture(SceneDepth, ScreenUV).x
+    local raw: number = texture(SceneDepth, ScreenUV).x
+    local depth: number = if CompatibilityDepth > 0.5 then raw * 2.0 - 1.0 else raw
     local scene: vec4 = InverseProjectionMatrix * vec4(ScreenUV * 2.0 - 1.0, depth, 1.0)
     local water: number = length(scene.xyz / scene.w) - length(Vertex)
     local clarity: number = exp(-water * 1.4)

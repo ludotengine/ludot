@@ -10,6 +10,11 @@ for component in ['Common', 'Ast', 'Bytecode', 'Inliner', 'Compiler', 'VM']:
 ludot.Append(CPPPATH=[str(root / 'luau/VM/src'), str(root / 'luau/Bytecode/src')])
 if env['platform'] == 'windows' and not env['use_mingw']:
     ludot.Append(CCFLAGS=['/EHsc'])
+elif env['platform'] == 'web':
+    # Luau raises errors as C++ exceptions. Godot's web build uses wasm setjmp/longjmp,
+    # which only combines with native wasm exceptions, at compile and link time.
+    ludot.Append(CXXFLAGS=['-fexceptions', '-fwasm-exceptions'])
+    env.Append(LINKFLAGS=['-fwasm-exceptions'])
 else:
     ludot.Append(CXXFLAGS=['-fexceptions'])
 if env.editor_build:

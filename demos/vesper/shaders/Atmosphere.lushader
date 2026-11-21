@@ -6,6 +6,7 @@ renderMode("unshaded", "cull_front", "depth_test_disabled", "depth_draw_never", 
 --- when you fly inside it. Sunlit air scatters blue, the terminator glows warm.
 
 export SceneDepth: DepthTexture
+export CompatibilityDepth: number = 0
 export PlanetRadius: number = 14.0
 export Thickness: number = 2.6
 export Density: number = 1.2
@@ -39,8 +40,12 @@ function fragment()
     local near: number = max(span.x, 0.0)
     local far: number = span.y
 
-    local depth: number = texture(SceneDepth, ScreenUV).x
-    if depth > 0.00001 then
+    -- Sky pixels sit on the far plane: 0 in Forward+, 1 in the Compatibility renderer.
+    local raw: number = texture(SceneDepth, ScreenUV).x
+    local compatibility: bool = CompatibilityDepth > 0.5
+    local sky: bool = if compatibility then raw > 0.99999 else raw < 0.00001
+    if not sky then
+        local depth: number = if compatibility then raw * 2.0 - 1.0 else raw
         local scene: vec4 = InverseProjectionMatrix * vec4(ScreenUV * 2.0 - 1.0, depth, 1.0)
         far = min(far, length(scene.xyz / scene.w))
     end

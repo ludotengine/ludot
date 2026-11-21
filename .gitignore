@@ -11,3 +11,16 @@ __pycache__/
 /.ci-cache/
 /.scons_cache/
 /.ccache/
+
+# Documentation site
+/website/node_modules/
+/website/.vitepress/cache/
+/website/.vitepress/dist/
+/website/.generated/
+/website/docs/api/engine/
+/website/docs/reference/
+/website/public/runtime/
+/website/public/vesper/
+/website/public/search.json
+/website/public/engine.api
+/website/public/api-members/

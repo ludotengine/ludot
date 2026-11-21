@@ -1,0 +1,121 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'docs/**'
+      - 'types/engine.api'
+      - 'engine/doc/classes/**'
+      - 'engine/modules/**/doc_classes/**'
+      - 'engine/modules/ludot/**'
+      - 'demos/vesper/**'
+      - 'luau/**'
+      - 'logo.svg'
+      - 'LICENSE'
+      - 'upstreams.json'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'website/**'
+      - 'docs/**'
+      - 'types/engine.api'
+      - 'engine/doc/classes/**'
+      - 'engine/modules/**/doc_classes/**'
+      - 'engine/modules/ludot/**'
+      - 'demos/vesper/**'
+      - 'luau/**'
+      - 'logo.svg'
+      - 'LICENSE'
+      - 'upstreams.json'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: blacksmith-32vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install site dependencies
+        run: npm ci --prefix website
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install --yes ninja-build mold libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libudev-dev
+          python -m pip install scons==4.11.1
+      - name: Install pinned Emscripten SDK
+        run: |
+          git init build/docs-emsdk
+          git -C build/docs-emsdk remote add origin https://github.com/emscripten-core/emsdk.git
+          git -C build/docs-emsdk fetch --depth 1 origin 708dcbcc9ee23bc7d2dad44fc90db377e38b771c
+          git -C build/docs-emsdk checkout FETCH_HEAD
+          build/docs-emsdk/emsdk install 4.0.23
+          build/docs-emsdk/emsdk activate 4.0.23
+      - name: Restore compiler objects
+        uses: actions/cache@v4
+        with:
+          path: build/docs-runtime
+          key: docs-wasm-v1-${{ runner.os }}-${{ hashFiles('luau/**', 'website/runtime/**') }}
+          restore-keys: docs-wasm-v1-${{ runner.os }}-
+      - name: Compile the Ludot browser runtime
+        run: |
+          source build/docs-emsdk/emsdk_env.sh
+          bash website/scripts/build-runtime.sh
+      - name: Mount documentation engine caches
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-docs-engine-cache
+          path: ${{ github.workspace }}/.ci-cache
+      - name: Build the live demo engine and template
+        run: |
+          source build/docs-emsdk/emsdk_env.sh
+          scons -C engine platform=linuxbsd target=editor debug_symbols=no module_mono_enabled=no linker=mold scu_build=yes cache_path=../.ci-cache/docs-native -j8
+          scons -C engine platform=web target=template_release threads=no optimize=speed debug_symbols=no module_mono_enabled=no cache_path=../.ci-cache/docs-web -j8
+      - name: Export the live Vesper demo
+        env:
+          LUDOT: ${{ github.workspace }}/engine/bin/ludot.linuxbsd.editor.x86_64
+        run: bash website/scripts/export-vesper-web.sh
+      - name: Generate reference and test runtime
+        run: |
+          npm run docs:generate --prefix website
+          npm test --prefix website
+      - name: Build static site
+        env:
+          DOCS_BASE: /${{ github.event.repository.name }}/
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: npm run build --prefix website
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/.vitepress/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

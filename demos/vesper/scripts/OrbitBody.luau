@@ -7,6 +7,11 @@ class OrbitBody extends Node3D = {
     export Phase: number = 0.7
     export Spin: number = 0.012
 
+    --- Starts on the orbit, so a camera aimed at this world in its first frame finds it.
+    function _ready()
+        self:_process(0)
+    end
+
     function _process(delta: number)
         const angle = self.Phase + Clock.Time * self.AngularSpeed
         self.Position = Vector3.new(math.cos(angle), 0, math.sin(angle)) * self.Radius

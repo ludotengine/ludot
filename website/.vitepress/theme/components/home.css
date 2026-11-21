@@ -1,0 +1,366 @@
+/* Landing page. The hero always uses the dark theme colors, because the
+   screenshot behind it is dark. Everything below it follows the site theme. */
+
+.landing-hero {
+	position: relative;
+	display: flex;
+	align-items: center;
+	min-height: min(620px, 80vh);
+	padding: 80px max(32px, calc((100% - 1176px) / 2));
+	background: #121314;
+	color: #fff;
+	overflow: hidden;
+	isolation: isolate;
+}
+
+.landing-hero::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: linear-gradient(
+		to right,
+		#121314e6 0,
+		#12131499 50%,
+		#12131433 100%
+	);
+}
+
+.landing-hero-image {
+	position: absolute;
+	inset: 0;
+	z-index: -2;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: 50% 45%;
+}
+
+.landing-hero-text {
+	max-width: 700px;
+}
+
+.landing-hero h1 {
+	margin: 0 0 20px;
+	font-size: clamp(40px, 5.4vw, 72px);
+	line-height: 1.05;
+	letter-spacing: -2px;
+	font-weight: 700;
+}
+
+.landing-lead {
+	margin: 0;
+	font-size: 20px;
+	line-height: 1.5;
+	color: #e7e8eb;
+}
+
+.landing-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin: 36px 0 24px;
+}
+
+.landing-button {
+	display: inline-block;
+	padding: 13px 24px;
+	border: 1px solid #ffffff40;
+	border-radius: 6px;
+	font-size: 16px;
+	font-weight: 600;
+	color: #fff;
+	background: #ffffff1a;
+}
+
+.landing-button:hover {
+	background: #ffffff29;
+}
+
+.landing-button.primary {
+	background: #1673d2;
+	border-color: #1673d2;
+}
+
+.landing-button.primary:hover {
+	background: #2585e7;
+	border-color: #2585e7;
+}
+
+.landing-note {
+	margin: 0;
+	font-size: 14px;
+	color: #c3c6cc;
+}
+
+/* Sections below the hero */
+
+.landing-demo,
+.landing-facts,
+.landing-playground {
+	max-width: 1240px;
+	margin: 0 auto;
+	padding: 80px 32px;
+}
+
+.landing-facts,
+.landing-playground {
+	border-top: 1px solid var(--line);
+}
+
+.landing-heading {
+	display: flex;
+	align-items: baseline;
+	gap: 20px;
+	margin-bottom: 28px;
+}
+
+.landing-heading h2 {
+	margin: 0;
+	font-size: 30px;
+	line-height: 1.2;
+	letter-spacing: -0.6px;
+	font-weight: 600;
+	border: 0;
+	padding: 0;
+}
+
+.landing-heading a {
+	color: var(--accent);
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.landing-heading a:hover {
+	text-decoration: underline;
+}
+
+/* Demo scenes: a still beside the code that draws it */
+
+.landing-tabs {
+	display: flex;
+	border: 1px solid var(--line);
+	border-bottom: 0;
+	border-radius: 6px 6px 0 0;
+	background: var(--panel);
+	overflow-x: auto;
+}
+
+.landing-tabs button {
+	padding: 10px 16px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: none;
+	font: 13px var(--vp-font-family-mono);
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+.landing-tabs button:hover {
+	color: var(--text);
+}
+
+.landing-tabs button[aria-selected='true'] {
+	color: var(--text);
+	border-bottom-color: var(--accent);
+}
+
+.landing-scene {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+	border: 1px solid var(--line);
+	border-radius: 0 0 6px 6px;
+	overflow: hidden;
+}
+
+.landing-viewport {
+	position: relative;
+	min-height: 320px;
+	background: #000;
+}
+
+.landing-viewport img,
+.landing-viewport iframe {
+	position: absolute;
+	inset: 0;
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	object-fit: cover;
+}
+
+/* The live demo fades in over the still once its first world is on screen. */
+.landing-viewport iframe {
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.4s ease;
+}
+
+.landing-viewport iframe.ready {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.landing-files {
+	min-width: 0;
+	background: var(--panel);
+	border-left: 1px solid var(--line);
+}
+
+.landing-files[data-file='0'] .landing-file:not(:nth-child(1)),
+.landing-files[data-file='1'] .landing-file:not(:nth-child(2)),
+.landing-files[data-file='2'] .landing-file:not(:nth-child(3)) {
+	display: none;
+}
+
+.landing-file .lang,
+.landing-file .copy {
+	display: none;
+}
+
+.landing-file pre {
+	margin: 0;
+	padding: 18px 20px;
+	overflow-x: auto;
+	background: transparent !important;
+	font: 12.5px/1.65 var(--vp-font-family-mono);
+	tab-size: 4;
+}
+
+.landing-file .shiki span {
+	color: var(--shiki-light);
+}
+
+.dark .landing-file .shiki span {
+	color: var(--shiki-dark);
+}
+
+/* What works now */
+
+.landing-fact-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	border-top: 1px solid var(--line);
+	border-left: 1px solid var(--line);
+}
+
+.landing-fact-grid a {
+	display: block;
+	padding: 24px 26px;
+	border-right: 1px solid var(--line);
+	border-bottom: 1px solid var(--line);
+}
+
+.landing-fact-grid a:hover {
+	background: var(--panel);
+}
+
+.landing-fact-grid a:hover h3 {
+	color: var(--accent);
+}
+
+.landing-fact-grid h3 {
+	margin: 0 0 8px;
+	font-size: 17px;
+	font-weight: 600;
+	letter-spacing: -0.2px;
+}
+
+.landing-fact-grid p {
+	margin: 0;
+	font-size: 14px;
+	line-height: 1.6;
+	color: var(--muted);
+}
+
+/* Playground */
+
+.landing-playground .playground {
+	margin: 0;
+}
+
+.landing-playground .runtime-label {
+	display: none;
+}
+
+/* Footer */
+
+.landing-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px 24px;
+	padding: 28px max(32px, calc((100% - 1176px) / 2));
+	border-top: 1px solid var(--line);
+	font-size: 13px;
+	color: var(--muted);
+}
+
+.landing-footer .brand {
+	margin-right: auto;
+	font-size: 18px;
+	color: var(--text);
+}
+
+.landing-footer .brand img {
+	width: 22px;
+	height: 22px;
+}
+
+.landing-footer > a:not(.brand):hover {
+	color: var(--accent);
+}
+
+@media (max-width: 1000px) {
+	.landing-scene {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.landing-viewport {
+		min-height: 0;
+		aspect-ratio: 16 / 9;
+	}
+
+	.landing-files {
+		border-left: 0;
+		border-top: 1px solid var(--line);
+	}
+
+	.landing-fact-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 640px) {
+	.landing-hero {
+		min-height: auto;
+		padding: 64px 16px 72px;
+	}
+
+	.landing-hero::before {
+		background: #121314b3;
+	}
+
+	.landing-lead {
+		font-size: 17px;
+	}
+
+	.landing-demo,
+	.landing-facts,
+	.landing-playground {
+		padding: 56px 16px;
+	}
+
+	.landing-heading h2 {
+		font-size: 25px;
+	}
+
+	.landing-fact-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.landing-footer {
+		padding: 24px 16px;
+	}
+}
