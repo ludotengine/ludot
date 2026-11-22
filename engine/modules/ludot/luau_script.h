@@ -64,8 +64,9 @@ protected:
     static void _bind_methods();
 public:
     bool can_instantiate() const override;
-    const HashMap<StringName, MethodInfo> &get_signals() const { return signals; }
-    int get_class_reference() const { return class_ref; }
+	Variant new_instance(const Variant **p_args, int p_count, Callable::CallError &r_error);
+	const HashMap<StringName, MethodInfo> &get_signals() const { return signals; }
+	int get_class_reference() const { return class_ref; }
     Ref<Script> get_base_script() const override { return base_script; }
     StringName get_global_name() const override { return class_name; }
     bool inherits_script(const Ref<Script> &p_script) const override { return base_script == p_script || (base_script.is_valid() && base_script->inherits_script(p_script)); }
@@ -102,13 +103,14 @@ public:
     static String create_from_template(const String &p_template, const String &p_class_name, const String &p_base_class);
 #ifdef TOOLS_ENABLED
     StringName get_doc_class_name() const override { return class_name; }
-    Vector<DocData::ClassDoc> get_documentation() const override { return {}; }
-    String get_class_icon_path() const override { return ""; }
+	Vector<DocData::ClassDoc> get_documentation() const override;
+	String get_class_icon_path() const override { return ""; }
 #endif
     bool has_method(const StringName &p_method) const override;
     MethodInfo get_method_info(const StringName &p_method) const override;
-    bool is_tool() const override { return false; }
-    bool is_valid() const override { return valid; }
+	MethodInfo get_constructor_info() const override { return get_method_info("__init"); }
+	bool is_tool() const override { return false; }
+	bool is_valid() const override { return valid; }
     bool is_abstract() const override { return false; }
     ScriptLanguage *get_language() const override;
     bool has_script_signal(const StringName &p_signal) const override { return signals.has(p_signal); }
@@ -150,8 +152,8 @@ public:
     void notification(int p_notification, bool p_reversed) override;
     Ref<Script> get_script() const override { return script; }
     ScriptLanguage *get_language() override;
-    LuauScriptInstance(Object *p_owner, const Ref<LuauScript> &p_script);
-    ~LuauScriptInstance();
+	LuauScriptInstance(Object *p_owner, const Ref<LuauScript> &p_script, const Variant **p_args = nullptr, int p_count = 0);
+	~LuauScriptInstance();
 };
 
 class LuauLanguage : public ScriptLanguage {
@@ -313,6 +315,7 @@ public:
     bool validate(const String &p_script, const String &p_path, List<String> *r_functions, List<ScriptError> *r_errors, List<Warning> *r_warnings, HashSet<int> *r_safe_lines) const override;
     Error complete_code(const String &p_code, const String &p_path, Object *p_owner, List<CodeCompletionOption> *r_options, bool &r_force, String &r_call_hint) override;
     bool supports_builtin_mode() const override { return false; }
+	bool supports_documentation() const override { return true; }
     ScriptNameCasing preferred_file_name_casing() const override { return SCRIPT_NAME_CASING_PASCAL_CASE; }
     bool is_using_templates() override { return true; }
     Vector<ScriptTemplate> get_built_in_templates(const StringName &p_object) override;

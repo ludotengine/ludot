@@ -59,6 +59,12 @@ with tempfile.TemporaryDirectory(prefix="ludot-mcp-installer-") as tmp:
     fake_home.mkdir()
     fake_xdg.mkdir()
     fake_bin.mkdir()
+    # Providers use native app-data locations on macOS and Windows, while
+    # OpenCode and Unix Goose/Zed use XDG configuration directories.
+    fake_app_data = fake_home / "Library" / "Application Support" if sys.platform == "darwin" else fake_xdg
+    fake_zed = fake_app_data / "Zed" if sys.platform == "win32" else fake_xdg / "zed"
+    fake_goose = fake_app_data / "Block" / "goose" / "config" if sys.platform == "win32" else fake_xdg / "goose"
+    fake_vscode = fake_app_data / "Code" / "User"
 
     # Create installed providers in the sandboxed environment:
     # - Claude Code: installed, NOT configured yet (has another server)
@@ -85,19 +91,19 @@ with tempfile.TemporaryDirectory(prefix="ludot-mcp-installer-") as tmp:
         encoding="utf-8",
     )
     # - Zed: installed with JSONC comments, NOT configured yet
-    (fake_xdg / "zed").mkdir()
-    (fake_xdg / "zed" / "settings.json").write_text(
+    fake_zed.mkdir(parents=True)
+    (fake_zed / "settings.json").write_text(
         '// Zed settings\n{"theme": "One Dark", /* block comment */}\n',
         encoding="utf-8",
     )
     # - Goose: installed, NOT configured yet
-    (fake_xdg / "goose").mkdir()
-    (fake_xdg / "goose" / "config.yaml").write_text(
+    fake_goose.mkdir(parents=True)
+    (fake_goose / "config.yaml").write_text(
         "GOOSE_PROVIDER: anthropic\nextensions:\n  developer:\n    enabled: true\n",
         encoding="utf-8",
     )
     # - VS Code: installed, NOT configured yet
-    (fake_xdg / "Code" / "User").mkdir(parents=True)
+    fake_vscode.mkdir(parents=True)
     # - Cursor: NOT installed (should not be marked installed)
 
     # Put a fake ludot-editor-mcp binary in fake_bin so command resolution picks it up.
@@ -143,7 +149,7 @@ func _run() -> void:
         "HOME": str(fake_home),
         "USERPROFILE": str(fake_home),
         "XDG_CONFIG_HOME": str(fake_xdg),
-        "APPDATA": str(fake_xdg),
+        "APPDATA": str(fake_app_data),
         "CODEX_HOME": str(fake_home / ".codex"),
         "PATH": str(fake_bin),
     }
@@ -180,9 +186,15 @@ func _run() -> void:
     assert before["antigravity"]["installed"] is True and before["antigravity"]["already_configured"] is False
     assert before["opencode"]["installed"] is True and before["opencode"]["already_configured"] is False
     assert before["zed"]["installed"] is True and before["zed"]["already_configured"] is False
-    assert before["goose"]["installed"] is True and before["goose"]["already_configured"] is False
-    assert before["vscode"]["installed"] is True and before["vscode"]["already_configured"] is False
+    assert before["goose"]["installed"] is True and before["goose"]["already_configured"] is False, before["goose"]
+    assert before["vscode"]["installed"] is True and before["vscode"]["already_configured"] is False, before["vscode"]
     assert before["cursor"]["installed"] is False
+    for provider, expected in {
+        "zed": fake_zed / "settings.json",
+        "goose": fake_goose / "config.yaml",
+        "vscode": fake_vscode / "mcp.json",
+    }.items():
+        assert Path(before[provider]["config_path"]) == expected, (provider, before[provider], expected)
 
     # Codex was already configured, so configure_provider skipped it without duplicating.
     assert report["cfg_codex"]["ok"] is True and report["cfg_codex"]["skipped"] is True
@@ -201,18 +213,18 @@ func _run() -> void:
     assert set(opencode_cfg["mcp"]) == {"existing", "ludot-mcp"}
     assert opencode_cfg["mcp"]["ludot-mcp"] == {"type": "local", "command": ["ludot-editor-mcp"]}
 
-    zed_cfg = json.loads((fake_xdg / "zed" / "settings.json").read_text(encoding="utf-8"))
+    zed_cfg = json.loads((fake_zed / "settings.json").read_text(encoding="utf-8"))
     assert zed_cfg["theme"] == "One Dark"
     assert zed_cfg["context_servers"]["ludot-mcp"]["command"]["path"] == "ludot-editor-mcp"
 
-    vscode_cfg = json.loads((fake_xdg / "Code" / "User" / "mcp.json").read_text(encoding="utf-8"))
+    vscode_cfg = json.loads((fake_vscode / "mcp.json").read_text(encoding="utf-8"))
     assert vscode_cfg["servers"]["ludot-mcp"]["type"] == "stdio"
     assert vscode_cfg["servers"]["ludot-mcp"]["command"] == "ludot-editor-mcp"
 
     agy_cfg = json.loads((fake_home / ".gemini" / "config" / "mcp_config.json").read_text(encoding="utf-8"))
     assert agy_cfg["mcpServers"]["ludot-mcp"]["command"] == "ludot-editor-mcp"
 
-    goose_text = (fake_xdg / "goose" / "config.yaml").read_text(encoding="utf-8")
+    goose_text = (fake_goose / "config.yaml").read_text(encoding="utf-8")
     assert "developer:" in goose_text and "ludot-mcp:" in goose_text and "ludot-editor-mcp" in goose_text
 
     # Re-detection after install marks all newly configured providers as already_configured.

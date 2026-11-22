@@ -1,0 +1,138 @@
+{
+	"Button": {
+		"code": "const function onButtonPressed()\n\tprint(\"Hello world!\")\nend\n\nclass Menu extends Control = {\n\tfunction _ready()\n\t\tconst button = Button.new()\n\t\tbutton.Text = \"Click me\"\n\t\tbutton.Pressed:connect(onButtonPressed)\n\t\tself:addChild(button)\n\tend\n}",
+		"names": {
+			"Menu": [
+				"class",
+				"Menu"
+			],
+			"button": [
+				"constant",
+				"button"
+			],
+			"Text": [
+				"api_property",
+				"text"
+			],
+			"Pressed": [
+				"api_property",
+				"pressed"
+			],
+			"connect": [
+				"api_method",
+				"connect"
+			],
+			"addChild": [
+				"api_method",
+				"add_child"
+			],
+			"onButtonPressed": [
+				"function",
+				"on_button_pressed"
+			],
+			"_ready": [
+				"api_callback",
+				"_ready"
+			]
+		}
+	},
+	"Node.get_node": {
+		"code": "class Scene extends Node = {\n\tonready private MessageLabel = self:getNode(\"Label\") :: Label\n\n\tfunction _ready()\n\t\tself.MessageLabel.Text = \"Ready\"\n\tend\n}",
+		"names": {
+			"Scene": [
+				"class",
+				"Scene"
+			],
+			"getNode": [
+				"api_method",
+				"get_node"
+			],
+			"Text": [
+				"api_property",
+				"text"
+			],
+			"MessageLabel": [
+				"property",
+				"message_label"
+			],
+			"_ready": [
+				"api_callback",
+				"_ready"
+			]
+		}
+	},
+	"Object.connect": {
+		"code": "const function watch(button: Button)\n\tconst function onPressed()\n\t\tprint(\"Pressed\")\n\tend\n\n\tconst connection = button.Pressed:connect(onPressed)\n\treturn connection\nend",
+		"names": {
+			"watch": [
+				"function",
+				"watch"
+			],
+			"button": [
+				"variable",
+				"button"
+			],
+			"connection": [
+				"constant",
+				"connection"
+			],
+			"Pressed": [
+				"api_property",
+				"pressed"
+			],
+			"connect": [
+				"api_method",
+				"connect"
+			],
+			"onPressed": [
+				"function",
+				"on_pressed"
+			]
+		}
+	},
+	"Signal": {
+		"code": "const changed = signal with (previous: number, current: number)\n\nconst function onChanged(previous: number, current: number)\n\tprint(previous, current)\nend\n\nconst connection = changed:connect(onChanged)\nchanged:fire(100, 75)\nconnection:disconnect()",
+		"names": {
+			"changed": [
+				"constant",
+				"changed"
+			],
+			"connection": [
+				"constant",
+				"connection"
+			],
+			"previous": [
+				"variable",
+				"previous"
+			],
+			"current": [
+				"variable",
+				"current"
+			],
+			"connect": [
+				"api_method",
+				"connect"
+			],
+			"fire": [
+				"api_method",
+				"fire"
+			],
+			"disconnect": [
+				"api_method",
+				"disconnect"
+			],
+			"onChanged": [
+				"function",
+				"on_changed"
+			]
+		},
+		"description": "A typed Luau signal created with signal with (...). Engine and public script signals use the same type. Luau uses fire; GDScript sees a native Godot Signal and uses emit.",
+		"members": {
+			"fire": "Calls connected handlers with the signal arguments. Engine-backed signals also notify GDScript handlers.",
+			"connect": "Connects a handler and returns a Luau Connection. Handler parameter types come from the signal.",
+			"once": "Connects a handler for the next emission only and returns a Connection.",
+			"wait": "Suspends the current resumable thread until the signal fires, then returns its arguments.",
+			"disconnect_all": "Disconnects handlers made through the Luau API. Editor and GDScript connections stay connected."
+		}
+	}
+}

@@ -53,8 +53,13 @@ with tempfile.TemporaryDirectory(prefix='ludot-lsp-project-') as directory:
         send({'method': 'textDocument/didOpen', 'params': {'textDocument': {'uri': path.as_uri(), 'languageId': 'luau', 'version': 1, 'text': text}}})
         send({'id': 2, 'method': 'textDocument/completion', 'params': {'textDocument': {'uri': path.as_uri()}, 'position': {'line': 2, 'character': 7}}})
         assert 'projectRayNormal' in [entry['label'] for entry in response(2)]
-        send({'id': 3, 'method': 'shutdown'})
-        response(3)
+        hover_source = 'const button = Button.new()\nprint(button.Pressed)'
+        send({'method': 'textDocument/didChange', 'params': {'textDocument': {'uri': path.as_uri(), 'version': 2}, 'contentChanges': [{'text': hover_source}]}})
+        send({'id': 3, 'method': 'textDocument/hover', 'params': {'textDocument': {'uri': path.as_uri()}, 'position': {'line': 1, 'character': 15}}})
+        hover = response(3)['contents']['value']
+        assert 'Emitted when' in hover and 'object.Pressed:connect' in hover, hover
+        send({'id': 4, 'method': 'shutdown'})
+        response(4)
         send({'method': 'exit'})
         process.wait(timeout=10)
         assert process.returncode == 0

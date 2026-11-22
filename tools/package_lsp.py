@@ -18,6 +18,12 @@ output = args.output_dir.resolve()
 suffix = '.exe' if sys.platform == 'win32' else ''
 work = build / 'lsp-package'
 work.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(root / 'tools'))
+from ludot_lsp.documentation import Documentation
+import json
+docs = Documentation()
+documentation_file = work / 'documentation.json'
+documentation_file.write_text(json.dumps({'classes': docs.classes, 'examples': docs.examples}), encoding='utf-8')
 command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--name', 'ludot-lsp', '--paths', str(root / 'tools'), '--distpath', str(output), '--workpath', str(work / 'objects'), '--specpath', str(work)]
 if sys.platform == 'win32':
     command += ['--icon', str(root / 'engine/platform/windows/godot.ico')]
@@ -25,6 +31,7 @@ for source, destination, kind in [
     (build / 'luau' / ('luau-analyze' + suffix), 'bin', 'binary'),
     (build / ('ludot-shader' + suffix), 'bin', 'binary'),
     (root / 'types/engine.api', 'share/ludot', 'data'),
+    (documentation_file, 'share/ludot', 'data'),
     (root / 'LICENSE', 'share/licenses/ludot', 'data'),
     (root / 'luau/LICENSE.txt', 'share/licenses/luau', 'data'),
     (root / 'luau/lua_LICENSE.txt', 'share/licenses/luau', 'data'),

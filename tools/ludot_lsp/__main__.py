@@ -1,5 +1,6 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,15 @@ import tempfile
 import threading
 from urllib.parse import unquote, urlparse
 from .backend import Backend, RequestCancelled
+from .documentation import Documentation
+
+
+@lru_cache(maxsize=1)
+def documentation():
+    bundled = Path(getattr(sys, '_MEIPASS', '')) / 'share/ludot/documentation.json'
+    if bundled.is_file():
+        return Documentation(data=json.loads(bundled.read_text(encoding='utf-8')))
+    return Documentation()
 
 
 def path_from_uri(uri):
@@ -59,6 +69,8 @@ class Server:
         self.workers = ThreadPoolExecutor(max_workers=2)
         self.project_casing = {}
         self.require_completion = True
+        self.documentation_naming = {}
+        self.documentation_indent = '\t'
         self.shader_words = None
         self.shutdown = False
         self.timers = {}
@@ -298,7 +310,24 @@ class Server:
             if path_from_uri(uri).suffix == '.lushader':
                 return None
             result, _ = self.analyze(params['textDocument']['uri'], params['position'])
-            return {'contents': {'kind': 'markdown', 'value': '```luau\n' + result['hover'] + '\n```'}} if result['hover'] else None
+            if not result['hover']:
+                return None
+            value = '```luau\n' + result['hover'] + '\n```'
+            docs = documentation()
+            owner, member = result.get('docClass', ''), result.get('docMember', '')
+            casing = self.api_casing(path_from_uri(uri))
+            if member:
+                resolved = docs.resolve(owner, member, casing)
+                if resolved:
+                    owner, member, _ = resolved
+                else:
+                    owner = ''
+            description = docs.markdown({'class': owner, 'member': member}, casing, self.documentation_naming, self.documentation_indent)
+            if description:
+                value += '\n\n' + description
+            if result.get('docComment'):
+                value += '\n\n' + result['docComment']
+            return {'contents': {'kind': 'markdown', 'value': value}}
         raise LookupError(method)
 
     def handle_request(self, message):
@@ -357,7 +386,11 @@ class Server:
             for uri in list(self.documents):
                 self.schedule_diagnostics(uri)
         elif method == 'workspace/didChangeConfiguration':
-            self.require_completion = params.get('settings', {}).get('ludot', {}).get('requireAutocomplete', True)
+            settings = params.get('settings', {}).get('ludot', {})
+            self.require_completion = settings.get('requireAutocomplete', True)
+            docs = settings.get('documentation', {})
+            self.documentation_naming = docs.get('naming', {})
+            self.documentation_indent = ' ' * max(1, min(16, int(docs.get('tabSize', 4)))) if docs.get('insertSpaces', False) else '\t'
 
     def run(self):
         while True:

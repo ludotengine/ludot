@@ -20,7 +20,7 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   checks cover flight, the planet camera, riding along with a moving world, ground
   clearance, pause, and orbit visibility. A 54-second Forward+ capture covers the tour.
 - Vendored Godot 4.7.2-stable and Luau 0.743 source with pinned provenance.
-- Engine version 4.7.2-lu.9, set by the `status` field in `engine/version.py`.
+- Engine version 4.7.2-lu.10, set by the `status` field in `engine/version.py`.
 - `.ludot` project file format (`project.ludot`) across core project settings, CLI,
   Project Manager, desktop MIME/bundle metadata, standalone LSP, and MCP tools, with
   backwards-compatible fallback loading for legacy `project.godot` projects.
@@ -47,8 +47,15 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   GDScript `connect`/`emit_signal` share handlers with Luau. `private` signal fields
   stay class-internal and Luau-only. The checker rejects exporting, `onready`, or
   reassigning signal fields, and the `signal_declaration` lint flags untyped signal
-  parameters. The old Godot `Signal` methods (`emit`, `isConnected`) and
-  `Signal.new` are gone.
+  parameters. Luau does not expose Godot's `Signal.emit`, `is_connected`, or
+  `Signal.new`; GDScript retains its native Godot signal API.
+- GDScript can construct engine-backed Luau scripts with `preload(...).new(...)`,
+  including `__init` arguments. Constructor metadata keeps the script instance type
+  in GDScript. Public Luau signals read as native Godot `Signal` values, supporting
+  `.connect` and `.emit`, and method references read as `Callable` values. Typed
+  returns retain their native types; dynamic and optional values cross as Variants.
+  GDScript-declared signals also connect and emit through the Luau signal API.
+  These changes leave Luau's syntax, signal methods, and API casing intact.
 - A native `task` library (`spawn`, `defer`, `delay`, `wait`, `cancel`) with one
   scheduler per VM, stepped from SceneTree's process frame. Engine callbacks start in
   resumable threads, so `task.wait` works in `_ready`, `_process`, and signal
@@ -96,6 +103,13 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   documented Godot methods to their original API reference page. Luau names retain
   their binding casing; GDScript functions include default argument values.
   Native callback overrides retain their Godot documentation links.
+- Luau hovers in the native editor and standalone LSP use source-derived engine
+  descriptions and a shared Luau example catalog. Examples follow API casing;
+  native editor examples also follow lint naming and formatter indentation.
+  Signal hovers resolve the signal's declaring class, and XML supplies named,
+  typed connection examples. Public Luau signals and `---` comments appear in
+  script class documentation; local signal hovers read unsaved comments. The
+  packaged LSP includes descriptions and examples without a source checkout.
 - Native editor checking and completion using Luau Analysis and reflected engine
   signatures, including alias-aware import and `require` path completion. Project
   setting `luau/editor/require_autocomplete` turns path completion off.
@@ -154,6 +168,11 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 
 ## Known limits
 
+- Many upstream class-reference examples still need authored Luau equivalents.
+  Luau hovers and reference pages mark those blocks as unavailable. Shared button,
+  node lookup, and signal examples are available; signal connection examples derive
+  their argument names from class XML.
+
 - All Luau code shares one VM. Calls from different threads run one at a time, and a
   thread stopped at a breakpoint blocks other threads that call into Luau.
 - A function keeps its old code after a reload while it is running, or when the
@@ -178,7 +197,16 @@ limits. A planned feature or an unrun CI job is not listed as verified.
 
 Local Linux results:
 
-- `ctest`: extension (23 tests), language (17), shader (20), and LSP (24) suites
+- The documentation/interoperation changes were checked on 2026-11-22 with an
+  editor build, the headless engine regression, native editor hover/class-reference
+  checks, all nine API casing combinations, and the expanded signal integration
+  suite. The language, shader, extension, LSP, and documentation CTest suites pass.
+  Example checks cover authored snippets under all nine API casing combinations
+  and generated signal handlers under all three casing styles. The packaged LSP
+  passes its protocol and signal-hover checks from an unrelated project directory.
+
+- `ctest`: extension (23 tests), language (17), shader (20), LSP (29), and
+  documentation (5) suites
   pass. The extension suite checks the Signal usage cases, misuse errors, declaration lint, signal field
   rules, and method casing.
 - `tools/test_signals_engine.py` passes. It runs the Signal usage cases in the engine
@@ -209,8 +237,14 @@ Local Linux results:
   Goose, and VS Code.
 - Local verification on 2026-11-22 passed `ctest` (4/4), `tests/test_install.py`,
   the updated MCP unit/contract suites (1,196 cases), and all 9 desktop suites via
-  `tools/test_desktop.py` against `v4.7.2-lu.9`. Cross-platform CI for `4.7.2-lu.9`
-  is pending.
+  `tools/test_desktop.py` against `v4.7.2-lu.9`. The
+  [lu.9 desktop CI run](https://github.com/ludotengine/ludot/actions/runs/45053367835)
+  compiled all three editors, but the macOS and Windows jobs failed MCP provider
+  fixture assertions. The lu.10 fixtures use macOS Application Support for VS Code,
+  Windows app-data paths for Goose and Zed, and XDG paths for Unix Goose and Zed.
+  Assertions check detected paths as well as configuration writes and preservation
+  of existing entries. Use the Desktop builds workflow to check cross-platform
+  results for lu.10.
 - In `mcp/`, the upstream unit and contract tests pass, along with the live-editor
   inspection test against the Ludot editor, which covers the settings and
   conventions commands, and the live-editor Luau test, which diagnoses a script with

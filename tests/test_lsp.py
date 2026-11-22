@@ -53,10 +53,64 @@ class LspTests(unittest.TestCase):
         uri = self.open('--!strict\nlocal camera = Camera3D.new()\ncamera.Fov = 60\nlocal p: Vector2 = Vector2.new(1, 2) * 2\nreturn camera')
         checked, _ = self.server.analyze(uri)
         self.assertEqual(checked['diagnostics'], [])
+
         text = 'local camera = Camera3D.new()\ncamera:'
         self.server.documents[uri] = {'version': 2, 'text': text}
         result = self.server.request({'method': 'textDocument/completion', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 7}}})
         self.assertIn('projectRayNormal', [entry['label'] for entry in result])
+
+    def test_documented_luau_hovers(self):
+        self.server.api = ROOT / 'types/engine.api'
+        for methods, properties in [('camelCase', 'PascalCase'), ('PascalCase', 'camelCase'), ('snake_case', 'snake_case')]:
+            with self.subTest(methods=methods, properties=properties):
+                project = self.root / (methods + properties)
+                project.mkdir()
+                (project / 'project.ludot').write_text('config_version=5\n[luau]\napi/method_casing=' + json.dumps(methods) + '\napi/property_casing=' + json.dumps(properties) + '\n')
+                from ludot_lsp.documentation import name_case
+                pressed = name_case('pressed', properties)
+                text = 'const button = Button.new()\nprint(button.' + pressed + ')'
+                uri = self.open(text, str(project.relative_to(self.root) / 'Main.luau'))
+                hover = self.server.request({'method': 'textDocument/hover', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 14}}})['contents']['value']
+                self.assertIn('Emitted when', hover)
+                self.assertIn('object.' + pressed + ':' + name_case('connect', methods), hover)
+                self.assertIn('```luau', hover)
+                self.assertNotIn('func ', hover)
+                self.assertNotIn('[/', hover)
+                hover = self.server.request({'method': 'textDocument/hover', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 17}}})['contents']['value']
+                self.assertIn('Click me', hover)
+                self.assertIn('self:' + name_case('add_child', methods), hover)
+                self.assertNotIn('Button.new()\n\t\t\tbutton.text', hover)
+
+    def test_signal_docs_use_unsaved_utf16_positions(self):
+        self.server.api = ROOT / 'types/engine.api'
+        text = 'class Menu extends Button = { function _ready() print("😀", self.Pressed) end }'
+        uri = self.open(text)
+        position = len(text[:text.index('Pressed') + 3].encode('utf-16-le')) // 2
+        self.server.notify({'method': 'workspace/didChangeConfiguration', 'params': {'settings': {'ludot': {'documentation': {'insertSpaces': True, 'tabSize': 2, 'naming': {'constant': 'SCREAMING_SNAKE_CASE'}}}}}})
+        result = self.server.request({'method': 'textDocument/hover', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': position}}})
+        hover = result['contents']['value']
+        self.assertIn('Emitted when', hover)
+        self.assertIn('  const CONNECTION = object.Pressed:connect', hover)
+
+    def test_signal_library_hover_uses_luau_contract(self):
+        self.server.api = ROOT / 'types/engine.api'
+        text = 'const changed = signal with (value: number)\nchanged:fire(1)'
+        uri = self.open(text)
+        result = self.server.request({'method': 'textDocument/hover', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 10}}})
+        self.assertIn('Calls connected handlers', result['contents']['value'])
+        self.assertIn('changed:fire', result['contents']['value'])
+        self.assertNotIn('is_connected', result['contents']['value'])
+
+    def test_script_signal_hover_uses_unsaved_comments(self):
+        self.server.api = ROOT / 'types/engine.api'
+        text = 'class Player extends Node = {\n\t--- Emitted after damage.\n\tpublic HealthChanged = signal with (amount: number)\n\tfunction damage() self.HealthChanged:fire(1) end\n}'
+        uri = self.open(text)
+        result = self.server.request({'method': 'textDocument/hover', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 3, 'character': 28}}})
+        self.assertIn('Emitted after damage.', result['contents']['value'])
+        self.server.documents[uri]['text'] = text.replace('after damage.', 'when healed.')
+        result = self.server.request({'method': 'textDocument/hover', 'params': {'textDocument': {'uri': uri}, 'position': {'line': 3, 'character': 28}}})
+        self.assertIn('Emitted when healed.', result['contents']['value'])
+        self.assertNotIn('after damage.', result['contents']['value'])
     def test_transform_operator_results(self):
         self.server.api = ROOT / 'types/engine.api'
         uri = self.open('--!strict\nconst direction = Basis.new() * Vector3.new(1, 2, 3)\nconst x: number = direction.X\nconst translated: Vector3 = Transform3D.new() * direction\nreturn translated')

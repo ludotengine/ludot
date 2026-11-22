@@ -402,6 +402,7 @@ public:
 	enum Language {
 		LANGUAGE_GDSCRIPT,
 		LANGUAGE_CSHARP,
+		LANGUAGE_LUAU,
 		LANGUAGE_MAX,
 	};
 

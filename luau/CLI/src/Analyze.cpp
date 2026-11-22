@@ -30,6 +30,7 @@
 #include <functional>
 #include <mutex>
 #include <queue>
+#include <sstream>
 #include <thread>
 #include <unordered_set>
 #include <utility>
@@ -738,14 +739,84 @@ int main(int argc, char** argv)
         }
         json.writeRaw("],\"hover\":");
         std::string hover;
+        std::string docClass, docMember, docComment;
         if (!files.empty())
         {
             auto module = frontend.moduleResolver.getModule(files.front());
             auto source = frontend.getSourceModule(files.front());
             if (module && source)
-                if (auto ty = Luau::findTypeAtPosition(*module, *source, {queryLine, queryColumn})) hover = Luau::toString(*ty);
+            {
+                const Luau::Position position{queryLine, queryColumn};
+                if (auto ty = Luau::findTypeAtPosition(*module, *source, position))
+                {
+                    hover = Luau::toString(*ty);
+                    if (const auto external = Luau::get<Luau::ExternType>(Luau::follow(*ty)))
+                        docClass = external->name;
+                    if (const auto table = Luau::get<Luau::TableType>(Luau::follow(*ty)); table && table->name && *table->name == "Signal")
+                        docClass = "Signal";
+                }
+                const auto ancestry = Luau::findAstAncestryOfPosition(*source, position, true);
+                for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it)
+                {
+                    const auto index = (*it)->as<Luau::AstExprIndexName>();
+                    if (!index || !index->indexLocation.contains(position))
+                        continue;
+                    if (auto receiver = module->astTypes.find(index->expr))
+                    {
+                        auto external = Luau::get<Luau::ExternType>(Luau::follow(*receiver));
+                        while (external && !external->props.count(index->index.value))
+                            external = external->parent ? Luau::get<Luau::ExternType>(Luau::follow(*external->parent)) : nullptr;
+                        if (external)
+                        {
+                            docClass = external->name;
+                            docMember = index->index.value;
+                            for (const auto stat : source->root->body)
+                            {
+                                const auto declaration = stat->as<Luau::AstStatClass>();
+                                if (!declaration || declaration->name->name.value != docClass)
+                                    continue;
+                                for (const auto& member : declaration->members)
+                                {
+                                    const auto property = Luau::get_if<Luau::AstClassProperty>(&member);
+                                    if (!property || property->name.value != docMember)
+                                        continue;
+                                    const auto content = frontend.fileResolver->readSource(files.front());
+                                    if (!content)
+                                        continue;
+                                    std::istringstream stream(content->source);
+                                    std::vector<std::string> lines;
+                                    std::string line;
+                                    while (std::getline(stream, line))
+                                        lines.push_back(line);
+                                    for (int row = int(property->qualifierLocation.begin.line) - 1; row >= 0; --row)
+                                    {
+                                        const auto start = lines[row].find_first_not_of(" \t");
+                                        if (start == std::string::npos || lines[row].compare(start, 3, "---") != 0)
+                                            break;
+                                        const auto text = lines[row].find_first_not_of(" \t", start + 3);
+                                        docComment = (text == std::string::npos ? "" : lines[row].substr(text)) +
+                                                     (docComment.empty() ? "" : "\n" + docComment);
+                                    }
+                                }
+                            }
+                        }
+                        if (const auto table = Luau::get<Luau::TableType>(Luau::follow(*receiver)); table && table->name && *table->name == "Signal")
+                        {
+                            docClass = "Signal";
+                            docMember = index->index.value;
+                        }
+                    }
+                    break;
+                }
+            }
         }
         Luau::Json::write(json, hover);
+        json.writeRaw(",\"docClass\":");
+        Luau::Json::write(json, docClass);
+        json.writeRaw(",\"docMember\":");
+        Luau::Json::write(json, docMember);
+        json.writeRaw(",\"docComment\":");
+        Luau::Json::write(json, docComment);
         if (!files.empty()) LudotNavigation::write(json, frontend, files.front(), {queryLine, queryColumn});
         json.writeRaw('}');
         printf("%s\n", json.str().c_str());

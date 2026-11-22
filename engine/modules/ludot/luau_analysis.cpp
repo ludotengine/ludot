@@ -12,12 +12,13 @@
 #include "Luau/LudotEnums.h"
 #include "Luau/ToString.h"
 #include "Luau/TypePack.h"
+#include "luau_documentation.h"
 #include "luau_script.h"
 
 #include "core/config/engine.h"
+#include "core/config/project_settings.h"
 #include "core/core_constants.h"
 #include "core/io/file_access.h"
-#include "core/config/project_settings.h"
 #include "core/object/class_db.h"
 #include "core/os/thread.h"
 #include "editor/doc/editor_help.h"
@@ -30,6 +31,7 @@
 #include <unordered_map>
 
 namespace {
+String library_description(const String &p_class, const String &p_member);
 std::string utf8(const String &value) { const CharString text = value.utf8(); return {text.get_data(), size_t(text.length())}; }
 struct Files : Luau::FileResolver {
     std::unordered_map<std::string, std::string> overlays;
@@ -608,13 +610,16 @@ Dictionary ludot_symbol_help(const String &source, const String &path, const Str
         value["display_name"] = symbol;
         value["value_type"] = String::utf8(Luau::toString(resolved).c_str());
         value["symbol_type"] = "Variable";
-        if (const auto native = analysis.classes.find(utf8(symbol)); native != analysis.classes.end() && Luau::follow(native->second) == resolved) {
-            value["symbol_type"] = "Type";
-            value["declaring_class"] = symbol;
+		if (const auto table = Luau::get<Luau::TableType>(resolved); table && table->name && (*table->name == "Signal" || *table->name == "task")) {
+			value["description"] = library_description(String::utf8(table->name->c_str()), "");
+		}
+		if (const auto native = analysis.classes.find(utf8(symbol)); native != analysis.classes.end() && Luau::follow(native->second) == resolved) {
+			value["symbol_type"] = "Type";
+			value["declaring_class"] = symbol;
             value["value_type"] = symbol;
-        }
-        const auto ancestry = Luau::findAstAncestryOfPosition(*parsed, position, true);
-        for (auto *node : ancestry) {
+		}
+		const auto ancestry = Luau::findAstAncestryOfPosition(*parsed, position, true);
+		for (auto *node : ancestry) {
             if (!node->asType()) continue;
             value["symbol_type"] = "Type";
             if (const auto external = Luau::get<Luau::ExternType>(resolved)) {
@@ -646,26 +651,95 @@ Dictionary ludot_symbol_help(const String &source, const String &path, const Str
             while (external) {
                 String class_name = String::utf8(external->name.c_str());
                 List<PropertyInfo> properties;
-                if (ClassDB::class_exists(class_name)) ClassDB::get_property_list(class_name, &properties, true);
-                else {
-                    for (int builtin = ::Variant::VECTOR2; builtin < ::Variant::VARIANT_MAX; ++builtin) {
-                        if (::Variant::get_type_name(::Variant::Type(builtin)) != class_name) continue;
-                        ::Variant instance;
+				for (const auto stat : parsed->root->body) {
+					const auto declaration = stat->as<Luau::AstStatClass>();
+					if (!declaration || String::utf8(declaration->name->name.value) != class_name) {
+						continue;
+					}
+					for (const auto &member : declaration->members) {
+						const auto property = Luau::get_if<Luau::AstClassProperty>(&member);
+						if (!property || String::utf8(property->name.value) != symbol) {
+							continue;
+						}
+						const auto table = Luau::get<Luau::TableType>(resolved);
+						if (!table || !table->name || *table->name != "Signal") {
+							continue;
+						}
+						value.erase("description");
+						value["symbol_type"] = "Signal";
+						if (!property->isPrivate) {
+							value["native_kind"] = "signal";
+							value["declaring_class"] = class_name;
+							value["native_member"] = symbol;
+						}
+						const PackedStringArray lines = clean_source.split("\n");
+						String description;
+						for (int line = int(property->qualifierLocation.begin.line) - 1; line >= 0; --line) {
+							const String comment = lines[line].strip_edges();
+							if (!comment.begins_with("---")) {
+								break;
+							}
+							description = comment.substr(3).strip_edges() + (description.is_empty() ? String() : "\n" + description);
+						}
+						if (!description.is_empty()) {
+							value["description"] = description.replace("[", "[lb]");
+						}
+						return value;
+					}
+				}
+				const auto script_doc = EditorHelp::get_doc_data() ? EditorHelp::get_doc(class_name) : nullptr;
+				if (script_doc && script_doc->is_script_doc) {
+					for (const auto &signal : script_doc->signals) {
+						if (signal.name != symbol) {
+							continue;
+						}
+						value.erase("description");
+						value["symbol_type"] = "Signal";
+						value["native_kind"] = "signal";
+						value["declaring_class"] = class_name;
+						value["native_member"] = signal.name;
+						return value;
+					}
+				}
+				if (ClassDB::class_exists(class_name)) {
+					List<MethodInfo> signals;
+					ClassDB::get_signal_list(class_name, &signals, true);
+					for (const MethodInfo &signal : signals) {
+						if (LuauLanguage::api_name(signal.name, true) != symbol) {
+							continue;
+						}
+						value.erase("description");
+						value["symbol_type"] = "Signal";
+						value["native_kind"] = "signal";
+						value["declaring_class"] = class_name;
+						value["native_member"] = signal.name;
+						return value;
+					}
+					ClassDB::get_property_list(class_name, &properties, true);
+				} else {
+					for (int builtin = ::Variant::VECTOR2; builtin < ::Variant::VARIANT_MAX; ++builtin) {
+						if (::Variant::get_type_name(::Variant::Type(builtin)) != class_name) {
+							continue;
+						}
+						::Variant instance;
                         Callable::CallError error;
                         ::Variant::construct(::Variant::Type(builtin), instance, nullptr, 0, error);
                         if (error.error == Callable::CallError::CALL_OK) instance.get_property_list(&properties);
                         break;
-                    }
-                }
-                for (const PropertyInfo &property : properties) {
-                    if (LuauLanguage::api_name(property.name, true) != symbol) continue;
-                    value["symbol_type"] = "Property";
+					}
+				}
+				for (const PropertyInfo &property : properties) {
+					if (LuauLanguage::api_name(property.name, true) != symbol) {
+						continue;
+					}
+					value.erase("description");
+					value["symbol_type"] = "Property";
                     value["declaring_class"] = class_name;
                     value["native_member"] = property.name;
                     return value;
-                }
-                external = external->parent ? Luau::get<Luau::ExternType>(Luau::follow(*external->parent)) : nullptr;
-            }
+				}
+				external = external->parent ? Luau::get<Luau::ExternType>(Luau::follow(*external->parent)) : nullptr;
+			}
             break;
         }
         return value;
@@ -717,9 +791,23 @@ Dictionary ludot_symbol_help(const String &source, const String &path, const Str
             info["description"] = description.replace("[", "[lb]");
         }
     }
-    if (!info.has("declaring_class") && fn->hasSelf && !args.empty()) {
-        auto receiver = Luau::get<Luau::ExternType>(Luau::follow(args.front()));
-        while (receiver && !info.has("declaring_class")) {
+	if (fn->hasSelf && !args.empty()) {
+		if (const auto receiver = Luau::get<Luau::ExternType>(Luau::follow(args.front()))) {
+			const String description = library_description(String::utf8(receiver->name.c_str()), symbol);
+			if (!description.is_empty()) {
+				info["description"] = description;
+			}
+		}
+		if (const auto table = Luau::get<Luau::TableType>(Luau::follow(args.front())); table && table->name) {
+			const String description = library_description(String::utf8(table->name->c_str()), symbol);
+			if (!description.is_empty()) {
+				info["description"] = description;
+			}
+		}
+	}
+	if (!info.has("declaring_class") && fn->hasSelf && !args.empty()) {
+		auto receiver = Luau::get<Luau::ExternType>(Luau::follow(args.front()));
+		while (receiver && !info.has("declaring_class")) {
             String class_name = String::utf8(receiver->name.c_str());
             if (ClassDB::class_exists(class_name)) {
                 List<MethodInfo> virtuals;
@@ -734,25 +822,16 @@ Dictionary ludot_symbol_help(const String &source, const String &path, const Str
             }
             receiver = receiver->parent ? Luau::get<Luau::ExternType>(Luau::follow(*receiver->parent)) : nullptr;
         }
-    }
-    return info;
+	}
+	return info;
 }
 void ludot_clear_analysis() { MutexLock lock(analysis_mutex); session.reset(); }
 
 namespace {
 // Godot documentation BBCode as plain text, with member references in Luau spelling.
-// GDScript and C# code examples are omitted because they would mislead Luau code.
+// Callers select Luau examples before converting markup to Markdown.
 String clean_doc(const String &p_text) {
 	String text = p_text;
-	for (const char *block : { "codeblocks", "codeblock" }) {
-		const String open = "[" + String(block);
-		const String close = "[/" + String(block) + "]";
-		for (int start = text.find(open); start >= 0; start = text.find(open)) {
-			const int end = text.find(close, start);
-			if (end < 0) break;
-			text = text.substr(0, start) + "(code example omitted)" + text.substr(end + close.length());
-		}
-	}
 	String out;
 	int i = 0;
 	while (i < text.length()) {
@@ -768,10 +847,21 @@ String clean_doc(const String &p_text) {
 		const String tag = text.substr(i + 1, close - i - 1);
 		i = close + 1;
 		const String kind = tag.get_slice(" ", 0);
-		if (tag == "code" || tag == "/code") out += "`";
-		else if (tag == "br") out += "\n";
-		else if (tag == "lb") out += "[";
-		else if (tag == "rb") out += "]";
+		if (tag == "codeblock lang=luau") {
+			const int end = text.find("[/codeblock]", i);
+			if (end < 0) {
+				break;
+			}
+			out += "\n```luau\n" + text.substr(i, end - i).strip_edges() + "\n```\n";
+			i = end + String("[/codeblock]").length();
+		} else if (tag == "code" || tag == "/code") {
+			out += "`";
+		} else if (tag == "br") {
+			out += "\n";
+		} else if (tag == "lb") {
+			out += "[";
+		} else if (tag == "rb")
+			out += "]";
 		else if (kind == "method" || kind == "member" || kind == "signal" || kind == "constant" || kind == "param" || kind == "enum" || kind == "theme_item" || kind == "annotation") {
 			const String name = tag.substr(kind.length() + 1);
 			const int dot = name.rfind(".");
@@ -790,7 +880,15 @@ String clean_doc(const String &p_text) {
 	}
 	// The class reference indents its text with tabs, which mean nothing here.
 	PackedStringArray lines = out.split("\n");
-	for (int line = 0; line < lines.size(); ++line) lines.set(line, lines[line].strip_edges());
+	bool in_code = false;
+	for (int line = 0; line < lines.size(); ++line) {
+		if (lines[line].begins_with("```")) {
+			in_code = !in_code;
+		}
+		if (!in_code) {
+			lines.set(line, lines[line].strip_edges());
+		}
+	}
 	return String("\n").join(lines).strip_edges();
 }
 
@@ -872,9 +970,15 @@ String member_description(const DocData::ClassDoc *p_doc, const DocMember &p_mem
 		}
 		return String();
 	};
-	if (p_member.kind == "method" || p_member.kind == "callback") return clean_doc(find(p_doc->methods));
-	if (p_member.kind == "property") return clean_doc(find(p_doc->properties));
-	if (p_member.kind == "signal") return clean_doc(find(p_doc->signals));
+	if (p_member.kind == "method" || p_member.kind == "callback") {
+		return clean_doc(ludot_luau_doc(find(p_doc->methods), p_doc->name, p_member.godot));
+	}
+	if (p_member.kind == "property") {
+		return clean_doc(ludot_luau_doc(find(p_doc->properties), p_doc->name, p_member.godot));
+	}
+	if (p_member.kind == "signal") {
+		return clean_doc(ludot_luau_doc(find(p_doc->signals), p_doc->name, p_member.godot));
+	}
 	return clean_doc(find(p_doc->constants));
 }
 
@@ -910,6 +1014,19 @@ Vector<LibraryEntry> library_entries() {
 		{ "Enum", "from_value", "method", "Enum.MouseMode:fromValue(value: number): EnumItem?", "The item with this value." },
 		{ "Enum", "get_enum_items", "method", "Enum.MouseMode:getEnumItems(): { EnumItem }", "Every item of the enum." },
 	};
+}
+
+String library_description(const String &p_class, const String &p_member) {
+	for (const auto &entry : library_entries()) {
+		if (p_class != entry.owner) {
+			continue;
+		}
+		const String name = String(entry.kind) == "property" ? LuauLanguage::api_name(entry.name, true) : LuauLanguage::api_name(entry.name);
+		if (p_member == name) {
+			return ludot_luau_doc(entry.description, p_class, entry.name);
+		}
+	}
+	return String();
 }
 
 Dictionary enum_entry(const Luau::EngineEnum &p_enum, bool p_items) {
@@ -1007,7 +1124,7 @@ Dictionary ludot_api_docs(const String &p_symbol) {
 				result["kind"] = "library";
 				result["name"] = head;
 				result["signature"] = signature;
-				result["description"] = entry.description;
+				result["description"] = clean_doc(ludot_luau_doc(entry.description, head));
 			}
 			continue;
 		}
@@ -1022,7 +1139,7 @@ Dictionary ludot_api_docs(const String &p_symbol) {
 			result["kind"] = entry.kind;
 			result["name"] = head + "." + name;
 			result["signature"] = signature;
-			result["description"] = entry.description;
+			result["description"] = clean_doc(ludot_luau_doc(entry.description, head, entry.name));
 		}
 	}
 	if (library) {
@@ -1088,7 +1205,7 @@ Dictionary ludot_api_docs(const String &p_symbol) {
 		result["inherits"] = chain.slice(1);
 		if (doc != nullptr) {
 			result["brief"] = clean_doc(doc->brief_description);
-			const String description = clean_doc(doc->description);
+			const String description = clean_doc(ludot_luau_doc(doc->description, head));
 			result["description"] = description.length() > 4000 ? description.substr(0, 4000) + "..." : description;
 		} else {
 			result["docs_loaded"] = false;

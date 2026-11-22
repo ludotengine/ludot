@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='ludot-editor-tests-') as directory:
     (plugin / 'plugin.cfg').write_text('[plugin]\nname="Editor regression"\ndescription=""\nauthor="Ludot"\nversion="1"\nscript="plugin.gd"\n')
     (plugin / 'plugin.gd').write_text((root / 'tests/editor_integration.gd').read_text())
     (project / 'project.ludot').write_text('config_version=5\n[application]\nconfig/name="Ludot editor tests"\n[editor_plugins]\nenabled=PackedStringArray("res://addons/editor_test/plugin.cfg")\n[rendering]\nrenderer/rendering_method="gl_compatibility"\n')
-    (project / 'Player.luau').write_text('class Player extends Node = {\n    export Speed: number = 1\n    function _ready()\n        print("Ready!")\n    end\n}\n')
+    (project / 'Player.luau').write_text('class Player extends Node = {\n    export Speed: number = 1\n    function _ready()\n        print("Ready!")\n    end\n    --- Emitted when the player dies.\n    public Died = signal with ()\n}\n')
     (project / 'Hover.gd').write_text('extends Node\n## Adds two numbers.\nfunc add(a: int, b: int = 2) -> int:\n    return a + b\nfunc _ready() -> void:\n    get_node(".")\n    add(1, 2)\n')
     (project / 'NodeNode.luau').write_text('class NodeNode extends Node3D = { export Calls: number = 0 function _ready() self.Calls = 100 end function _process(delta: number) self.Calls += 1 end function Start(): number self.Calls += 1 return self.Calls end function Add(amount: number): number return amount + 1 end }')
     (project / 'Sample.lushader').write_text('shader spatial\nexport Strength: number = 1 in 0 to 2 step 0.1\nfunction fragment()\n    Albedo = vec3(Strength)\nend\n')
@@ -39,7 +39,13 @@ with tempfile.TemporaryDirectory(prefix='ludot-editor-tests-') as directory:
     else:
         env.pop('LUDOT_HOVER_SCREENSHOTS', None)
         command.append('--headless')
-    result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=60)
+    try:
+        result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired as error:
+        for output in (error.stdout, error.stderr):
+            if output:
+                print(output.decode(errors='replace') if isinstance(output, bytes) else output, end='')
+        raise
     print(result.stdout, end='')
     print(result.stderr, end='')
     raise SystemExit(0 if result.returncode == 0 and 'LUDOT_EDITOR_TESTS_PASSED' in result.stdout else 1)

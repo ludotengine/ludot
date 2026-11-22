@@ -62,6 +62,10 @@
 #include "servers/display/display_server.h"
 
 #include "modules/modules_enabled.gen.h" // For gdscript, mono.
+#ifdef MODULE_LUDOT_ENABLED
+#include "modules/ludot/luau_documentation.h"
+#include "modules/ludot/luau_highlighter.h"
+#endif
 
 // For syntax highlighting.
 #ifdef MODULE_GDSCRIPT_ENABLED
@@ -2714,7 +2718,7 @@ static void _add_text_to_rt(const String &p_bbcode, RichTextLabel *p_rt, const C
 			const String codeblock_text = bbcode.substr(brk_end + 1, end_pos - (brk_end + 1)).strip_edges();
 
 			String codeblock_copy_text = codeblock_text;
-			if (using_space_indent) {
+			if (using_space_indent && !tag.contains("lang=luau")) {
 				// Replace the code block's tab indentation with spaces.
 				StringBuilder builder;
 				PackedStringArray text_lines = codeblock_copy_text.split("\n");
@@ -2757,6 +2761,13 @@ static void _add_text_to_rt(const String &p_bbcode, RichTextLabel *p_rt, const C
 			p_rt->push_color(code_dark_color);
 
 			bool codeblock_printed = false;
+
+#ifdef MODULE_LUDOT_ENABLED
+			if (lang == "luau") {
+				EditorHelpHighlighter::get_singleton()->highlight(p_rt, EditorHelpHighlighter::LANGUAGE_LUAU, codeblock_text, false);
+				codeblock_printed = true;
+			}
+#endif
 
 #ifdef MODULE_GDSCRIPT_ENABLED
 			if (!codeblock_printed && (lang.is_empty() || lang == "gdscript")) {
@@ -4747,8 +4758,9 @@ void EditorHelpBit::parse_symbol(const String &p_symbol, const String &p_prologu
 		symbol_hint = SYMBOL_HINT_ASSIGNABLE;
 		if (!class_name.is_empty()) {
 			if (item_data.has("native_member")) {
-				help_data = _get_property_help_data(class_name, item_name);
-				symbol_doc_link = vformat("@member %s.%s", class_name, item_name);
+				const bool is_signal = String(item_data.get("native_kind", "")) == "signal";
+				help_data = is_signal ? _get_signal_help_data(class_name, item_name) : _get_property_help_data(class_name, item_name);
+				symbol_doc_link = vformat(is_signal ? "@signal %s.%s" : "@member %s.%s", class_name, item_name);
 			} else {
 				help_data = _get_class_help_data(class_name);
 				symbol_doc_link = vformat("#%s", class_name);
@@ -4867,6 +4879,12 @@ void EditorHelpBit::parse_symbol(const String &p_symbol, const String &p_prologu
 	} else {
 		ERR_FAIL_MSG("Invalid doc id: Unknown item type " + item_type.quote() + ".");
 	}
+
+#ifdef MODULE_LUDOT_ENABLED
+	if (String(item_data.get("language", "")) == "Luau") {
+		help_data.description = ludot_luau_doc(help_data.description, class_name, item_data.has("native_member") ? item_name : String());
+	}
+#endif
 
 	// Do not add links for custom or undocumented symbols.
 	if (symbol_class_name.is_empty() || (help_data.description.is_empty() && help_data.deprecated_message.is_empty() && help_data.experimental_message.is_empty())) {
@@ -5183,6 +5201,11 @@ EditorHelpHighlighter::HighlightData EditorHelpHighlighter::_get_highlight_data(
 			ERR_FAIL_V_MSG(HighlightData(), "Mono module is disabled.");
 #endif
 			break;
+		case LANGUAGE_LUAU:
+#ifndef MODULE_LUDOT_ENABLED
+			ERR_FAIL_V_MSG(HighlightData(), "Ludot module is disabled.");
+#endif
+			break;
 		default:
 			ERR_FAIL_V_MSG(HighlightData(), "Invalid parameter \"p_language\".");
 	}
@@ -5256,6 +5279,11 @@ void EditorHelpHighlighter::highlight(RichTextLabel *p_rich_text_label, Language
 void EditorHelpHighlighter::reset_cache() {
 	const Color text_color = EDITOR_GET("text_editor/theme/highlighting/text_color");
 
+#ifdef MODULE_LUDOT_ENABLED
+	highlight_data_caches[LANGUAGE_LUAU].clear();
+	text_edits[LANGUAGE_LUAU]->add_theme_color_override(SceneStringName(font_color), text_color);
+#endif
+
 #ifdef MODULE_GDSCRIPT_ENABLED
 	highlight_data_caches[LANGUAGE_GDSCRIPT].clear();
 	text_edits[LANGUAGE_GDSCRIPT]->add_theme_color_override(SceneStringName(font_color), text_color);
@@ -5269,6 +5297,16 @@ void EditorHelpHighlighter::reset_cache() {
 
 EditorHelpHighlighter::EditorHelpHighlighter() {
 	const Color text_color = EDITOR_GET("text_editor/theme/highlighting/text_color");
+
+#ifdef MODULE_LUDOT_ENABLED
+	TextEdit *luau_text_edit = memnew(TextEdit);
+	luau_text_edit->add_theme_color_override(SceneStringName(font_color), text_color);
+	Ref<LuauSyntaxHighlighter> luau_highlighter;
+	luau_highlighter.instantiate();
+	luau_highlighter->set_text_edit(luau_text_edit);
+	text_edits[LANGUAGE_LUAU] = luau_text_edit;
+	highlighters[LANGUAGE_LUAU] = luau_highlighter;
+#endif
 
 #ifdef MODULE_GDSCRIPT_ENABLED
 	TextEdit *gdscript_text_edit = memnew(TextEdit);
@@ -5308,6 +5346,9 @@ EditorHelpHighlighter::EditorHelpHighlighter() {
 }
 
 EditorHelpHighlighter::~EditorHelpHighlighter() {
+#ifdef MODULE_LUDOT_ENABLED
+	memdelete(text_edits[LANGUAGE_LUAU]);
+#endif
 #ifdef MODULE_GDSCRIPT_ENABLED
 	memdelete(text_edits[LANGUAGE_GDSCRIPT]);
 #endif

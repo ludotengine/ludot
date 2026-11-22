@@ -66,6 +66,40 @@ class Hero extends Fighter = {
 return Hero
 '''
 
+CONSTRUCTED = '''class Constructed extends RefCounted = {
+	public Value: number = 0
+
+	function __init(value: number)
+		self.Value = value
+	end
+
+	function numberValue(): number
+		return self.Value
+	end
+
+	function dynamicValue()
+		return self.Value
+	end
+
+	function optionalValue(): number?
+		return nil
+	end
+
+	function pass(value: any): any
+		return value
+	end
+}
+'''
+
+CONSTRUCTED_NODE = '''class ConstructedNode extends Node = {
+	public Value: number = 0
+
+	function __init(value: number)
+		self.Value = value
+	end
+}
+'''
+
 HUB = '''const Hub = {
 	Ping = signal with (),
 	Count = 0,
@@ -170,12 +204,32 @@ class Probe extends Node = {
 '''
 
 RECEIVER = '''extends Node
+signal health_changed(value: float)
 var heard := []
 func on_died() -> void:
 	heard.append("scene died")
 '''
 
+BRIDGE_PEER = '''class BridgePeer extends Node = {
+	public Last: number = 0
+
+	function subscribe(source: any)
+		const function onHealthChanged(value: number)
+			self.Last = value
+		end
+
+		source.health_changed:connect(onHealthChanged)
+	end
+
+	function send(source: any, value: number)
+		source.health_changed:fire(value)
+	end
+}
+'''
+
 RUN = '''extends SceneTree
+const Constructed = preload("res://constructed.luau")
+const ConstructedNode = preload("res://constructed_node.luau")
 var frames := 0
 var failed := false
 var fighter: Node
@@ -196,9 +250,8 @@ func expect(condition: bool, message: String) -> bool:
 	return condition
 
 func make(path: String, name: String) -> Node:
-	var node := Node.new()
+	var node: Node = load(path).new()
 	node.name = name
-	node.set_script(load(path))
 	root.add_child(node)
 	return node
 
@@ -217,6 +270,9 @@ func on_ping() -> void:
 func on_extra(value) -> void:
 	gd_log.append("gd extra %s" % value)
 
+func on_native(value: float) -> void:
+	gd_log.append("gd native %d" % value)
+
 func signal_named(script: Script, name: String) -> Dictionary:
 	for signal_info in script.get_script_signal_list():
 		if signal_info.name == name:
@@ -224,6 +280,37 @@ func signal_named(script: Script, name: String) -> Dictionary:
 	return {}
 
 func _initialize() -> void:
+	var signal_docs = LuauScript.get_api_docs("Signal")
+	if not expect('changed:fire' in signal_docs.get("description", ""), "Headless signal docs contain the Luau example"):
+		return
+	var constructed = Constructed.new(42.0)
+	if not expect(constructed.Value == 42.0, "GDScript .new forwards Luau constructor arguments"):
+		return
+	var returned: float = constructed.numberValue()
+	var dynamic = constructed.dynamicValue()
+	if not expect(returned == 42.0 and dynamic == 42.0, "GDScript reads typed and dynamic Luau return values"):
+		return
+	var optional = constructed.optionalValue()
+	var passed: float = constructed.pass(12.0)
+	if not expect(optional == null and passed == 12.0, "Optional and any Luau types cross as Variant values"):
+		return
+	var node_constructor = ConstructedNode.new(7.0)
+	if not expect(node_constructor.Value == 7.0, "GDScript .new constructs an engine-backed Node with arguments"):
+		return
+	node_constructor.free()
+	var native_peer = load("res://receiver.gd").new()
+	var bridge_peer = load("res://bridge_peer.luau").new()
+	native_peer.health_changed.connect(on_native)
+	bridge_peer.subscribe(native_peer)
+	native_peer.health_changed.emit(17.0)
+	if not expect(bridge_peer.Last == 17.0, "GDScript signal emissions reach a Luau handler"):
+		return
+	bridge_peer.send(native_peer, 42.0)
+	if not expect(bridge_peer.Last == 42.0 and gd_log == ["gd native 17", "gd native 42"], "Luau fire reaches GDScript handlers on a GDScript signal"):
+		return
+	gd_log.clear()
+	bridge_peer.free()
+	native_peer.free()
 	var cases := Node.new()
 	cases.set_script(load("res://cases_reader.luau"))
 	root.add_child(cases)
@@ -260,10 +347,11 @@ func _process(_delta: float) -> bool:
 				fail("A Signal field is listed as a property")
 				return true
 		# GDScript handlers receive Luau fires, and Luau handlers receive GDScript emits.
-		fighter.connect("HealthChanged", on_health)
-		fighter.connect("Died", on_died)
-		fighter.call("damage", 25.0)
-		fighter.emit_signal("HealthChanged", 75.0, 60.0)
+		fighter.HealthChanged.connect(on_health)
+		fighter.Died.connect(on_died)
+		var damage: Callable = fighter.damage
+		damage.call(25.0)
+		fighter.HealthChanged.emit(75.0, 60.0)
 		# The emit only runs handlers, so Health is still 75.
 		fighter.call("damage", 75.0)
 		var luau_text: String = fighter.call("text")
@@ -367,6 +455,9 @@ with tempfile.TemporaryDirectory(prefix='ludot-signal-engine-') as directory:
     files = {
         'cases.luau': CASES, 'cases_reader.luau': CASES_READER, 'fighter.luau': FIGHTER, 'hero.luau': HERO,
         'hub.luau': HUB, 'listener.luau': LISTENER, 'probe.luau': PROBE, 'receiver.gd': RECEIVER, 'run.gd': RUN,
+        'constructed.luau': CONSTRUCTED,
+        'constructed_node.luau': CONSTRUCTED_NODE,
+        'bridge_peer.luau': BRIDGE_PEER,
     }
     for name, text in files.items():
         (project / name).write_text(text)

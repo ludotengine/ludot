@@ -4,6 +4,10 @@ import html
 import json
 import re
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tools'))
+from ludot_lsp.documentation import Documentation, example, select_examples
 
 KINDS = {
     "P": "property",
@@ -34,6 +38,7 @@ class Reference:
         self.classes = classes
         self.xmls = xmls
         self.casing = casing
+        self.examples = Documentation().examples
         self.enum_groups = {
             row[1] if row[0] == "G" else row[1] + "." + row[2] for row in enum_rows
         }
@@ -122,9 +127,11 @@ class Reference:
             f'<a href="../../engine/values.html"><code>{html.escape(label)}</code></a>'
         )
 
-    def prose(self, text, owner):
+    def prose(self, text, owner, member=''):
         """Escape source, resolve native references locally, and protect code spans."""
         snippets = []
+        key = owner + ('.' + member if member else '')
+        text = select_examples(text, example(key, self.examples))
 
         def protect(content):
             snippets.append(content)
@@ -140,13 +147,13 @@ class Reference:
             code = html.escape("\n".join(line[indent:] for line in lines)).replace(
                 "\n", "&#10;"
             )
-            label = {"gdscript": "GDScript", "csharp": "C#"}.get(language, "Upstream")
+            label = 'Luau' if language == 'codeblock lang=luau' else 'Upstream'
             return protect(
-                f'<details class="upstream-example"><summary>{label} example from engine source</summary><pre><code>{code}</code></pre></details>'
+                f'<details class="upstream-example"><summary>{label} example</summary><pre><code>{code}</code></pre></details>'
             )
 
         text = re.sub(
-            r"\[(codeblock|gdscript|csharp)(?:[^\]]*)\]([\s\S]*?)\[/\1\]", block, text
+            r"\[(codeblock lang=luau|codeblock|gdscript|csharp)(?:[^\]]*)\]([\s\S]*?)\[/(?:codeblock|gdscript|csharp)\]", block, text
         )
         text = html.escape(text)
         text = re.sub(
@@ -227,7 +234,7 @@ class Reference:
                 result = result.replace(token, content)
         return (
             '<div class="api-description" v-pre>'
-            + result.replace("<p></p>", "")
+            + result.replace("<p></p>", "").replace("\n", " ")
             + "</div>"
         )
 
@@ -515,7 +522,7 @@ def generate_reference(classes, xmls, casing, write, site, enum_rows):
                     body = detail if kind in ("P", "K") else detail.find("description")
                     if body is not None:
                         parts += [
-                            reference.prose("".join(body.itertext()).strip(), name),
+                            reference.prose("".join(body.itertext()).strip(), name, row[2]),
                             "",
                         ]
                 parts += [
@@ -529,7 +536,7 @@ def generate_reference(classes, xmls, casing, write, site, enum_rows):
             "",
             '<details class="reference-source"><summary>Source and attribution</summary><p>Generated from <code>types/engine.api</code> and <code>'
             + source
-            + '</code>. Engine class descriptions remain under the engine MIT license. <a href="../../guide/licenses.html">Licenses and attribution</a>. Native examples retain their language and are folded above; Luau usage examples are maintained for Ludot.</p></details>',
+            + '</code>. Engine class descriptions remain under the engine MIT license. <a href="../../guide/licenses.html">Licenses and attribution</a>. Luau examples share their source with editor and language-server hovers.</p></details>',
             "",
         ]
         write(f"docs/api/engine/{name}.md", "\n".join(parts), source)

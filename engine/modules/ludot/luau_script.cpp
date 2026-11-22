@@ -739,6 +739,25 @@ Variant::Type annotation_type(Luau::AstType *type) {
     for (int i = Variant::VECTOR2; i < Variant::VARIANT_MAX; ++i) if (Variant::get_type_name(Variant::Type(i)) == name) return Variant::Type(i);
     return Variant::OBJECT;
 }
+
+PropertyInfo bridge_type_info(Luau::AstType *p_type, const StringName &p_name = StringName()) {
+	PropertyInfo info(annotation_type(p_type), p_name);
+	const auto reference = p_type ? p_type->as<Luau::AstTypeReference>() : nullptr;
+	if (info.type == Variant::OBJECT) {
+		const String name = reference ? String::utf8(reference->name.value) : String();
+		if (ClassDB::class_exists(name)) {
+			info.class_name = name;
+		} else {
+			// Dynamic types, unions, tables, and user enums have no single native
+			// engine class. Let GDScript receive their converted Variant value.
+			info.type = Variant::NIL;
+		}
+	}
+	if (info.type == Variant::NIL) {
+		info.usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
+	}
+	return info;
+}
 // A field initialized with `signal with (...)` or declared as Signal<...> is a script signal.
 bool signal_annotation(Luau::AstType *type) {
     const auto ref = type != nullptr ? type->as<Luau::AstTypeReference>() : nullptr;
@@ -1729,8 +1748,9 @@ void LuauScript::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_lint_warnings", "code"), &LuauScript::get_lint_warnings);
     ClassDB::bind_method(D_METHOD("get_completions", "code"), &LuauScript::get_completions);
     ClassDB::bind_method(D_METHOD("get_symbol_help", "code", "symbol", "owner"), &LuauScript::get_symbol_help, DEFVAL(Variant()));
-    ClassDB::bind_static_method("LuauScript", D_METHOD("get_api_docs", "symbol"), &LuauScript::get_api_docs);
-    ClassDB::bind_static_method("LuauScript", D_METHOD("check_code", "code", "path"), &LuauScript::check_code);
+	ClassDB::bind_vararg_method(METHOD_FLAGS_DEFAULT, "new", &LuauScript::new_instance, MethodInfo("new"));
+	ClassDB::bind_static_method("LuauScript", D_METHOD("get_api_docs", "symbol"), &LuauScript::get_api_docs);
+	ClassDB::bind_static_method("LuauScript", D_METHOD("check_code", "code", "path"), &LuauScript::check_code);
     ClassDB::bind_static_method("LuauScript", D_METHOD("lint_code", "code", "path"), &LuauScript::lint_code);
     ClassDB::bind_static_method("LuauScript", D_METHOD("inspect_code", "code", "path", "line", "column"), &LuauScript::inspect_code);
     ClassDB::bind_static_method("LuauScript", D_METHOD("find_enums", "query"), &LuauScript::find_enums);
@@ -2115,10 +2135,20 @@ Error LuauScript::reload(bool p_keep_state) {
             MethodInfo info(String::utf8(method->functionName.value));
             for (size_t i = 1; i < method->function->args.size; ++i) {
                 auto arg = method->function->args.data[i];
-                info.arguments.push_back(PropertyInfo(annotation_type(arg->annotation), String::utf8(arg->name.value)));
-            }
-            methods.insert(info.name, info);
-        }
+				info.arguments.push_back(bridge_type_info(arg->annotation, String::utf8(arg->name.value)));
+			}
+			if (method->function->vararg) {
+				info.flags |= METHOD_FLAG_VARARG;
+			}
+			const auto returns = method->function->returnAnnotation ? method->function->returnAnnotation->as<Luau::AstTypePackExplicit>() : nullptr;
+			if (returns && returns->typeList.types.size == 1) {
+				const auto type = returns->typeList.types.data[0];
+				info.return_val = bridge_type_info(type);
+			} else if (!returns || returns->typeList.types.size > 1) {
+				info.return_val.usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
+			}
+			methods.insert(info.name, info);
+		}
     }
     for (const auto &replacement : replacements) {
         lua_getref(L, replacement.key->object_ref);
@@ -2150,6 +2180,83 @@ StringName LuauScript::resolve_method_name(const StringName &p_method) const {
     if (methods.has(p_method)) return p_method;
     return LuauLanguage::callback_name(base_type, p_method);
 }
+#ifdef TOOLS_ENABLED
+Vector<DocData::ClassDoc> LuauScript::get_documentation() const {
+	const CharString bytes = source.utf8();
+	Luau::Allocator allocator;
+	Luau::AstNameTable names(allocator);
+	const auto parsed = Luau::Parser::parse(bytes.get_data(), bytes.length(), names, allocator);
+	if (!parsed.errors.empty()) {
+		return {};
+	}
+	const PackedStringArray lines = source.split("\n");
+	auto description = [&](unsigned p_line) {
+		String text;
+		for (int line = int(p_line) - 1; line >= 0; --line) {
+			const String comment = lines[line].strip_edges();
+			if (!comment.begins_with("---")) {
+				break;
+			}
+			text = comment.substr(3).strip_edges() + (text.is_empty() ? String() : "\n" + text);
+		}
+		return text;
+	};
+	Vector<DocData::ClassDoc> docs;
+	for (const auto stat : parsed.root->body) {
+		const auto declaration = stat->as<Luau::AstStatClass>();
+		if (declaration == nullptr) {
+			continue;
+		}
+		DocData::ClassDoc doc;
+		doc.name = String::utf8(declaration->name->name.value);
+		doc.inherits = base_script.is_valid() ? String(base_script->get_global_name()) : String(base_type);
+		doc.is_script_doc = true;
+		doc.script_path = get_path();
+		doc.description = description(declaration->location.begin.line);
+		for (const auto &member : declaration->members) {
+			if (const auto property = Luau::get_if<Luau::AstClassProperty>(&member)) {
+				if (property->isPrivate) {
+					continue;
+				}
+				const String text = description(property->qualifierLocation.begin.line);
+				if (is_signal_property(property)) {
+					DocData::MethodDoc signal;
+					DocData::method_doc_from_methodinfo(signal, signal_info(property), text);
+					doc.signals.push_back(signal);
+				} else {
+					DocData::PropertyDoc field;
+					field.name = String::utf8(property->name.value);
+					const auto type = bridge_type_info(property->ty);
+					field.type = !type.class_name.is_empty() ? String(type.class_name) : type.type == Variant::NIL ? String("Variant")
+																												   : Variant::get_type_name(type.type);
+					field.description = text;
+					doc.properties.push_back(field);
+				}
+			} else if (const auto method = Luau::get_if<Luau::AstClassMethod>(&member)) {
+				if (method->functionName == "__onready") {
+					continue;
+				}
+				MethodInfo info(String::utf8(method->functionName.value));
+				for (size_t i = 1; i < method->function->args.size; ++i) {
+					const auto arg = method->function->args.data[i];
+					info.arguments.push_back(bridge_type_info(arg->annotation, String::utf8(arg->name.value)));
+				}
+				const auto returns = method->function->returnAnnotation ? method->function->returnAnnotation->as<Luau::AstTypePackExplicit>() : nullptr;
+				if (returns && returns->typeList.types.size > 0) {
+					info.return_val = bridge_type_info(returns->typeList.types.data[0]);
+				} else if (!returns) {
+					info.return_val.usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
+				}
+				DocData::MethodDoc function;
+				DocData::method_doc_from_methodinfo(function, info, description(method->keywordLocation.begin.line));
+				doc.methods.push_back(function);
+			}
+		}
+		docs.push_back(doc);
+	}
+	return docs;
+}
+#endif
 bool LuauScript::has_method(const StringName &p_method) const { return methods.has(resolve_method_name(p_method)); }
 MethodInfo LuauScript::get_method_info(const StringName &p_method) const {
     const MethodInfo *info = methods.getptr(resolve_method_name(p_method));
@@ -2176,21 +2283,49 @@ ScriptInstance *LuauScript::instance_create(Object *p_this) {
     if (instance->object_ref == LUA_NOREF) { memdelete(instance); return nullptr; }
     return instance;
 }
+Variant LuauScript::new_instance(const Variant **p_args, int p_count, Callable::CallError &r_error) {
+	r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
+	if (!can_instantiate()) {
+		return {};
+	}
+	Object *owner = ClassDB::instantiate(base_type);
+	if (owner == nullptr) {
+		return {};
+	}
+	Ref<RefCounted> reference = Object::cast_to<RefCounted>(owner);
+	auto instance = memnew(LuauScriptInstance(owner, Ref<LuauScript>(this), p_args, p_count));
+	if (instance->object_ref == LUA_NOREF) {
+		memdelete(instance);
+		if (reference.is_null()) {
+			memdelete(owner);
+		}
+		r_error.error = Callable::CallError::CALL_ERROR_INVALID_ARGUMENT;
+		r_error.argument = 0;
+		r_error.expected = Variant::NIL;
+		return {};
+	}
+	owner->set_script_instance(instance);
+	r_error.error = Callable::CallError::CALL_OK;
+	return reference.is_valid() ? Variant(reference) : Variant(owner);
+}
 PlaceHolderScriptInstance *LuauScript::placeholder_instance_create(Object *p_this) {
     auto placeholder = memnew(PlaceHolderScriptInstance(LuauLanguage::get_singleton(), Ref<Script>(this), p_this));
     placeholder->update(properties, defaults);
     return placeholder;
 }
-LuauScriptInstance::LuauScriptInstance(Object *p_owner, const Ref<LuauScript> &p_script) : owner(p_owner), script(p_script) {
-    auto language = LuauLanguage::get_singleton();
-    MutexLock lock(language->mutex);
+LuauScriptInstance::LuauScriptInstance(Object *p_owner, const Ref<LuauScript> &p_script, const Variant **p_args, int p_count) : owner(p_owner), script(p_script) {
+	auto language = LuauLanguage::get_singleton();
+	MutexLock lock(language->mutex);
     lua_State *L = language->state;
     lua_getref(L, script->class_ref);
     Object *previous_owner = language->construction_owner;
     language->construction_owner = owner;
-    const int construction_status = lua_pcall(L, 0, 1, 0);
-    language->construction_owner = previous_owner;
-    if (construction_status != LUA_OK) {
+	for (int i = 0; i < p_count; ++i) {
+		language->push_variant(L, *p_args[i]);
+	}
+	const int construction_status = lua_pcall(L, p_count, 1, 0);
+	language->construction_owner = previous_owner;
+	if (construction_status != LUA_OK) {
         language->last_error = String::utf8(lua_tostring(L, -1)); lua_pop(L, 1);
         ERR_PRINT(language->last_error);
         return;
@@ -2225,8 +2360,16 @@ bool LuauScriptInstance::set(const StringName &p_name, const Variant &p_value) {
     return true;
 }
 bool LuauScriptInstance::get(const StringName &p_name, Variant &r_value) const {
-    bool found = false;
-    for (const PropertyInfo &property : script->properties) if (property.name == p_name) found = true;
+	if (script->signals.has(p_name)) {
+		r_value = Signal(owner, p_name);
+		return true;
+	}
+	if (script->has_method(p_name)) {
+		r_value = Callable(owner, script->resolve_method_name(p_name));
+		return true;
+	}
+	bool found = false;
+	for (const PropertyInfo &property : script->properties) if (property.name == p_name) found = true;
     if (!found || object_ref == LUA_NOREF) return false;
     auto language = LuauLanguage::get_singleton();
     MutexLock lock(language->mutex);

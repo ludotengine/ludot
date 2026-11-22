@@ -11229,6 +11229,16 @@ F	LuauScript	get_enum_property	Dictionary	0	0	StringName
 F	LuauScript	get_lint_warnings	Array	0	0	String
 F	LuauScript	get_completions	PackedStringArray	0	0	String
 F	LuauScript	get_symbol_help	Dictionary	0	0	String	String	Object?
+F	LuauScript	new	Variant	0	1
+F	LuauScript	get_api_docs	Dictionary	1	0	String
+F	LuauScript	check_code	Array	1	0	String	String
+F	LuauScript	lint_code	Array	1	0	String	String
+F	LuauScript	inspect_code	Dictionary	1	0	String	String	int	int
+F	LuauScript	find_enums	Array	1	0	String
+F	LuauScript	resolve_module_path	String	1	0	String	String
+F	LuauScript	format_code	Dictionary	1	0	String
+F	LuauScript	get_templates	Array	1	0	String
+F	LuauScript	create_from_template	String	1	0	String	String	String
 C	LuauShader	Shader	0
 P	LuauShader	source	String
 P	LuauShader	diagnostics	String
@@ -11237,6 +11247,8 @@ F	LuauShader	get_source	String	0	0
 F	LuauShader	get_diagnostics	String	0	0
 F	LuauShader	is_library	bool	0	0
 C	LuauSyntaxHighlighter	EditorSyntaxHighlighter	0
+C	LuauValue	RefCounted	0
+F	LuauValue	to_variant	Variant	0	0
 C	MainLoop	Object	0
 F	MainLoop	_initialize	void	0	0
 F	MainLoop	_physics_process	bool	0	0	float

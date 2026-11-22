@@ -19,6 +19,19 @@ else:
     ludot.Append(CXXFLAGS=['-fexceptions'])
 if env.editor_build:
     import importlib.util
+    import sys
+    sys.path.insert(0, str(root / 'tools'))
+    spec = importlib.util.spec_from_file_location('generate_doc_examples', str(root / 'tools/generate_doc_examples.py'))
+    doc_examples = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(doc_examples)
+    examples_header = ludot.Command(
+        'generated/ludot_doc_examples.gen.h',
+        [str(root / 'docs/luau_examples.json'), str(root / 'tools/generate_doc_examples.py'), str(root / 'tools/ludot_lsp/documentation.py')]
+        + [str(path) for path in sorted((root / 'engine/doc/classes').glob('*.xml'))]
+        + [str(path) for path in sorted((root / 'engine/modules').glob('*/doc_classes/*.xml'))],
+        env.Run(doc_examples.scons_action),
+    )
+    ludot.Depends('luau_documentation.cpp', examples_header)
     for component in ['Analysis', 'Config']:
         ludot.Append(CPPPATH=[str(root / 'luau' / component / 'include')])
     spec = importlib.util.spec_from_file_location('embed_mcp_addon', str(Path(Dir('.').abspath) / 'embed_mcp_addon.py'))

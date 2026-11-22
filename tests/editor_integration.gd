@@ -206,6 +206,58 @@ func run() -> void:
     var property_help = script.get_symbol_help(property_source, "Velocity")
     check(property_help.get("value_type") == "Vector3", "Property hover reports its datatype")
     check(property_help.get("declaring_class") == "CharacterBody3D" and property_help.get("native_member") == "velocity", "Property hover maps to the native property documentation")
+    var signal_source = 'const button = Button.new()\nprint(button.Pre' + String.chr(0xffff) + 'ssed)'
+    var signal_help = script.get_symbol_help(signal_source, "Pressed")
+    check(signal_help.get("native_kind") == "signal" and signal_help.get("native_member") == "pressed", "Inherited signal hover identifies the native signal rather than a property")
+    var fire_help = script.get_symbol_help('const changed = signal with (value: number)\nchanged:fi' + String.chr(0xffff) + 're(1)', "fire")
+    check('connected handler' in fire_help.get("description", ""), "Luau signal method hover uses the Luau library contract")
+    var button_docs = LuauScript.get_api_docs("Button")
+    check('Button.new()' in button_docs.get("description", "") and 'self:addChild(button)' in button_docs.get("description", ""), "Class docs contain the shared Luau button example")
+    check('func _ready' not in button_docs.get("description", ""), "Luau class docs omit GDScript code")
+    var signal_docs = LuauScript.get_api_docs("Button.Pressed")
+    check(signal_docs.get("kind") == "signal" and 'Emitted when' in signal_docs.get("description", ""), "Signal docs retain the declaring class description")
+    check('object.Pressed:connect' in signal_docs.get("description", ""), "Signal docs include an argument-aware Luau connection example")
+    var documentation_settings = EditorInterface.get_editor_settings()
+    var saved_constant_case = documentation_settings.get_setting("text_editor/luau/lint/constant_casing")
+    var saved_indent_type = documentation_settings.get_setting("text_editor/luau/stylua/indent_type")
+    var saved_indent_width = documentation_settings.get_setting("text_editor/luau/stylua/indent_width")
+    documentation_settings.set_setting("text_editor/luau/lint/constant_casing", "SCREAMING_SNAKE_CASE")
+    documentation_settings.set_setting("text_editor/luau/stylua/indent_type", "Spaces")
+    documentation_settings.set_setting("text_editor/luau/stylua/indent_width", 2)
+    button_docs = LuauScript.get_api_docs("Button")
+    check('    const BUTTON = Button.new()' in button_docs.get("description", ""), "Examples follow naming and indentation settings")
+    check('BUTTON.Text = "Click me"' in button_docs.get("description", ""), "Renaming examples preserves string literals")
+    documentation_settings.set_setting("text_editor/luau/lint/constant_casing", saved_constant_case)
+    documentation_settings.set_setting("text_editor/luau/stylua/indent_type", saved_indent_type)
+    documentation_settings.set_setting("text_editor/luau/stylua/indent_width", saved_indent_width)
+    code.text = 'const button = Button.new()\nprint(button.Pressed)'
+    code.symbol_hovered.emit("Button", 0, code.get_line(0).find("Button") + 2)
+    await get_tree().process_frame
+    await check_documentation_card(code, 'button.Pressed:connect', 'func _ready')
+    await close_hover_cards(code)
+    code.symbol_hovered.emit("Pressed", 1, code.get_line(1).find("Pressed") + 2)
+    await get_tree().process_frame
+    await check_documentation_card(code, 'Emitted when', 'There is currently no description')
+    await close_hover_cards(code)
+    code.text = saved_editor_source.replace('print("Ready!")', 'print(self.Died)')
+    code.symbol_hovered.emit("Died", 3, code.get_line(3).find("Died") + 2)
+    await get_tree().process_frame
+    await check_documentation_card(code, 'Emitted when the player dies.', 'There is currently no description')
+    await close_hover_cards(code)
+    script.source_code = saved_editor_source
+    EditorInterface.get_script_editor().update_docs_from_script(script)
+    editor.go_to_help.emit("class_name:Player")
+    for frame in range(4):
+        await get_tree().process_frame
+    var player_reference = ""
+    for help_tab in EditorInterface.get_script_editor().find_children("*", "EditorHelp", true, false):
+        for label in help_tab.find_children("*", "RichTextLabel", true, false):
+            if not label.is_finished():
+                await label.finished
+            player_reference += label.get_parsed_text()
+    check('Died' in player_reference and 'Emitted when the player dies.' in player_reference, "Public Luau signals and comments appear in the full script class reference: " + player_reference)
+    EditorInterface.edit_script(script)
+    await get_tree().process_frame
     var type_source = 'const speed: num' + String.chr(0xffff) + 'ber = 5'
     var type_help = script.get_symbol_help(type_source, "number")
     check(type_help.get("symbol_type") == "Type" and type_help.get("value_type") == "number", "Primitive type annotations provide a type hover")
@@ -379,6 +431,17 @@ func run() -> void:
     if failures.is_empty():
         print("LUDOT_EDITOR_TESTS_PASSED")
     get_tree().quit(0 if failures.is_empty() else 1)
+
+func check_documentation_card(code: CodeEdit, expected: String, excluded: String) -> void:
+    var found = false
+    for child in code.get_children():
+        if child is PopupPanel:
+            found = true
+            var text = ""
+            for label in child.find_children("*", "RichTextLabel", true, false):
+                text += label.get_parsed_text() + "\n"
+            check(expected in text and excluded not in text, "Hover uses the language-specific documentation: " + text)
+    check(found, "Documentation hover opens a card")
 
 func check_hover_card(code: CodeEdit, name_text: String, parameter: String, return_type: String, native: bool, wiki_url: String = "https://docs.godotengine.org/en/latest/classes/class_node.html#class-node-method-get-node") -> void:
     var found = false

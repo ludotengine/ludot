@@ -1403,6 +1403,7 @@ void ScriptTextEditor::_show_symbol_tooltip(const String &p_symbol, int p_row, i
 				native_class = ClassDB::get_parent_class(native_class);
 			}
 		}
+		function_help["language"] = script->get_language()->get_name();
 		doc_symbol = String(function_help.get("kind", "function")) + "|" + String(function_help.get("declaring_class", "")) + "|" + String(function_help.get("native_member", p_symbol)) + "|" + JSON::stringify(function_help);
 	} else {
 		lc_error = script->get_language()->lookup_code(code_text, p_symbol, script->get_path(), base, result);

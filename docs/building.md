@@ -188,6 +188,16 @@ help.
 The native editor derives its signatures directly from ClassDB and Variant
 reflection. It does not use `engine.api`.
 
+The editor, standalone LSP, and reference website share authored Luau examples in
+`docs/luau_examples.json`. Each entry supplies valid Luau plus a map identifying
+the names that follow API or lint casing. Signal examples derive their arguments
+from class XML. The editor embeds the catalog at build time; the packaged LSP
+includes the matching class descriptions and examples as local JSON. Run
+`python tests/test_documentation.py` after changing either the catalog or its
+renderers. The editor embeds the catalog as UTF-8 bytes to avoid compiler
+string-literal size limits. The checks cover authored examples under all nine API casing combinations
+and generated signal examples under all three casing styles.
+
 To package the server as a self-contained directory, with Python, `luau-analyze`,
 `ludot-shader`, and the API data, install PyInstaller into the virtual environment
 and run:

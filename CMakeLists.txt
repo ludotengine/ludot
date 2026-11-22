@@ -19,6 +19,7 @@ add_executable(ludot-shader tools/shader_main.cpp)
 target_link_libraries(ludot-shader PRIVATE Ludot.Language Luau.Config)
 add_test(NAME ludot_shaders COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_shaders.py $<TARGET_FILE:ludot-shader>)
 add_test(NAME ludot_lsp COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_lsp.py)
+add_test(NAME ludot_documentation COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_documentation.py)
 install(TARGETS ludot-shader Luau.Repl.CLI Luau.Analyze.CLI Luau.Compile.CLI RUNTIME DESTINATION bin)
 install(DIRECTORY tools/ludot_lsp DESTINATION lib/ludot FILES_MATCHING PATTERN "*.py")
 

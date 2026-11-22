@@ -171,6 +171,9 @@ public:
 	virtual int get_script_method_argument_count(const StringName &p_method, bool *r_is_valid = nullptr) const;
 
 	virtual MethodInfo get_method_info(const StringName &p_method) const = 0;
+	// Constructor metadata for callers in another script language. Languages may
+	// use a different initializer name without exposing that name as an alias.
+	virtual MethodInfo get_constructor_info() const { return get_method_info(SNAME("_init")); }
 
 	virtual bool is_tool() const = 0;
 	virtual bool is_valid() const = 0;

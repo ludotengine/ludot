@@ -470,7 +470,7 @@ const Debug = signal with (...any)
 
 - Methods follow `luau/api/method_casing`, so they become `Fire` and `Connect` in
   PascalCase. `Connected` follows `luau/api/property_casing`.
-- The method is `fire`. There is no `emit`.
+- Luau uses `fire`. GDScript keeps Godot's `Signal.emit`.
 - `Signal` is a type only (`Signal<number, number>`, `Signal<>`, `Signal<...any>`).
   `typeof` returns `"Signal"` or `"Connection"`.
 - Handler parameter types come from the signal, so you can leave them off.
@@ -510,6 +510,7 @@ class Player extends CharacterBody3D = {
 	public Died = signal with ()
 	public HealthChanged = signal with (previous: number, current: number)
 	private InternalTick = signal with (dt: number)
+	public Health: number = 100
 
 	function damage(amount: number)
 		const previous = self.Health
@@ -531,6 +532,47 @@ registered as engine signals and cannot be accessed from other classes.
 
 Signal fields are read-only, cannot be `export`ed or `onready`, and do not appear
 in the Inspector.
+
+### GDScript interoperation
+
+GDScript keeps Godot syntax and native APIs, including `Node.new()`, `@export`,
+`_ready`, `signal`, `await`, `Signal.connect`, and `Signal.emit`. The Luau API
+casing settings do not rename GDScript's engine methods or properties. Public
+members declared in a Luau script keep their authored names in both languages.
+
+Given the `Player` class above saved as `player.luau`, GDScript can instantiate it
+and use its signals directly:
+
+```gdscript
+extends Node
+
+const Player = preload("res://player.luau")
+
+func _ready() -> void:
+	var player = Player.new()
+	player.HealthChanged.connect(_on_health_changed)
+	add_child(player)
+	player.damage(25.0)
+	player.HealthChanged.emit(75.0, 60.0)
+	player.queue_free()
+
+func _on_health_changed(previous: float, current: float) -> void:
+	print(previous, " -> ", current)
+```
+
+The `.emit` call notifies listeners; it does not change the player's health field.
+GDScript's string-based `connect` and `emit_signal` APIs also work. A public Luau
+method read from GDScript, such as `player.damage`, is a Godot `Callable`.
+Engine-backed Luau script resources accept `.new(...)` from GDScript and forward
+constructor arguments to the Luau class's `__init` method. Nodes need the usual
+`free` or `queue_free`; RefCounted instances use Godot reference counting.
+
+In Luau, the same field remains a `Signal<number, number>`. Use
+`self.HealthChanged:fire(previous, current)` and the Luau `Connection` API.
+GDScript connections and Luau connections receive emissions from either language.
+
+Public Luau signal declarations and adjacent `---` documentation comments also
+appear in the editor's script class reference. Private signals remain internal.
 
 ### Passing values
 
@@ -1073,3 +1115,25 @@ link to the original `get_node` page.
 To document your own Luau functions, put `---` comments directly above them.
 GDScript uses its normal `##` comments. Named script functions use the editor's
 current text, including unsaved edits.
+
+Engine descriptions come from the committed class-reference XML. Luau hovers in
+the editor and standalone LSP show Luau examples from `docs/luau_examples.json`;
+the website uses that same source. Signal connection examples derive their
+parameter names from the XML. GDScript hovers retain their GDScript examples.
+
+Examples follow the project's `luau/api/method_casing` and
+`luau/api/property_casing`. In the native editor, marked example identifiers also
+follow Text Editor > Luau > Lint naming preferences, and indentation follows Text
+Editor > Luau > StyLua. Callbacks, type names, node paths, and string contents keep
+their meaning. Rendering examples never renames code in your scripts.
+
+The standalone LSP reads API casing from `project.ludot`. Clients can configure
+`ludot.documentation.naming` with the `variable`, `constant`, `function`, `method`,
+`property`, and `class` styles, plus `ludot.documentation.insertSpaces` and
+`ludot.documentation.tabSize`, through `workspace/didChangeConfiguration`.
+
+Some upstream examples still lack an authored Luau equivalent. Luau documentation
+marks those examples as unavailable instead of displaying GDScript under a Luau
+label. Add the Luau example to the shared catalog to make it available in every
+consumer. Examples are local and versioned with the engine; hover requests do not
+fetch documentation from the network.

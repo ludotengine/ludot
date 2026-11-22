@@ -45,6 +45,18 @@ test('search includes manual topics and converted API methods', async () => {
 	assert.ok(entries.every((entry) => entry.path.startsWith('/docs/')))
 })
 
+test('Luau class and signal examples share the hover catalog', async () => {
+	const button = await readFile(new URL('docs/api/engine/Button.md', site), 'utf8')
+	assert.match(button, /button\.Pressed:connect/)
+	assert.doesNotMatch(button, /func _ready/)
+	const base = await readFile(new URL('docs/api/engine/BaseButton.md', site), 'utf8')
+	assert.match(base, /object\.Pressed:connect/)
+	assert.match(base, /Emitted when/)
+	const signals = await readFile(new URL('docs/engine/signals.md', site), 'utf8')
+	assert.match(signals, /player\.HealthChanged\.emit/)
+	assert.match(signals, /player = Player\.new\(\)/)
+})
+
 test('inherited BBCode produces valid escaped Vue HTML', async () => {
 	const { parse } = await import('@vue/compiler-dom')
 	for (const file of ['AESContext', 'CanvasItem', 'RichTextLabel', 'Node']) {

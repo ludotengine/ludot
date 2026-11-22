@@ -6004,11 +6004,17 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 
 	Ref<Script> base_script = p_base_type.script_type;
 
-	while (base_script.is_valid() && base_script->has_method(function_name)) {
-		MethodInfo info = base_script->get_method_info(function_name);
+	while (base_script.is_valid() && (p_is_constructor || base_script->has_method(function_name))) {
+		MethodInfo info = p_is_constructor ? base_script->get_constructor_info() : base_script->get_method_info(function_name);
 
 		if (!(info == MethodInfo())) {
-			return function_signature_from_info(info, r_return_type, r_par_types, r_default_arg_count, r_method_flags);
+			const bool valid = function_signature_from_info(info, r_return_type, r_par_types, r_default_arg_count, r_method_flags);
+			if (p_is_constructor) {
+				r_return_type = p_base_type;
+				r_return_type.is_meta_type = false;
+				r_method_flags.set_flag(METHOD_FLAG_STATIC);
+			}
+			return valid;
 		}
 		base_script = base_script->get_base_script();
 	}
