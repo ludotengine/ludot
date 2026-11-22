@@ -39,6 +39,7 @@
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
 #include "editor/themes/editor_scale.h"
+#include "modules/ludot/ludot_mcp_installer.h"
 #include "scene/gui/separator.h"
 #include "scene/gui/texture_rect.h"
 #include "scene/gui/tree.h"
@@ -172,6 +173,10 @@ void EditorPluginSettings::_create_clicked() {
 	plugin_config_dialog->popup_centered();
 }
 
+void EditorPluginSettings::_setup_mcp_clicked() {
+	LudotMcpInstaller::open_dialog();
+}
+
 void EditorPluginSettings::_cell_button_pressed(Object *p_item, int p_column, int p_id, MouseButton p_button) {
 	if (p_button != MouseButton::LEFT) {
 		return;
@@ -245,6 +250,9 @@ EditorPluginSettings::EditorPluginSettings() {
 	label->set_theme_type_variation("HeaderSmall");
 	title_hb->add_child(label);
 	title_hb->add_spacer();
+	Button *setup_mcp_button = memnew(Button(TTRC("Setup Ludot MCP...")));
+	setup_mcp_button->connect(SceneStringName(pressed), callable_mp(this, &EditorPluginSettings::_setup_mcp_clicked));
+	title_hb->add_child(setup_mcp_button);
 	Button *create_plugin_button = memnew(Button(TTRC("Create New Plugin")));
 	create_plugin_button->connect(SceneStringName(pressed), callable_mp(this, &EditorPluginSettings::_create_clicked));
 	title_hb->add_child(create_plugin_button);

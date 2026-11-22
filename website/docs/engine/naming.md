@@ -69,7 +69,7 @@ Settings are read once, when the language runtime starts:
 - **Editor:** restart the editor after changing a casing setting.
 - **Running games:** restart them too. Reloading a script or changing
   ProjectSettings at runtime doesn't switch the spelling midway.
-- **Standalone LSP:** it reads the nearest `project.godot` and needs a restart after
+- **Standalone LSP:** it reads the nearest `project.ludot` (or legacy `project.godot`) and needs a restart after
   a change. One LSP session can serve projects with different styles.
 
 An invalid style name in the settings falls back to the default with a warning.

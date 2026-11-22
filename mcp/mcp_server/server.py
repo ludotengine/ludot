@@ -102,7 +102,7 @@ async def register_tool_transform(mcp: FastMCP) -> None:
 
 logger = logging.getLogger(__name__)
 
-SERVER_NAME = "godot-mcp"
+SERVER_NAME = "ludot-mcp"
 
 
 def _apply_http_host_origin_protection(config: ServerConfig) -> None:
@@ -208,7 +208,7 @@ def create_server(
         SERVER_NAME,
         lifespan=lifespan,
         instructions=SERVER_INSTRUCTIONS,
-        website_url="https://github.com/hybridindie/godot-mcp",
+        website_url="https://github.com/ludotengine/ludot",
         auth=auth,
         # The dynamic fields (toolset_count / prompts / resources) are filled in
         # from the live registry after registration; see capabilities.apply_capability.

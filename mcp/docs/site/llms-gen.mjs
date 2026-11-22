@@ -27,15 +27,15 @@ const DIST = join(SITE_DIR, 'dist')
 const REPO_RAW = 'https://raw.githubusercontent.com/hybridindie/godot-mcp/main/docs/site/'
 const SITE_URL = 'https://hybridindie.github.io/godot-mcp/'
 
-const TITLE = 'Godot Editor MCP'
+const TITLE = 'Ludot Editor MCP'
 const SUMMARY =
-  'Bridge an AI agent and a live Godot editor over MCP — inspect, mutate, run, ' +
+  'Bridge an AI agent and a live Ludot editor over MCP — inspect, mutate, run, ' +
   'and verify a real project. 210 tools across 29 categories (28 toggleable toolsets ' +
   'plus always-on core); the server ' +
-  'owns safety and typing, the Godot addon owns the editor.'
+  'owns safety and typing, the Ludot addon owns the editor.'
 const DETAILS =
-  'Godot Editor MCP is a generic, game-agnostic MCP server: the FastMCP server owns ' +
-  'safety and gating, the Godot addon owns editor API calls, and a versioned ' +
+  'Ludot Editor MCP is a generic, game-agnostic MCP server: the FastMCP server owns ' +
+  'safety and gating, the Ludot addon owns editor API calls, and a versioned ' +
   'JSON envelope joins them. Start with concepts (how it works and why), then ' +
   'getting-started for setup. Every mutation result ' +
   'carries honesty fields (persisted/undoable/aborted_at/rescan_pending) that ' +

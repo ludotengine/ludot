@@ -8,7 +8,7 @@ updated: 2026-10-18
 
 # Skills
 
-Beyond tools, prompts, and resources, Godot Editor MCP ships **three installable AI
+Beyond tools, prompts, and resources, Ludot Editor MCP ships **three installable AI
 skills** under [`skills/`](https://github.com/hybridindie/godot-mcp/tree/main/skills).
 A skill is client-side knowledge — not an action — that the agent **auto-triggers**
 when it recognises a matching task, then routes to the right prompts and tools.

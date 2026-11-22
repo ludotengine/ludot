@@ -33,8 +33,9 @@ Run `ludot --headless --path godot --import` once so the test project's class
 cache exists, then run `uv run pytest tests/unit tests/contract -q` from this
 directory. Live-editor tests in `tests/integration` use `GODOT_BIN` or `ludot`.
 
-Install locally with `uv tool install --force .`, which puts `godot-editor-mcp` in
-`~/.local/bin`, and copy `godot/addons/godot_mcp` into a project's `addons/`.
+Install locally with `uv tool install --force .`, which puts `ludot-editor-mcp` in
+`~/.local/bin`, and install the addon via Project → Setup Ludot MCP... or copy
+`godot/addons/godot_mcp` into a project's `addons/`.
 
 Upstream's own project guide is not copied here; see
 https://github.com/hybridindie/godot-mcp for its architecture notes.

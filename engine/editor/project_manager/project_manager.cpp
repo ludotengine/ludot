@@ -566,7 +566,7 @@ void ProjectManager::_open_selected_projects() {
 
 	const HashSet<String> &selected_list = project_list->get_selected_project_keys();
 	for (const String &path : selected_list) {
-		String conf = path.path_join("project.godot");
+		String conf = ProjectSettings::resolve_project_file(path);
 
 		if (!FileAccess::exists(conf)) {
 			loading_label->hide();
@@ -643,7 +643,7 @@ void ProjectManager::_open_selected_projects_check_warnings() {
 
 	// Check if the config_version property was empty or 0.
 	if (config_version == 0) {
-		ask_update_label->set_text(vformat(TTR("The selected project \"%s\" does not specify its supported Godot version in its configuration file (\"project.godot\").\n\nProject path: %s\n\nIf you proceed with opening it, it will be converted to Godot's current configuration file format.\n\nWarning: You won't be able to open the project with previous versions of the engine anymore."), project.project_name, project.path));
+		ask_update_label->set_text(vformat(TTR("The selected project \"%s\" does not specify its supported Ludot version in its configuration file (\"project.ludot\").\n\nProject path: %s\n\nIf you proceed with opening it, it will be converted to Ludot's current configuration file format.\n\nWarning: You won't be able to open the project with previous versions of the engine anymore."), project.project_name, project.path));
 		ask_update_settings->popup_centered(popup_min_size);
 		return;
 	}
@@ -675,25 +675,25 @@ void ProjectManager::_open_selected_projects_check_warnings() {
 			const String &feature = unsupported_features[i];
 			if (feature == "Double Precision") {
 				ask_update_backup->show();
-				warning_message += TTR("Warning: This project uses double precision floats, but this version of\nGodot uses single precision floats. Opening this project may cause data loss.\n\n");
+				warning_message += TTR("Warning: This project uses double precision floats, but this version of\nLudot uses single precision floats. Opening this project may cause data loss.\n\n");
 				unsupported_features.remove_at(i);
 				i--;
 			} else if (feature == "C#") {
-				warning_message += TTR("Warning: This project uses C#, but this build of Godot does not have\nthe Mono module. If you proceed you will not be able to use any C# scripts.\n\n");
+				warning_message += TTR("Warning: This project uses C#, but this build of Ludot does not have\nthe Mono module. If you proceed you will not be able to use any C# scripts.\n\n");
 				unsupported_features.remove_at(i);
 				i--;
 			} else if (ProjectList::project_feature_looks_like_version(feature)) {
 				ask_update_backup->show();
 				migration_guide_button->show();
 				version_convert_feature = feature;
-				warning_message += vformat(TTR("Warning: This project was last edited in Godot %s. Opening will change it to Godot %s.\n\n"), Variant(feature), Variant(GODOT_VERSION_BRANCH));
+				warning_message += vformat(TTR("Warning: This project was last edited in Ludot %s. Opening will change it to Ludot %s.\n\n"), Variant(feature), Variant(GODOT_VERSION_BRANCH));
 				unsupported_features.remove_at(i);
 				i--;
 			}
 		}
 		if (!unsupported_features.is_empty()) {
 			String unsupported_features_str = String(", ").join(unsupported_features);
-			warning_message += vformat(TTR("Warning: This project uses the following features not supported by this build of Godot:\n\n%s\n\n"), unsupported_features_str);
+			warning_message += vformat(TTR("Warning: This project uses the following features not supported by this build of Ludot:\n\n%s\n\n"), unsupported_features_str);
 		}
 		warning_message += TTR("Open anyway? Project will be modified.");
 		ask_update_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
@@ -885,7 +885,7 @@ void ProjectManager::_open_recovery_mode_ask(bool manual) {
 	// Only show the initial crash preamble if this popup wasn't manually triggered.
 	if (!manual) {
 		recovery_mode_details +=
-				TTR("It looks like Godot crashed when opening this project the last time. If you're having problems editing this project, you can try to open it in Recovery Mode.") +
+				TTR("It looks like Ludot crashed when opening this project the last time. If you're having problems editing this project, you can try to open it in Recovery Mode.") +
 				String::utf8("\n\n");
 	}
 
@@ -1052,22 +1052,22 @@ void ProjectManager::_apply_project_tags() {
 		}
 	}
 
-	const String project_godot = project_list->get_selected_projects()[0].path.path_join("project.godot");
-	ProjectSettings *cfg = memnew(ProjectSettings(project_godot));
+	const String project_file = ProjectSettings::resolve_project_file(project_list->get_selected_projects()[0].path);
+	ProjectSettings *cfg = memnew(ProjectSettings(project_file));
 	if (!cfg->is_project_loaded()) {
 		memdelete(cfg);
-		tag_edit_error->set_text(vformat(TTR("Couldn't load project at '%s'. It may be missing or corrupted."), project_godot));
+		tag_edit_error->set_text(vformat(TTR("Couldn't load project at '%s'. It may be missing or corrupted."), project_file));
 		tag_edit_error->show();
 		callable_mp((Window *)tag_manage_dialog, &Window::show).call_deferred(); // Make sure the dialog does not disappear.
 		return;
 	} else {
 		tags.sort();
 		cfg->set("application/config/tags", tags);
-		Error err = cfg->save_custom(project_godot);
+		Error err = cfg->save_custom(project_file);
 		memdelete(cfg);
 
 		if (err != OK) {
-			tag_edit_error->set_text(vformat(TTR("Couldn't save project at '%s' (error %d)."), project_godot, err));
+			tag_edit_error->set_text(vformat(TTR("Couldn't save project at '%s' (error %d)."), project_file, err));
 			tag_edit_error->show();
 			callable_mp((Window *)tag_manage_dialog, &Window::show).call_deferred();
 			return;

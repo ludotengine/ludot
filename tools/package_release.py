@@ -58,6 +58,15 @@ def package(system, destination, editor=None):
             ):
                 shutil.copy2(path, stage / path.name)
     shutil.copy2(ROOT / "logo.svg", stage / "ludot.svg")
+    mcp_dest = stage / ("Ludot.app/Contents/Resources/mcp" if system == "macos" else "mcp")
+    mcp_dest.mkdir(parents=True, exist_ok=True)
+    for mcp_file in ("pyproject.toml", "uv.lock", "LICENSE", "README.md"):
+        shutil.copy2(ROOT / "mcp" / mcp_file, mcp_dest / mcp_file)
+    shutil.copytree(
+        ROOT / "mcp/mcp_server",
+        mcp_dest / "mcp_server",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
     licenses = stage / "licenses"
     licenses.mkdir()
     for source, name in [

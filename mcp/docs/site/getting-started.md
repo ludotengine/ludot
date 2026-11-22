@@ -1,14 +1,14 @@
 ---
 type: index
 title: "Get started"
-description: "Install Godot Editor MCP, connect your editor and AI assistant, and drive your first session."
+description: "Install Ludot Editor MCP, connect your editor and AI assistant, and drive your first session."
 created: 2026-09-19
 updated: 2026-10-18
 ---
 
 # Get started
 
-Godot Editor MCP drives a **live Godot editor** through the addon. Pick the track that
+Ludot Editor MCP drives a **live Godot editor** through the addon. Pick the track that
 matches what you want to do.
 
 ## For creators — let your AI assistant do it
@@ -25,7 +25,7 @@ click and start building.
 You're comfortable with installs and MCP. Five steps:
 
 1. **[Install the MCP server](getting-started-install.md)** — PyPI, Docker, or from source.
-2. **[Install the Godot addon](getting-started-addon.md)** — from the [Godot Asset Store](https://store.godotengine.org/asset/john-d-studios/godot-editor-mcp-addon/) (**Godot Editor MCP - Addon**), or copy it in; then enable it.
+2. **[Install the Godot addon](getting-started-addon.md)** — from the [Godot Asset Store](https://store.godotengine.org/asset/john-d-studios/godot-editor-mcp-addon/) (**Ludot Editor MCP - Addon**), or copy it in; then enable it.
 3. **[Configure your client](getting-started-clients.md)** — OpenCode, Claude, or any MCP host.
 4. **[Install the skills](reference-skills.md)** — this is what makes your assistant enable toolsets on its own, read the honesty fields, and avoid the common Godot pitfalls. Do it before your first session.
 5. **[Run your first session](getting-started-first-session.md)** — the orient → enable → preview → act → verify rhythm.

@@ -1,7 +1,7 @@
 ---
 type: index
 title: "Install the MCP server"
-description: "Three ways to run godot-editor-mcp — PyPI, Docker, or from source."
+description: "Ways to run ludot-editor-mcp — local install, Docker, or from source."
 created: 2026-09-19
 updated: 2026-10-18
 ---
@@ -9,26 +9,15 @@ updated: 2026-10-18
 # Install the MCP server
 
 ::: info For developers
-This is the manual setup path. Rather not touch a terminal? → **[For creators](for-creators.md)** has your assistant do it.
+This is the manual setup path. In Ludot, you can also open **Project → Setup Ludot MCP...** to install the addon and configure your AI clients automatically.
 :::
 
-## Option A: PyPI (recommended)
+## Option A: Install with uv or pip (recommended)
 
 ```bash
-uv tool install godot-editor-mcp    # or: pip install godot-editor-mcp
-godot-editor-mcp                    # starts the MCP server over stdio
+uv tool install --force ./mcp       # or: pip install ./mcp
+ludot-editor-mcp                    # starts the MCP server over stdio
 ```
-
-That installs the **stable** channel (`2026.10.20.1`, Godot 4.7 validated).
-For the **beta** channel — `2026.11.04b2`, verified against **Godot 4.8-beta2**
-and adding the 4.8-only surface — opt in explicitly:
-
-```bash
-uv tool install --pre godot-editor-mcp   # or: pip install --pre godot-editor-mcp
-```
-
-Both channels keep the Godot 4.4 floor; the 4.8-only tools report
-`UNSUPPORTED` on 4.4–4.7.
 
 ## Option B: Docker
 
@@ -44,17 +33,16 @@ Docker binds `0.0.0.0` inside the container, so a **bearer token is required**
 ## Option C: From source (development)
 
 ```bash
-git clone https://github.com/hybridindie/godot-mcp
-cd godot-mcp
+cd mcp
 uv sync
-uv run godot-editor-mcp   # stdio mode (default)
+uv run ludot-editor-mcp   # stdio mode (default)
 ```
 
 ## Choose a transport
 
 | Transport | Use case | How |
 |-----------|----------|-----|
-| `stdio` (default) | A single local agent | the client spawns `godot-editor-mcp` itself |
+| `stdio` (default) | A single local agent | the client spawns `ludot-editor-mcp` itself |
 | `http` | Shared service; several clients on one editor; remote/web UIs | `GODOT_MCP_TRANSPORT=http` or `scripts/serve-http.sh` |
 
 ::: tip Service mode for multiple clients
@@ -65,7 +53,7 @@ every client at `http://<host>:9090/mcp`:
 
 ```bash
 GODOT_MCP_TRANSPORT=http GODOT_MCP_AUTH_TOKEN=<token> \
-  uv run godot-editor-mcp
+  uv run ludot-editor-mcp
 ```
 
 Non-loopback HTTP binds **require** a `GODOT_MCP_AUTH_TOKEN` — the server
@@ -75,9 +63,9 @@ refuses to start without one (fail-fast, #226).
 ## Verify
 
 ```bash
-GODOT_MCP_BRIDGE_URL=ws://127.0.0.1:9080 uv run godot-editor-mcp
+GODOT_MCP_BRIDGE_URL=ws://127.0.0.1:9080 uv run ludot-editor-mcp
 # logs are JSON on stderr; the MCP protocol is on stdout
 ```
 
-The server binds the bridge listener immediately — before Godot exists.
+The server binds the bridge listener immediately — before Ludot exists.
 Next: [install the addon](getting-started-addon.md).

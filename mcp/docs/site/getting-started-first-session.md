@@ -8,7 +8,7 @@ updated: 2026-10-18
 
 # Your first session
 
-Godot Editor MCP is driven **through an AI assistant**, not by typing tool names. So the single
+Ludot Editor MCP is driven **through an AI assistant**, not by typing tool names. So the single
 most useful thing you can do first is **install the skill** — a small bundle of knowledge
 your assistant loads automatically. It teaches it to:
 

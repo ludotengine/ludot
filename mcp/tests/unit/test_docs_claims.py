@@ -49,7 +49,7 @@ def test_docs_do_not_link_the_missing_top_level_tutorial() -> None:
 
 
 def test_docs_use_the_published_cli_name() -> None:
-    """The console script is ``godot-editor-mcp``; ``uv run godot-mcp`` fails."""
+    """The console script is ``ludot-editor-mcp``; ``uv run godot-mcp`` fails."""
     stale = [
         str(path.relative_to(REPO_ROOT))
         for path in _docs_sources()
@@ -58,20 +58,20 @@ def test_docs_use_the_published_cli_name() -> None:
     assert not stale, "docs use the wrong CLI name:\n" + "\n".join(stale)
 
 
-def test_product_name_is_godot_editor_mcp() -> None:
-    """The human-facing product is **Godot Editor MCP**, not the repo slug."""
+def test_product_name_is_ludot_editor_mcp() -> None:
+    """The human-facing product is **Ludot Editor MCP**, not the repo slug."""
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    assert re.search(r"<h1[^>]*>Godot Editor MCP</h1>", readme)
+    assert re.search(r"<h1[^>]*>Ludot Editor MCP</h1>", readme)
 
     config = (SITE / ".vitepress" / "config.mts").read_text(encoding="utf-8")
-    assert "title: 'Godot Editor MCP'" in config
-    assert "siteTitle: 'Godot Editor MCP'" in config
+    assert "title: 'Ludot Editor MCP'" in config
+    assert "siteTitle: 'Ludot Editor MCP'" in config
 
     home = (SITE / "index.md").read_text(encoding="utf-8")
-    assert "name: 'Godot Editor MCP'" in home
+    assert "name: 'Ludot Editor MCP'" in home
 
     llms_gen = (SITE / "llms-gen.mjs").read_text(encoding="utf-8")
-    assert "const TITLE = 'Godot Editor MCP'" in llms_gen
+    assert "const TITLE = 'Ludot Editor MCP'" in llms_gen
 
 
 def test_creator_and_developer_tracks_exist_and_are_linked() -> None:

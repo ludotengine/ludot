@@ -58,6 +58,7 @@ class EditorPluginSettings : public VBoxContainer {
 
 	void _plugin_activity_changed();
 	void _create_clicked();
+	void _setup_mcp_clicked();
 	void _cell_button_pressed(Object *p_item, int p_column, int p_id, MouseButton p_button);
 
 	static Vector<String> _get_plugins(const String &p_dir);

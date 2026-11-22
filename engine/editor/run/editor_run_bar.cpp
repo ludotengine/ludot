@@ -267,11 +267,12 @@ void EditorRunBar::_run_scene(const String &p_scene_path, const Vector<String> &
 
 	String resource_path = ProjectSettings::get_singleton()->get_resource_path();
 	if (!resource_path.is_empty()) {
-		String project_file_path = resource_path.path_join("project.godot");
+		String project_file_name = ProjectSettings::get_singleton()->get_project_file_name();
+		String project_file_path = resource_path.path_join(project_file_name);
 		if (!FileAccess::exists(project_file_path)) {
-			// TODO: Try to recover the "project.godot" file using ProjectSettings::get_singleton()->save()
+			// TODO: Try to recover the project file using ProjectSettings::get_singleton()->save()
 			EditorNode::get_singleton()->show_warning(
-					TTRC("Failed to run the project because the project.godot file is missing."),
+					vformat(TTR("Failed to run the project because the %s file is missing."), project_file_name),
 					TTRC("Error!"));
 			return;
 		}

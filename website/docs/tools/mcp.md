@@ -1,29 +1,37 @@
 # Editor MCP
 
-<p class="lead">Ludot includes a fork of Godot Editor MCP for inspecting and editing a live desktop editor from an MCP client.</p>
+<p class="lead">Ludot includes Ludot Editor MCP (a fork of Godot Editor MCP) for inspecting and editing a live desktop editor from an MCP client.</p>
 
-The server and addon live in the repository's `mcp/` folder. The package is still named `godot-editor-mcp`, and tool names keep their `godot_` prefix.
+The server and addon live in the repository's `mcp/` folder and are bundled with desktop releases. The package and CLI command are named `ludot-editor-mcp` (server ID `ludot-mcp`), and tool names keep their `godot_` prefix for protocol compatibility.
 
 ::: tip
-Install from the `mcp/` folder. The upstream release doesn't include Ludot's Luau tools.
+Use Ludot's built-in installer or install from the `mcp/` folder. Upstream releases don't include Ludot's Luau tools.
 :::
 
-## Install the local fork
+## Automatic setup from the editor
 
-Install the server from the local checkout into an environment with Python 3.11 or newer:
+Open your project in Ludot and choose **Project > Setup Ludot MCP...** (or click **Setup Ludot MCP...** under **Project Settings > Plugins**):
+
+1. Check **Install and enable Ludot Editor MCP addon in this project** to extract the matching `godot_mcp` addon into `res://addons/godot_mcp/` and enable it automatically.
+2. Select any detected AI providers you want to configure (Claude Code, Claude Desktop, OpenAI Codex, Gemini CLI, Antigravity / ACP, OpenCode, Cursor, VS Code, Windsurf, Zed, GitHub Copilot CLI, Cline, Roo Code, Goose, Qwen Code, Amp, Kiro, Factory Droid, or project-local `.mcp.json`).
+   - Leave all providers unchecked (or click **Addon Only**) to install only the project addon.
+   - Providers that already have Ludot MCP configured are automatically detected and greyed out.
+3. Click **Install**.
+
+## Manual install from source
+
+To install the server CLI manually from a local checkout into an environment with Python 3.11 or newer:
 
 ```bash
+uv tool install --force ./mcp
+# or inside a virtual environment:
 python -m venv build/mcp-venv
 build/mcp-venv/bin/pip install ./mcp
 ```
 
 On Windows, use `build\mcp-venv\Scripts\pip` instead.
 
-Then:
-
-1. Copy `mcp/godot/addons/godot_mcp/` into your project's `addons/` (or `Addons/`) folder.
-2. Enable it in Project Settings > Plugins.
-3. Point your MCP client at the virtual environment's `godot-editor-mcp` command.
+Then point your MCP client at `ludot-editor-mcp` (or run `ludot-editor-mcp config --client <client> --write`).
 
 The server finds `ludot` on your PATH. Use a server and editor from the same Ludot version. The [server README](https://github.com/ludotengine/ludot/blob/main/mcp/README.md) covers client configuration in detail.
 

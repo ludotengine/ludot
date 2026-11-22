@@ -18,8 +18,28 @@ elif env['platform'] == 'web':
 else:
     ludot.Append(CXXFLAGS=['-fexceptions'])
 if env.editor_build:
+    import importlib.util
     for component in ['Analysis', 'Config']:
         ludot.Append(CPPPATH=[str(root / 'luau' / component / 'include')])
+    spec = importlib.util.spec_from_file_location('embed_mcp_addon', str(Path(Dir('.').abspath) / 'embed_mcp_addon.py'))
+    embed_mcp_addon = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(embed_mcp_addon)
+    addon_dir = root / 'mcp/godot/addons/godot_mcp'
+    addon_sources = [
+        str(path)
+        for path in sorted(addon_dir.rglob('*'))
+        if path.is_file()
+        and not path.name.endswith('.import')
+        and '__pycache__' not in path.parts
+        and not any(part.startswith('.') for part in path.relative_to(addon_dir).parts)
+    ]
+    ludot['LUDOT_MCP_ADDON_DIR'] = str(addon_dir)
+    mcp_header = ludot.Command(
+        'generated/ludot_mcp_addon.gen.h',
+        addon_sources + ['embed_mcp_addon.py'],
+        env.Run(embed_mcp_addon.scons_action),
+    )
+    ludot.Append(CPPPATH=[Dir('generated').abspath])
 
 luau_build = ludot.Clone()
 # Luau intentionally uses constructor parameters named after their members. Its

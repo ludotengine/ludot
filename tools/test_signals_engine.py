@@ -363,7 +363,7 @@ class CasesReader extends Node = {
 
 with tempfile.TemporaryDirectory(prefix='ludot-signal-engine-') as directory:
     project = Path(directory)
-    (project / 'project.godot').write_text('config_version=5\n')
+    (project / 'project.ludot').write_text('config_version=5\n')
     files = {
         'cases.luau': CASES, 'cases_reader.luau': CASES_READER, 'fighter.luau': FIGHTER, 'hero.luau': HERO,
         'hub.luau': HUB, 'listener.luau': LISTENER, 'probe.luau': PROBE, 'receiver.gd': RECEIVER, 'run.gd': RUN,

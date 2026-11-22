@@ -20,7 +20,10 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   checks cover flight, the planet camera, riding along with a moving world, ground
   clearance, pause, and orbit visibility. A 54-second Forward+ capture covers the tour.
 - Vendored Godot 4.7.2-stable and Luau 0.743 source with pinned provenance.
-- Engine version 4.7.2-lu.8, set by the `status` field in `engine/version.py`.
+- Engine version 4.7.2-lu.9, set by the `status` field in `engine/version.py`.
+- `.ludot` project file format (`project.ludot`) across core project settings, CLI,
+  Project Manager, desktop MIME/bundle metadata, standalone LSP, and MCP tools, with
+  backwards-compatible fallback loading for legacy `project.godot` projects.
 - Project Manager update check repointed to Ludot's GitHub Releases (`ludotengine/ludot`),
   comparing `4.7.2-lu.<N>` versions and offering one-click install via the release's
   `install.sh` / `install.ps1` or opening the release page.
@@ -122,9 +125,18 @@ limits. A planned feature or an unrun CI job is not listed as verified.
   Ludot icon. Original copyright notices remain intact.
 - Deferred documentation-cache loads are cancelled after editor shutdown, so a
   command-line export cannot start a documentation worker on the freed filesystem.
-- `mcp/` holds Ludot's fork of Godot Editor MCP (stable 2026.11.04): a Python MCP
-  server and a GDScript editor addon that lets an AI agent drive a live editor. It
-  finds `ludot` on PATH, and its always-on inspection toolset adds
+- `mcp/` holds Ludot Editor MCP (Ludot's fork of Godot Editor MCP, package/CLI
+  `ludot-editor-mcp`, server ID `ludot-mcp`, stable 2026.11.04): a Python MCP
+  server and an editor addon that lets an AI agent drive a live editor. Desktop
+  releases bundle the `mcp/` server alongside the editor, and the editor embeds the
+  matching addon directly. **Project > Setup Ludot MCP...** and **Project Settings >
+  Plugins > Setup Ludot MCP...** open a built-in installer that extracts and enables
+  `res://addons/godot_mcp` (with synchronous script class registration), detects
+  installed AI providers (Claude Code, Claude Desktop, OpenAI Codex, Gemini CLI,
+  Antigravity / ACP, OpenCode, Cursor, VS Code, Windsurf, Zed, GitHub Copilot CLI,
+  Cline, Roo Code, Goose, Qwen Code, Amp, Kiro, Factory Droid, and project `.mcp.json`),
+  greys out providers that already have Ludot MCP configured, and supports addon-only
+  installation. The server finds `ludot` on PATH, and its always-on inspection toolset adds
   `get_ludot_conventions` (API casing, the user's naming casing per kind, lint,
   StyLua and indentation preferences, module aliases, and project `.luaurc`,
   selene and stylua files) and `list_settings` (project settings or editor
@@ -189,6 +201,16 @@ Local Linux results:
   `template_release` build running the exported pack the way a shipped game does
   (pack beside the executable, scene selected through `override.cfg`).
 - `tools/package_lsp.py` builds the standalone LSP and passes its protocol check.
+- `tools/test_mcp_and_project_format.py` passes with the Linux editor build. It covers
+  `project.ludot` loading/saving, legacy `project.godot` fallback loading, embedded
+  MCP addon extraction and immediate plugin enablement, installed AI provider detection,
+  already-configured provider detection and skipping, and non-destructive JSON/JSONC/TOML/YAML
+  config merging across Claude Code, Codex, Gemini CLI, Antigravity, OpenCode, Zed,
+  Goose, and VS Code.
+- Local verification on 2026-11-22 passed `ctest` (4/4), `tests/test_install.py`,
+  the updated MCP unit/contract suites (1,196 cases), and all 9 desktop suites via
+  `tools/test_desktop.py` against `v4.7.2-lu.9`. Cross-platform CI for `4.7.2-lu.9`
+  is pending.
 - In `mcp/`, the upstream unit and contract tests pass, along with the live-editor
   inspection test against the Ludot editor, which covers the settings and
   conventions commands, and the live-editor Luau test, which diagnoses a script with

@@ -8,7 +8,7 @@ updated: 2026-10-18
 
 # Examples
 
-Godot Editor MCP ships two complete Godot 4.x games under
+Ludot Editor MCP ships two complete Godot 4.x games under
 [`examples/`](https://github.com/hybridindie/godot-mcp/tree/main/examples).
 They are the reference testbeds: real projects, built through the MCP tools,
 that exercise most of the surface end-to-end — and double as worked examples of
@@ -72,7 +72,7 @@ scope; the paused-frame stack/vars are not exposed on 4.7, #677),
 
 ## How to use an example
 
-Open either project folder in Godot 4.4+ with the Godot Editor MCP addon installed, then treat it
+Open either project folder in Godot 4.4+ with the Ludot Editor MCP addon installed, then treat it
 as a target. You prompt in plain language; the assistant makes the calls — the rhythm from
 [Your first session](getting-started-first-session.md).
 

@@ -2,9 +2,9 @@
 layout: home
 
 hero:
-  name: 'Godot Editor MCP'
-  text: 'Build your Godot game by talking to your AI'
-  tagline: 'Your AI assistant drives a live Godot editor — inspecting, editing, running, and double-checking its own work, with every change undoable. No more editing files blind.'
+  name: 'Ludot Editor MCP'
+  text: 'Build your Ludot game by talking to your AI'
+  tagline: 'Your AI assistant drives a live Ludot editor — inspecting, editing, running, and double-checking its own work, with every change undoable. No more editing files blind.'
   actions:
     - theme: brand
       text: For creators
@@ -42,12 +42,12 @@ Ask your assistant to add a node inside an instanced scene:
            saved. Enable Editable Children on 'Relic', or target a node the scene owns." }
 ```
 
-A file-blind agent would just say *"done."* Godot Editor MCP tells you **what will actually be saved** — and exactly how to fix it. That honesty is the whole point.
+A file-blind agent would just say *"done."* Ludot Editor MCP tells you **what will actually be saved** — and exactly how to fix it. That honesty is the whole point.
 
 ## Start in about two minutes
 
-1. **Add the addon** — install [Godot Editor MCP - Addon](https://store.godotengine.org/asset/john-d-studios/godot-editor-mcp-addon/) from the Godot Asset Store, then switch it on in *Project → Project Settings → Plugins*.
-2. **Point your AI assistant at it** with one line in its MCP config (for Claude Code: `claude mcp add godot -- uvx godot-editor-mcp`).
+1. **Add the addon** — install [Ludot Editor MCP - Addon](https://store.godotengine.org/asset/john-d-studios/godot-editor-mcp-addon/) from the Godot Asset Store, then switch it on in *Project → Project Settings → Plugins*.
+2. **Point your AI assistant at it** with one line in its MCP config (for Claude Code: `claude mcp add godot -- uvx ludot-editor-mcp`).
 3. **Tell it what you want** — *"add a player that jumps"*, *"make the jump feel snappier"*, *"why does it crash on start?"*.
 
 New to all this? **[For creators](./for-creators)** walks it through step by step — your
@@ -74,6 +74,6 @@ assistant does the installing. Prefer to do it yourself? **[Manual setup](./gett
 
 > **For AI agents.** This site ships [`llms.txt`](https://hybridindie.github.io/godot-mcp/llms.txt) (a page index) and [`llms-full.txt`](https://hybridindie.github.io/godot-mcp/llms-full.txt) (the whole site in one fetch).
 
-> **One name, three identifiers.** **Godot Editor MCP** is the product; the repository and
+> **One name, three identifiers.** **Ludot Editor MCP** is the product; the repository and
 > MCP server ID remain `godot-mcp` for wire compatibility, the package/CLI is
-> `godot-editor-mcp`, and the in-editor plugin is **Godot Editor MCP - Addon**.
+> `ludot-editor-mcp`, and the in-editor plugin is **Ludot Editor MCP - Addon**.

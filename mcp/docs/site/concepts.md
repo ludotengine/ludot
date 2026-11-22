@@ -1,7 +1,7 @@
 ---
 type: index
 title: "Why & how it works"
-description: "The problem Godot Editor MCP solves, why it's built this way, and the ideas every other page assumes."
+description: "The problem Ludot Editor MCP solves, why it's built this way, and the ideas every other page assumes."
 created: 2026-09-19
 updated: 2026-10-18
 ---
@@ -10,9 +10,9 @@ updated: 2026-10-18
 
 Two minutes here and the rest of the docs will click.
 
-## Naming: Godot Editor MCP
+## Naming: Ludot Editor MCP
 
-**Godot Editor MCP** is the product name, chosen because the **editor is the surface**:
+**Ludot Editor MCP** is the product name, chosen because the **editor is the surface**:
 every action lands on the live Godot editor through the addon, not on files behind its
 back.
 
@@ -20,15 +20,15 @@ The identifiers are deliberately stable and slightly different:
 
 | Thing | Value | Why |
 |-------|-------|-----|
-| Product | **Godot Editor MCP** | human-facing name |
+| Product | **Ludot Editor MCP** | human-facing name |
 | Repository | `godot-mcp` | existing URLs and history |
 | MCP server ID | `godot-mcp` | wire compatibility with existing clients |
-| Package / CLI | `godot-editor-mcp` | published PyPI name |
-| Addon | **Godot Editor MCP - Addon** | Godot Asset Store name |
+| Package / CLI | `ludot-editor-mcp` | published PyPI name |
+| Addon | **Ludot Editor MCP - Addon** | Godot Asset Store name |
 | Tools | `godot_<toolset>_<action>` | the prefix is the toolset gate |
 
 If a page says "the server" it means the Python MCP server; "the addon" means the
-GDScript editor plugin. Both together are Godot Editor MCP.
+GDScript editor plugin. Both together are Ludot Editor MCP.
 
 ## The problem
 
@@ -39,7 +39,7 @@ An AI agent can already edit Godot files on disk — but it edits **blind**:
 - its file writes race the editor's importer, so its next check can read a stale class cache;
 - a mistake has no undo unless the editor's own stack was involved.
 
-Godot Editor MCP closes that gap: the agent talks to the **live editor** over MCP, so every action lands on the project you're actually looking at — with undo, verification, and honest reporting.
+Ludot Editor MCP closes that gap: the agent talks to the **live editor** over MCP, so every action lands on the project you're actually looking at — with undo, verification, and honest reporting.
 
 ## Why it's built this way (the short version)
 

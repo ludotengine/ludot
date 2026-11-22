@@ -27,7 +27,7 @@ for method_style in styles:
             method = lambda name: member(name, method_style)
             prop = lambda name: member(name, property_style)
             callback = '_' + method('ready')
-            (project / 'project.godot').write_text('config_version=5\n[luau]\napi/method_casing=' + json.dumps(method_style) + '\napi/property_casing=' + json.dumps(property_style) + '\n')
+            (project / 'project.ludot').write_text('config_version=5\n[luau]\napi/method_casing=' + json.dumps(method_style) + '\napi/property_casing=' + json.dumps(property_style) + '\n')
             source = f'''class ApiCaseProbe extends Node3D = {{
     export custom_value: number = 7
     export noticed: boolean = false

@@ -70,7 +70,15 @@ class Server:
             sys.stdout.buffer.flush()
 
     def api_casing(self, path):
-        project = next((parent / 'project.godot' for parent in path.parents if (parent / 'project.godot').is_file()), None)
+        project = next(
+            (
+                candidate
+                for parent in path.parents
+                for candidate in (parent / 'project.ludot', parent / 'project.godot')
+                if candidate.is_file()
+            ),
+            None,
+        )
         with self.lock:
             if project in self.project_casing:
                 return self.project_casing[project]
@@ -88,7 +96,7 @@ class Server:
                         continue
                     style = json.loads(value.split(';', 1)[0].strip())
                     if style not in ('camelCase', 'PascalCase', 'snake_case'):
-                        print('Invalid Luau API casing in project.godot; using the default.', file=sys.stderr)
+                        print(f'Invalid Luau API casing in {project.name}; using the default.', file=sys.stderr)
                         continue
                     selected[0 if key.strip() == 'api/method_casing' else 1] = style
             self.project_casing[project] = tuple(selected)

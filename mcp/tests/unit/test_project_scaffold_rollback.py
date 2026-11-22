@@ -27,4 +27,4 @@ def test_rollback_snapshots_and_restores_uid_sidecars() -> None:
 
 
 def test_raw_project_file_fallback_refreshes_the_editor_view() -> None:
-    assert "EditorInterface.get_resource_filesystem().update_file(PROJECT_FILE)" in _SRC
+    assert "EditorInterface.get_resource_filesystem().update_file(project_file)" in _SRC

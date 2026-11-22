@@ -11,6 +11,7 @@
 #include "luau_highlighter.h"
 #include "luau_lint.h"
 #include "luau_shader_editor.h"
+#include "ludot_mcp_installer.h"
 
 #include "editor/editor_node.h"
 #include "editor/export/editor_export.h"
@@ -41,6 +42,8 @@ void initialize_ludot_module(ModuleInitializationLevel level) {
     if (level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
         GDREGISTER_CLASS(LuauSyntaxHighlighter);
         GDREGISTER_INTERNAL_CLASS(LudotThemeTools);
+        GDREGISTER_INTERNAL_CLASS(LudotMcpInstallerDialog);
+        GDREGISTER_INTERNAL_CLASS(LudotMcpInstaller);
         EditorNode::add_init_callback(initialize_luau_shader_editor);
     }
 #endif

@@ -111,11 +111,11 @@ def scan(project_dir: Path) -> ProjectIndex:
 
 
 def _collect_entry_points(index: ProjectIndex) -> None:
-    godot = index.texts.get("res://project.godot", "")
-    main = re.search(r'run/main_scene\s*=\s*"(res://[^"]+)"', godot)
+    project_text = index.texts.get("res://project.ludot") or index.texts.get("res://project.godot", "")
+    main = re.search(r'run/main_scene\s*=\s*"(res://[^"]+)"', project_text)
     if main:
         index.entry_points.add(main.group(1))
-    for auto in re.findall(r'^\s*[\w.]+\s*=\s*"\*?(res://[^"]+)"', godot, re.MULTILINE):
+    for auto in re.findall(r'^\s*[\w.]+\s*=\s*"\*?(res://[^"]+)"', project_text, re.MULTILINE):
         index.entry_points.add(auto)
     # Enabled plugins: their plugin.cfg `script=` is the EditorPlugin entry point.
     for res, text in index.texts.items():
@@ -139,7 +139,7 @@ def find_unused_resources(index: ProjectIndex) -> dict[str, Any]:
         for res in index.resources
         if res not in index.referenced
         and res not in index.entry_points
-        and res != "res://project.godot"
+        and res not in ("res://project.ludot", "res://project.godot")
     )
     return {"unused": unused, "scanned": len(index.resources), "referenced": len(index.referenced)}
 

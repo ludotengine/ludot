@@ -27,7 +27,7 @@ def build_health(
 ) -> HealthStatus:
     """Assemble the current health status from injected state (pure, testable)."""
     return HealthStatus(
-        server="godot-mcp",
+        server="ludot-mcp",
         version=__version__,
         transport=config.transport,
         bridge_url=config.bridge.url,

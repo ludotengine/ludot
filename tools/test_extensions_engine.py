@@ -11,7 +11,7 @@ args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='ludot-extension-engine-') as directory:
     project = Path(directory)
-    (project / 'project.godot').write_text('config_version=5\n')
+    (project / 'project.ludot').write_text('config_version=5\n')
     (project / 'states.luau').write_text('export enum State = { Idle, Running = 7 }\nexport enum Text = { First = "hello, world", Second = "second: value" }')
     (project / 'pipeline.luau').write_text((root / 'tests/fixtures/extensions/generic_pipeline.luau').read_text())
     (project / 'probe.luau').write_text('''import "./states" as states

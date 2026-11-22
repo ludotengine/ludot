@@ -226,7 +226,7 @@ def _addon_drift_warning(
         f"SERVER↔ADDON DRIFT: the connected addon does not register {len(missing)} "
         f"command(s) the server exposes ({sample}). The addon is likely older than "
         "the server (or vice versa). Update both sides to the same release: "
-        "pip-install the matching godot-editor-mcp and copy godot/addons/godot_mcp/ "
+        "pip-install the matching ludot-editor-mcp and copy godot/addons/godot_mcp/ "
         "from the same version."
     )
 
@@ -317,13 +317,13 @@ def _next_steps(
     steps: list[str] = []
     if update is not None and update.update_available:
         steps.append(
-            f"A newer Godot Editor MCP release is available: {update.latest} (you are on "
-            f"{update.current}). Update the server and the Godot addon to the same "
-            "release (pip install -U godot-editor-mcp)."
+            f"A newer Ludot Editor MCP release is available: {update.latest} (you are on "
+            f"{update.current}). Update the server and the Ludot addon to the same "
+            "release (pip install -U ludot-editor-mcp)."
         )
     if not bridge_connected:
         steps.append(
-            "BRIDGE IS OFFLINE: Open Godot with the addon enabled, then retry. "
+            "BRIDGE IS OFFLINE: Open Ludot with the addon enabled, then retry. "
             "The addon lives at godot/addons/godot_mcp/."
         )
         return steps
@@ -367,7 +367,7 @@ def register_diagnostics(
         )
         update = checker.cached() if checker is not None else None
         return ServerDiagnostics(
-            server="godot-mcp",
+            server="ludot-mcp",
             version=__version__,
             contract_version=CONTRACT_VERSION,
             min_compatible_contract=MIN_COMPATIBLE_CONTRACT,

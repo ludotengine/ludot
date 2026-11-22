@@ -1,13 +1,13 @@
 <p align="center">
   <a href="https://hybridindie.github.io/godot-mcp/">
-    <img src="docs/assets/social-banner.svg" alt="Godot Editor MCP — drive a live Godot editor from an AI agent over MCP" width="100%">
+    <img src="docs/assets/social-banner.svg" alt="Ludot Editor MCP — drive a live Ludot editor from an AI agent over MCP" width="100%">
   </a>
 </p>
 
-<h1 align="center">Godot Editor MCP</h1>
+<h1 align="center">Ludot Editor MCP</h1>
 
 <p align="center">
-  A <strong>generic, game-agnostic</strong> <a href="https://modelcontextprotocol.io">Model Context Protocol</a> (MCP) server for <strong>AI-driven Godot development</strong>.
+  A <strong>generic, game-agnostic</strong> <a href="https://modelcontextprotocol.io">Model Context Protocol</a> (MCP) server for <strong>AI-driven Ludot development</strong>.
 </p>
 
 <p align="center">
@@ -30,16 +30,16 @@
 
 > **Project-defined tools** (new in 2026.11.04): annotate a typed GDScript function with `## @mcp_tool` and register it as a `godot_project_*` tool — [guide](docs/site/guides-project-tools.md).
 
-> **One name, three identifiers.** **Godot Editor MCP** is the product: it drives the
-> **editor** as its surface, through the addon. The repository and MCP server ID stay
-> `godot-mcp` for wire compatibility; the package/CLI is `godot-editor-mcp`; the in-editor
-> plugin is **Godot Editor MCP - Addon**; and every tool shares the `godot_` prefix.
+> **One name, three identifiers.** **Ludot Editor MCP** is the product: it drives the
+> **editor** as its surface, through the addon. The MCP server ID is `ludot-mcp`;
+> the package/CLI is `ludot-editor-mcp`; the in-editor
+> plugin is **Ludot Editor MCP - Addon**; and every tool shares the `godot_` prefix for protocol compatibility.
 
 ---
 
 ## What it is
 
-Godot Editor MCP bridges an AI agent and a **live** Godot editor. Instead of editing files blindly on disk, the agent drives the editor directly over MCP:
+Ludot Editor MCP bridges an AI agent and a **live** Ludot editor. Instead of editing files blindly on disk, the agent drives the editor directly over MCP:
 
 - **Inspect** the scene tree, selected nodes, and project settings live
 - **Mutate** scenes — nodes, scripts, signals — with undo
@@ -67,38 +67,25 @@ AI client ──stdio / HTTP──▶ FastMCP server ──WebSocket──▶ Go
 **1. Install the server**
 
 ```bash
-pip install godot-editor-mcp          # stable 2026.11.04 (Godot 4.7 validated)
-pip install --pre godot-editor-mcp    # beta 2026.11.04b2 (Godot 4.8-beta2)
+uv tool install --force ./mcp
+# or inside a virtualenv:
+pip install ./mcp
 ```
 
-`pip install` and `uvx godot-editor-mcp` resolve the **stable** release. The beta is opt-in via `--pre` (PyPI normalizes it to `2026.11.4b2`).
+**2. Install the Ludot addon** into your project — either automatically via *Project → Setup Ludot MCP...* (or *Project Settings → Plugins → Setup Ludot MCP...*), or by copying `mcp/godot/addons/godot_mcp/` into your project's `addons/` folder and enabling **Ludot Editor MCP - Addon** under *Project → Project Settings → Plugins*.
 
-**2. Install the Godot addon** into your project, then enable it in *Project → Project Settings → Plugins → Godot Editor MCP - Addon*:
+A status dock appears in the editor; the addon connects out to the server's bridge (`ws://127.0.0.1:9080` by default) and reconnects automatically, so editor and server can start in either order.
 
-```bash
-# stable addon (2026.11.04)
-curl -L -o godot_mcp_addon.zip \
-  https://github.com/hybridindie/godot-mcp/releases/latest/download/godot_mcp_addon.zip
-
-# beta addon (2026.11.04b2) — use the matching server release
-curl -L -o godot_mcp_addon.zip \
-  https://github.com/hybridindie/godot-mcp/releases/download/2026.11.04b2/godot_mcp_addon.zip
-
-unzip godot_mcp_addon.zip -d /path/to/your/project/
-```
-
-(Or install **Godot Editor MCP - Addon** from the [Godot Asset Store](https://store.godotengine.org/asset/john-d-studios/godot-editor-mcp-addon/).) A status dock appears in the editor; the addon connects out to the server's bridge (`ws://127.0.0.1:9080` by default) and reconnects automatically, so editor and server can start in either order.
-
-**3. Point your MCP client at it** — generate the config, or write the OpenCode entry by hand:
+**3. Point your MCP client at it** — use *Project → Setup Ludot MCP...* in the editor to configure all detected AI providers, or use the CLI:
 
 ```bash
-godot-editor-mcp config --client opencode --write
-godot-editor-mcp config --client cursor --project /path/to/project --write
-godot-editor-mcp doctor --project /path/to/project   # checklist + a fix for every failure
+ludot-editor-mcp config --client opencode --write
+ludot-editor-mcp config --client cursor --project /path/to/project --write
+ludot-editor-mcp doctor --project /path/to/project   # checklist + a fix for every failure
 ```
 
 ```json
-{ "mcp": { "godot": { "type": "local", "command": ["uvx", "godot-editor-mcp"] } } }
+{ "mcp": { "ludot": { "type": "local", "command": ["ludot-editor-mcp"] } } }
 ```
 
 **4. Ask the agent to work**
@@ -109,8 +96,7 @@ godot-editor-mcp doctor --project /path/to/project   # checklist + a fix for eve
 **5. (Recommended) Install the skills** — paste this into your assistant so it learns how to drive the editor (enable toolsets on its own, read the result verdicts, and avoid the common Godot pitfalls). The server works without them — the instructions and prompts are the fallback — but they make it noticeably better:
 
 ```text
-Install the Godot Editor MCP AI skills into your skills directory: clone or download
-https://github.com/hybridindie/godot-mcp and copy the three folders under its `skills/`
+Install the Ludot Editor MCP AI skills into your skills directory: copy the three folders under `mcp/skills/`
 directory (godot-getting-started, godot-playtest-and-debug, godot-expert) into your
 skills directory — keep godot-expert/references/ — then reload your skills.
 ```

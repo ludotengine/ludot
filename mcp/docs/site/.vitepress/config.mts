@@ -5,9 +5,9 @@ const BASE = '/godot-mcp/'
 
 export default withMermaid(defineConfig({
   lang: 'en-US',
-  title: 'Godot Editor MCP',
+  title: 'Ludot Editor MCP',
   description:
-    'Godot Editor MCP bridges an AI agent and a live Godot editor over MCP — inspect, mutate, run, verify. 210 tools across 29 categories (28 toggleable toolsets plus always-on core); the server owns safety, the addon owns Godot.',
+    'Ludot Editor MCP bridges an AI agent and a live Ludot editor over MCP — inspect, mutate, run, verify. 210 tools across 29 categories (28 toggleable toolsets plus always-on core); the server owns safety, the addon owns Ludot.',
   base: BASE,
   outDir: 'dist',
   ignoreDeadLinks: false,
@@ -44,7 +44,7 @@ export default withMermaid(defineConfig({
     class: 'mermaid-blocks',
   },
   themeConfig: {
-    siteTitle: 'Godot Editor MCP',
+    siteTitle: 'Ludot Editor MCP',
     nav: [
       { text: 'Start here', link: '/getting-started' },
       { text: 'For creators', link: '/for-creators' },

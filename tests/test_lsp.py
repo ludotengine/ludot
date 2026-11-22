@@ -79,7 +79,7 @@ class LspTests(unittest.TestCase):
                 with self.subTest(methods=method_style, properties=property_style):
                     project = self.root / (method_style + '-' + property_style)
                     project.mkdir()
-                    (project / 'project.godot').write_text('config_version=5\n[luau]\napi/method_casing=' + json.dumps(method_style) + '\napi/property_casing=' + json.dumps(property_style) + '\n')
+                    (project / 'project.ludot').write_text('config_version=5\n[luau]\napi/method_casing=' + json.dumps(method_style) + '\napi/property_casing=' + json.dumps(property_style) + '\n')
                     method = name('get_instance_id', method_style)
                     prop = name('position', property_style)
                     component = name('x', property_style)
@@ -114,7 +114,7 @@ class LspTests(unittest.TestCase):
                     self.server.documents[uri] = {'version': 3, 'text': '--!strict\nclass Custom_Name = { public custom_field: number = 1 function Do_Not_Change(): number return self.custom_field end }\nreturn Custom_Name.new():Do_Not_Change()'}
                     checked, _ = self.server.analyze(uri)
                     self.assertEqual(checked['diagnostics'], [])
-                    (project / 'project.godot').write_text('config_version=5\n[luau]\napi/method_casing="snake_case"\napi/property_casing="snake_case"\n')
+                    (project / 'project.ludot').write_text('config_version=5\n[luau]\napi/method_casing="snake_case"\napi/property_casing="snake_case"\n')
                     self.assertEqual(self.server.api_casing(project / 'Main.luau'), (method_style, property_style))
 
     def test_persistent_session_and_import_invalidation(self):

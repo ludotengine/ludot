@@ -33,6 +33,6 @@ async def test_stdio_server_health_check_callable() -> None:
     async with Client(_entrypoint_transport()) as client:
         result = await client.call_tool("godot_health_check", {})
     payload = result.structured_content
-    assert payload["server"] == "godot-mcp"
+    assert payload["server"] == "ludot-mcp"
     # No editor running under this test ⇒ bridge reports disconnected, not an error.
     assert payload["bridge_connected"] is False

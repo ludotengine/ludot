@@ -55,6 +55,8 @@ public:
 	typedef HashMap<String, Variant> CustomMap;
 	// This constant is used to make the ".godot" folder and paths like "res://.godot/editor".
 	static inline const String PROJECT_DATA_DIR_NAME_SUFFIX = "godot";
+	static inline const String PROJECT_FILE_NAME = "project.ludot";
+	static inline const String LEGACY_PROJECT_FILE_NAME = "project.godot";
 	static inline const String EDITOR_SETTING_OVERRIDE_PREFIX = PNAME("editor_overrides") + String("/");
 
 	// Properties that are not for built in values begin from this value, so builtin ones are displayed first.
@@ -117,6 +119,7 @@ protected:
 	bool is_global_class_list_loaded = false;
 
 	String project_data_dir_name;
+	String project_file_name = PROJECT_FILE_NAME;
 
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
@@ -185,6 +188,9 @@ public:
 
 	String get_project_data_dir_name() const;
 	String get_project_data_path() const;
+	String get_project_file_name() const { return project_file_name; }
+	static String resolve_project_file(const String &p_dir);
+	static bool is_project_file_name(const String &p_name);
 	String get_resource_path() const;
 	String get_imported_files_path() const;
 

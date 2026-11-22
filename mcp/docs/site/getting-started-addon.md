@@ -28,10 +28,10 @@ matters. See [Bridge & transport](architecture/bridge.md).
 
 ## Option A: Godot Asset Store (easiest)
 
-The addon is published as **Godot Editor MCP - Addon** on the
+The addon is published as **Ludot Editor MCP - Addon** on the
 [Godot Asset Store](https://store.godotengine.org/asset/john-d-studios/godot-editor-mcp-addon/).
 Install it into your project from there — or, inside Godot, open the **AssetLib**
-tab, search for **Godot Editor MCP - Addon**, and **Install**.
+tab, search for **Ludot Editor MCP - Addon**, and **Install**.
 
 ## Option B: copy into your own project (from source)
 
@@ -48,7 +48,7 @@ testable.
 ---
 
 After installing by any method, enable the plugin: **Project Settings →
-Plugins → Godot Editor MCP - Addon**. The addon checks the editor version on enable and warns
+Plugins → Ludot Editor MCP - Addon**. The addon checks the editor version on enable and warns
 below 4.4.
 
 ::: warning A project created in the Project Manager starts without the addon
@@ -111,7 +111,7 @@ editor resumes automatically.
 
 The editor's own external-file detection is **window-focus-driven** — files
 changed by an agent, git, or any other tool while Godot is unfocused stay
-invisible until you click into the editor. All files written *through* Godot Editor MCP
+invisible until you click into the editor. All files written *through* Ludot Editor MCP
 tools already refresh the editor's filesystem view automatically; for edits made
 outside the MCP path, enable the opt-in auto-refresh:
 

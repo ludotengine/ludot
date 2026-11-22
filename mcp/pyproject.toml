@@ -1,7 +1,7 @@
 [project]
-name = "godot-editor-mcp"
+name = "ludot-editor-mcp"
 version = "2026.11.04"
-description = "MCP server that drives a live Godot editor for AI-driven game development"
+description = "MCP server that drives a live Ludot editor for AI-driven game development"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
@@ -59,7 +59,7 @@ Issues = "https://github.com/hybridindie/godot-mcp/issues"
 Changelog = "https://github.com/hybridindie/godot-mcp/releases"
 
 [project.scripts]
-godot-editor-mcp = "mcp_server.main:main"
+ludot-editor-mcp = "mcp_server.main:main"
 
 [dependency-groups]
 dev = [

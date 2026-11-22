@@ -35,7 +35,7 @@ async def _call_tool(server: FastMCP, name: str, arguments: dict[str, object] | 
 def test_diagnostics_tool_exists(server: FastMCP) -> None:
     """get_server_info is registered and callable."""
     result_text = asyncio.run(_call_tool(server, "godot_get_server_info"))
-    assert "godot-mcp" in result_text
+    assert "ludot-mcp" in result_text
     assert "toolsets" in result_text
 
 

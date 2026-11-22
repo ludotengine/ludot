@@ -14,7 +14,8 @@ extends RefCounted
 
 const DIRS := ["res://scenes/", "res://scripts/", "res://assets/", "res://shaders/"]
 const GAME_STATE_SCRIPT := "res://scripts/game_state.gd"
-const PROJECT_FILE := "res://project.godot"
+const PROJECT_FILE := "res://project.ludot"
+const LEGACY_PROJECT_FILE := "res://project.godot"
 const SETTING_KEYS := [
 	"application/config/name",
 	"display/window/size/viewport_width",
@@ -92,11 +93,13 @@ func _snapshot(main_scene_path: String) -> Dictionary:
 			"uid_existed": uid_existed,
 			"uid_text": FileAccess.get_file_as_string(uid_path) if uid_existed else "",
 		}
+	var project_file := PROJECT_FILE if FileAccess.file_exists(PROJECT_FILE) else LEGACY_PROJECT_FILE
 	return {
 		"settings": settings,
 		"dirs": dirs,
 		"files": files,
-		"project_text": FileAccess.get_file_as_string(PROJECT_FILE),
+		"project_file": project_file,
+		"project_text": FileAccess.get_file_as_string(project_file),
 	}
 
 
@@ -156,19 +159,20 @@ func _rollback(snapshot: Dictionary) -> Dictionary:
 
 	var save_err := ProjectSettings.save()
 	if save_err != OK:
-		# Last resort: put the original project.godot bytes back on disk.
+		# Last resort: put the original project file bytes back on disk.
+		var project_file := str(snapshot.get("project_file", PROJECT_FILE))
 		var project_text := str(snapshot["project_text"])
 		if project_text.is_empty():
 			errors.append("could not save project settings (error %d)" % save_err)
 		else:
-			var file := FileAccess.open(PROJECT_FILE, FileAccess.WRITE)
+			var file := FileAccess.open(project_file, FileAccess.WRITE)
 			if file == null:
-				errors.append("could not restore project.godot (error %d)" % save_err)
+				errors.append("could not restore %s (error %d)" % [project_file.get_file(), save_err])
 			else:
 				file.store_string(project_text)
 				file.close()
 				# The disk is authoritative again; drop the editor's stale view.
-				EditorInterface.get_resource_filesystem().update_file(PROJECT_FILE)
+				EditorInterface.get_resource_filesystem().update_file(project_file)
 
 	if errors.is_empty():
 		return {"ok": true}

@@ -39,7 +39,7 @@ async def test_health_check_reports_connected_bridge() -> None:
     async with Client(server) as client:
         result = await client.call_tool("godot_health_check", {})
     payload = result.structured_content
-    assert payload["server"] == "godot-mcp"
+    assert payload["server"] == "ludot-mcp"
     assert payload["version"] == __version__
     assert payload["bridge_connected"] is True
     assert payload["bridge_url"] == ServerConfig().bridge.url

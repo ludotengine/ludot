@@ -8,7 +8,7 @@ updated: 2026-10-18
 
 # The compatibility contract
 
-Godot Editor MCP is built to be consumed by other software — an agent harness, an
+Ludot Editor MCP is built to be consumed by other software — an agent harness, an
 orchestrator, an eval runner, or your own client. The **contract** is the stable boundary
 between that software and this server.
 
@@ -126,7 +126,7 @@ compatible = (
     <= info["contract_version"]
 )
 if not compatible:
-    raise RuntimeError(f"Godot Editor MCP contract mismatch: {info}")
+    raise RuntimeError(f"Ludot Editor MCP contract mismatch: {info}")
 ```
 
 That turns an incompatible server into one clear startup error instead of a sequence of

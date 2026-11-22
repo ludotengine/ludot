@@ -690,7 +690,7 @@ Error ProjectSettings::_setup(const String &p_path, const String &p_main_pack, b
 		bool ok = _load_resource_pack(p_main_pack, false, 0, true);
 		ERR_FAIL_COND_V_MSG(!ok, ERR_CANT_OPEN, vformat("Cannot open resource pack '%s'.", p_main_pack));
 
-		Error err = _load_settings_text_or_binary("res://project.godot", "res://project.binary");
+		Error err = _load_settings_text_or_binary("res://project.ludot", "res://project.binary");
 #ifdef OVERRIDE_ENABLED
 		if (err == OK && !p_ignore_override) {
 			// Load override from location of the main pack
@@ -745,7 +745,7 @@ Error ProjectSettings::_setup(const String &p_path, const String &p_main_pack, b
 
 		// If we opened our package, try and load our project.
 		if (found) {
-			Error err = _load_settings_text_or_binary("res://project.godot", "res://project.binary");
+			Error err = _load_settings_text_or_binary("res://project.ludot", "res://project.binary");
 #ifdef OVERRIDE_ENABLED
 			if (err == OK && !p_ignore_override) {
 				// Load overrides from the PCK and the executable location.
@@ -770,7 +770,7 @@ Error ProjectSettings::_setup(const String &p_path, const String &p_main_pack, b
 	// (Only Android -when reading from PCK-.)
 
 	if (!OS::get_singleton()->get_resource_dir().is_empty()) {
-		Error err = _load_settings_text_or_binary("res://project.godot", "res://project.binary");
+		Error err = _load_settings_text_or_binary("res://project.ludot", "res://project.binary");
 #ifdef OVERRIDE_ENABLED
 		if (err == OK && !p_ignore_override) {
 			// Optional, we don't mind if it fails.
@@ -796,7 +796,7 @@ Error ProjectSettings::_setup(const String &p_path, const String &p_main_pack, b
 
 		Error err;
 
-		err = _load_settings_text_or_binary(resource_path.path_join("project.godot"), resource_path.path_join("project.binary"));
+		err = _load_settings_text_or_binary(resource_path.path_join(PROJECT_FILE_NAME), resource_path.path_join("project.binary"));
 		if (err == OK && !p_ignore_override) {
 			// Optional, we don't mind if it fails.
 #ifdef OVERRIDE_ENABLED
@@ -825,7 +825,7 @@ Error ProjectSettings::_setup(const String &p_path, const String &p_main_pack, b
 		// Set the resource path early so things can be resolved when loading.
 		resource_path = current_dir;
 		resource_path = resource_path.replace_char('\\', '/'); // Windows path to Unix path just in case.
-		err = _load_settings_text_or_binary(current_dir.path_join("project.godot"), current_dir.path_join("project.binary"));
+		err = _load_settings_text_or_binary(current_dir.path_join(PROJECT_FILE_NAME), current_dir.path_join("project.binary"));
 		if (err == OK) {
 #ifdef OVERRIDE_ENABLED
 			if (!p_ignore_override) {
@@ -969,10 +969,13 @@ Error ProjectSettings::_load_settings_text(const String &p_path) {
 
 		err = VariantParser::parse_tag_assign_eof(&stream, lines, error_text, next_tag, assign, value, nullptr, true);
 		if (err == ERR_FILE_EOF) {
-			// If we're loading a project.godot from source code, we can operate some
+			// If we're loading a project file from source code, we can operate some
 			// ProjectSettings conversions if need be.
 			_convert_to_last_version(config_version);
-			last_save_time = FileAccess::get_modified_time(get_resource_path().path_join("project.godot"));
+			if (is_project_file_name(p_path.get_file())) {
+				project_file_name = p_path.get_file();
+			}
+			last_save_time = FileAccess::get_modified_time(get_resource_path().path_join(project_file_name));
 			return OK;
 		}
 		ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Error parsing '%s' at line %d: %s File might be corrupted.", p_path, lines, error_text));
@@ -1004,8 +1007,19 @@ Error ProjectSettings::_load_settings_text_or_binary(const String &p_text_path, 
 		ERR_PRINT(vformat("Couldn't load file '%s', error code %d.", p_bin_path, err));
 	}
 
-	// Fallback to text-based project.godot file if binary was not found.
-	err = _load_settings_text(p_text_path);
+	// Fallback to text-based project.ludot (or legacy project.godot) file if binary was not found.
+	String text_path = p_text_path;
+	err = _load_settings_text(text_path);
+	if (err == ERR_FILE_NOT_FOUND && text_path.get_file() == PROJECT_FILE_NAME) {
+		String legacy_path = text_path.begins_with("res://")
+				? String("res://") + LEGACY_PROJECT_FILE_NAME
+				: text_path.get_base_dir().path_join(LEGACY_PROJECT_FILE_NAME);
+		Error legacy_err = _load_settings_text(legacy_path);
+		if (legacy_err != ERR_FILE_NOT_FOUND) {
+			text_path = legacy_path;
+			err = legacy_err;
+		}
+	}
 	if (err == OK) {
 #ifndef DISABLE_DEPRECATED
 		const PackedStringArray features = get_setting("application/config/features");
@@ -1024,7 +1038,7 @@ Error ProjectSettings::_load_settings_text_or_binary(const String &p_text_path, 
 #endif
 		return OK;
 	} else if (err != ERR_FILE_NOT_FOUND) {
-		ERR_PRINT(vformat("Couldn't load file '%s', error code %d.", p_text_path, err));
+		ERR_PRINT(vformat("Couldn't load file '%s', error code %d.", text_path, err));
 	}
 
 	return err;
@@ -1066,10 +1080,27 @@ void ProjectSettings::clear(const String &p_name) {
 	_queue_changed(p_name);
 }
 
+String ProjectSettings::resolve_project_file(const String &p_dir) {
+	String ludot_path = p_dir.path_join(PROJECT_FILE_NAME);
+	if (FileAccess::exists(ludot_path)) {
+		return ludot_path;
+	}
+	String legacy_path = p_dir.path_join(LEGACY_PROJECT_FILE_NAME);
+	if (FileAccess::exists(legacy_path)) {
+		return legacy_path;
+	}
+	return ludot_path;
+}
+
+bool ProjectSettings::is_project_file_name(const String &p_name) {
+	return p_name == PROJECT_FILE_NAME || p_name == LEGACY_PROJECT_FILE_NAME;
+}
+
 Error ProjectSettings::save() {
-	Error error = save_custom(get_resource_path().path_join("project.godot"));
+	String path = get_resource_path().path_join(project_file_name);
+	Error error = save_custom(path);
 	if (error == OK) {
-		last_save_time = FileAccess::get_modified_time(get_resource_path().path_join("project.godot"));
+		last_save_time = FileAccess::get_modified_time(path);
 	}
 	return error;
 }
@@ -1147,7 +1178,7 @@ Error ProjectSettings::_save_settings_text(const String &p_file, const RBMap<Str
 	Error err;
 	Ref<FileAccess> file = FileAccess::open(p_file, FileAccess::WRITE, &err);
 
-	ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Couldn't save project.godot - %s.", p_file));
+	ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Couldn't save project file - %s.", p_file));
 
 	file->store_line("; Engine configuration file.");
 	file->store_line("; It's best edited using the editor UI and not directly,");
@@ -1315,7 +1346,7 @@ Error ProjectSettings::save_custom(const String &p_path, const CustomMap &p_cust
 		save_features += f;
 	}
 
-	if (p_path.ends_with(".godot") || p_path.ends_with("override.cfg")) {
+	if (p_path.ends_with(".ludot") || p_path.ends_with(".godot") || p_path.ends_with("override.cfg")) {
 		return _save_settings_text(p_path, save_props, p_custom, save_features);
 	} else if (p_path.ends_with(".binary")) {
 		return _save_settings_binary(p_path, save_props, p_custom, save_features);
@@ -1886,6 +1917,9 @@ ProjectSettings::ProjectSettings() {
 }
 
 ProjectSettings::ProjectSettings(const String &p_path) {
+	if (is_project_file_name(p_path.get_file())) {
+		project_file_name = p_path.get_file();
+	}
 	if (load_custom(p_path) == OK) {
 		resource_path = p_path.get_base_dir();
 		project_loaded = true;

@@ -12,7 +12,7 @@ updated: 2026-10-18
 This is the architecture track. New here and just want to make a game? → **[For creators](../for-creators.md)**.
 :::
 
-Godot Editor MCP is two halves joined by one seam. Keep the seam clean; keep logic out
+Ludot Editor MCP is two halves joined by one seam. Keep the seam clean; keep logic out
 of the handlers.
 
 ```mermaid
@@ -20,11 +20,11 @@ flowchart LR
     subgraph client["Agent side"]
         AI["AI client (OpenCode / Claude / any MCP client)"]
     end
-    subgraph server["Godot Editor MCP server (Python)"]
+    subgraph server["Ludot Editor MCP server (Python)"]
         SRV["FastMCP server 210 tools · safety · Pydantic models"]
         BR["WebSocket listener ws://127.0.0.1:9080"]
     end
-    subgraph addon["Godot Editor MCP addon (GDScript)"]
+    subgraph addon["Ludot Editor MCP addon (GDScript)"]
         WS["WebSocketPeer client connects out · reconnects"]
         RT["Command router cmd_* handlers"]
     end

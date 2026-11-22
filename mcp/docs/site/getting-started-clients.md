@@ -1,7 +1,7 @@
 ---
 type: index
 title: "Configure your MCP client"
-description: "Register Godot Editor MCP in OpenCode, Claude, or any MCP host — stdio or HTTP."
+description: "Register Ludot Editor MCP in OpenCode, Claude, or any MCP host — stdio or HTTP."
 created: 2026-09-19
 updated: 2026-10-18
 ---
@@ -14,21 +14,21 @@ The server ships a small setup CLI. It prints (or with `--write` merges into)
 the client's MCP config without clobbering other servers:
 
 ```bash
-godot-editor-mcp config --client claude-code --project /path/to/game --write
-godot-editor-mcp config --client cursor --project /path/to/game --write
-godot-editor-mcp config --client vscode --project /path/to/game --write
-godot-editor-mcp config --client codex --write
-godot-editor-mcp config --client gemini --write
-godot-editor-mcp config --client opencode --project /path/to/game --write
+ludot-editor-mcp config --client claude-code --project /path/to/game --write
+ludot-editor-mcp config --client cursor --project /path/to/game --write
+ludot-editor-mcp config --client vscode --project /path/to/game --write
+ludot-editor-mcp config --client codex --write
+ludot-editor-mcp config --client gemini --write
+ludot-editor-mcp config --client opencode --project /path/to/game --write
 ```
 
-Without `--write` it prints the merged config. An existing `godot-mcp` entry is
+Without `--write` it prints the merged config. An existing `ludot-mcp` entry is
 refused unless you pass `--force`.
 
 Then check the whole install:
 
 ```bash
-godot-editor-mcp doctor --project /path/to/game
+ludot-editor-mcp doctor --project /path/to/game
 ```
 
 It checks Python/uv, the Godot binary and version, the addon's presence and
@@ -45,7 +45,7 @@ works in CI.
   "mcp": {
     "godot": {
       "type": "local",
-      "command": ["uv", "run", "--directory", "/path/to/godot-mcp", "godot-editor-mcp"]
+      "command": ["uv", "run", "--directory", "/path/to/godot-mcp", "ludot-editor-mcp"]
     }
   }
 }
@@ -58,7 +58,7 @@ Or with a PyPI install:
   "mcp": {
     "godot": {
       "type": "local",
-      "command": ["godot-editor-mcp"]
+      "command": ["ludot-editor-mcp"]
     }
   }
 }
@@ -100,12 +100,12 @@ Any MCP client works the same way — the server speaks standard MCP over stdio
 or Streamable HTTP:
 
 - **Any MCP client or agent harness**: register the server with the same
-  `command` (stdio) or `url` (HTTP) shape in its MCP config. Godot Editor MCP speaks
+  `command` (stdio) or `url` (HTTP) shape in its MCP config. Ludot Editor MCP speaks
   standard MCP, so any client that drives MCP tools works — a coding agent, an
   IDE assistant, or your own orchestrator.
 
 ::: info Sessions are stateless
-Godot Editor MCP serves the sessionless MCP `2026-07-28` protocol shape: no
+Ludot Editor MCP serves the sessionless MCP `2026-07-28` protocol shape: no
 per-session state, and toolset grants are server-global. A reconnect keeps
 the grant — nothing to re-establish.
 :::
@@ -128,7 +128,7 @@ the *initial* `tools/list` already contains them and no refresh is needed:
   "mcp": {
     "godot": {
       "type": "local",
-      "command": ["godot-editor-mcp"],
+      "command": ["ludot-editor-mcp"],
       "env": { "GODOT_MCP_DEFAULT_TOOLSETS": "scene_edit,scripts,physics,runtime" }
     }
   }
@@ -184,7 +184,7 @@ the safer configuration.
 A capable client (Claude Code's CLI) subscribes only when the server's
 handshake advertises `capabilities.tools.listChanged: true`. On the
 `2026-07-28` sessionless protocol MCP derives that flag from whether the server
-serves a `subscriptions/listen` stream. Godot Editor MCP now serves it — it registers
+serves a `subscriptions/listen` stream. Ludot Editor MCP now serves it — it registers
 the mcp SDK's `ListenHandler` on FastMCP's low-level server, the same wiring
 mcp's own `MCPServer` uses — so the modern `server/discover` advertises
 `tools.listChanged: true` and a subscribing client receives

@@ -24,9 +24,9 @@ import mcp_server
 from mcp_server.config import BridgeConfig, ServerConfig
 from mcp_server.runtime import find_godot_binary
 
-SERVER_NAME = "godot-mcp"
+SERVER_NAME = "ludot-mcp"
 COMMAND = "uvx"
-ARGS = ["godot-editor-mcp"]
+ARGS = ["ludot-editor-mcp"]
 
 # client -> (path template, format, root key)
 _CLIENTS: dict[str, tuple[str, str, str]] = {
@@ -57,15 +57,15 @@ def _entry(
 
 def _toml_snippet(project: Path | None) -> str:
     lines = [
-        "[mcp_servers.godot-mcp]",
+        f"[mcp_servers.{SERVER_NAME}]",
         f'command = "{COMMAND}"',
-        'args = ["godot-editor-mcp"]',
+        f'args = ["{ARGS[0]}"]',
     ]
     if project is not None:
         lines.extend(
             [
                 "",
-                "[mcp_servers.godot-mcp.env]",
+                f"[mcp_servers.{SERVER_NAME}.env]",
                 f"GODOT_MCP_PROJECT_DIR = {json.dumps(str(project))}",
             ]
         )
@@ -142,12 +142,13 @@ def _config(args: argparse.Namespace) -> int:
                 tomllib.loads(existing)
             except tomllib.TOMLDecodeError as exc:
                 raise SystemExit(f"error: {path} is not valid TOML: {exc}") from exc
-            if "[mcp_servers.godot-mcp]" in existing and not args.force:
+            toml_header = f"[mcp_servers.{SERVER_NAME}]"
+            if toml_header in existing and not args.force:
                 raise SystemExit(
-                    f"error: {path} already has [mcp_servers.godot-mcp]; use --force to replace it."
+                    f"error: {path} already has {toml_header}; use --force to replace it."
                 )
-            if "[mcp_servers.godot-mcp]" in existing:
-                existing = _strip_toml_table(existing, "mcp_servers.godot-mcp")
+            if toml_header in existing:
+                existing = _strip_toml_table(existing, f"mcp_servers.{SERVER_NAME}")
         text = existing.rstrip() + ("\n\n" if existing.strip() else "") + snippet
 
     if args.write:
@@ -192,12 +193,20 @@ def _addon_version(path: Path) -> str | None:
     return match.group(1) if match else None
 
 
+def _project_file(project: Path) -> Path | None:
+    for name in ("project.ludot", "project.godot"):
+        candidate = project / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def _addon_enabled(project: Path, plugin: Path) -> bool:
-    godot = project / "project.godot"
-    if not godot.is_file():
+    project_file = _project_file(project)
+    if project_file is None:
         return False
     rel = "res://" + plugin.relative_to(project).as_posix()
-    text = godot.read_text(encoding="utf-8", errors="replace")
+    text = project_file.read_text(encoding="utf-8", errors="replace")
     match = re.search(r"^enabled=PackedStringArray\((.*?)\)", text, re.M)
     return bool(match and rel in match.group(1))
 
@@ -232,17 +241,18 @@ def _doctor(args: argparse.Namespace) -> int:
     checks.append(
         _check(
             binary is not None and godot_version is not None,
-            "godot",
+            "ludot",
             godot_version or "not found",
             "set GODOT_MCP_GODOT_BIN or put ludot or godot on PATH",
         )
     )
+    project_file = _project_file(project)
     checks.append(
         _check(
-            (project / "project.godot").is_file(),
+            project_file is not None,
             "project",
             str(project),
-            "pass --project <path to a Godot project>",
+            "pass --project <path to a Ludot or Godot project>",
         )
     )
     plugin = _find_addon(project)
@@ -266,11 +276,13 @@ def _doctor(args: argparse.Namespace) -> int:
                 "update the addon and the server to the same release",
             )
         )
+        enabled = _addon_enabled(project, plugin)
+        project_label = project_file.name if project_file is not None else "project.ludot"
         checks.append(
             _check(
-                _addon_enabled(project, plugin),
+                enabled,
                 "addon enabled",
-                "enabled in project.godot" if _addon_enabled(project, plugin) else "not enabled",
+                f"enabled in {project_label}" if enabled else "not enabled",
                 "Project Settings → Plugins → enable godot_mcp (or add it to "
                 "[editor_plugins] enabled)",
             )
@@ -294,7 +306,7 @@ def _doctor(args: argparse.Namespace) -> int:
                 False,
                 "bridge",
                 f"{host}:{port} not reachable",
-                "start the server: godot-editor-mcp (then open the project with the addon enabled)",
+                "start the server: ludot-editor-mcp (then open the project with the addon enabled)",
             )
         )
     return 0 if all(checks) else 1
@@ -302,28 +314,28 @@ def _doctor(args: argparse.Namespace) -> int:
 
 def config_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="godot-editor-mcp config",
+        prog="ludot-editor-mcp config",
         description="Print or merge a client's MCP config.",
     )
     parser.add_argument("--client", required=True, choices=sorted(_CLIENTS))
     parser.add_argument(
-        "--project", default=None, help="Godot project path (project-local clients)"
+        "--project", default=None, help="Ludot project path (project-local clients)"
     )
     parser.add_argument(
         "--write", action="store_true", help="write the merged config"
     )
     parser.add_argument(
-        "--force", action="store_true", help="replace an existing godot-mcp entry"
+        "--force", action="store_true", help="replace an existing ludot-mcp entry"
     )
     return parser
 
 
 def doctor_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="godot-editor-mcp doctor",
+        prog="ludot-editor-mcp doctor",
         description="Check the local install and print a fix for each failure.",
     )
-    parser.add_argument("--project", default=None, help="Godot project path")
+    parser.add_argument("--project", default=None, help="Ludot project path")
     return parser
 
 

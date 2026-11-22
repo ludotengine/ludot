@@ -8,7 +8,7 @@ updated: 2026-10-18
 
 # Remote & multi-client
 
-Godot Editor MCP's HTTP transport is built for remote/web front-ends: run the server
+Ludot Editor MCP's HTTP transport is built for remote/web front-ends: run the server
 next to your editor, expose it with a bearer token, and drive it from a phone
 or laptop via [OpenWebUI](https://openwebui.com) — or any MCP Streamable HTTP
 client.
@@ -17,7 +17,7 @@ client.
 
 ```bash
 GODOT_MCP_TRANSPORT=http GODOT_MCP_HTTP_HOST=0.0.0.0 \
-GODOT_MCP_AUTH_TOKEN=<token> uv run godot-editor-mcp
+GODOT_MCP_AUTH_TOKEN=<token> uv run ludot-editor-mcp
 ```
 
 Non-loopback binds **require** a token (fail-fast, #226). The addon still

@@ -1,7 +1,7 @@
 ---
 type: index
 title: "For developers"
-description: "Integrate, extend, or contribute to Godot Editor MCP — architecture, setup, the tool contract, and the extension points."
+description: "Integrate, extend, or contribute to Ludot Editor MCP — architecture, setup, the tool contract, and the extension points."
 created: 2026-10-18
 updated: 2026-10-18
 ---
@@ -11,7 +11,7 @@ updated: 2026-10-18
 **You know MCP and want the internals, a stable integration surface, or to contribute.**
 This track is the technical map.
 
-Godot Editor MCP is a generic, game-agnostic MCP server. It drives a **live Godot
+Ludot Editor MCP is a generic, game-agnostic MCP server. It drives a **live Godot
 editor** — the editor is the surface, reached through the addon — rather than editing
 files blindly on disk.
 
@@ -76,15 +76,15 @@ AI client ──stdio / HTTP──▶ FastMCP server ──WebSocket──▶ Go
 
 | Thing | Value | Change policy |
 |-------|-------|---------------|
-| Product name | **Godot Editor MCP** | human-facing |
+| Product name | **Ludot Editor MCP** | human-facing |
 | Repository | `hybridindie/godot-mcp` | stable |
 | MCP server ID | `godot-mcp` | wire compatibility |
-| Package / CLI | `godot-editor-mcp` | published name |
-| Addon | **Godot Editor MCP - Addon** | Asset Store name |
+| Package / CLI | `ludot-editor-mcp` | published name |
+| Addon | **Ludot Editor MCP - Addon** | Asset Store name |
 | Tools | `godot_<toolset>_<action>` | gated by the prefix |
 | Contract version | `contract_version` in `godot_get_server_info` | additive changes do not bump it |
 
-Read the [naming note](concepts.md#naming-godot-editor-mcp) for why the product name and
+Read the [naming note](concepts.md#naming-ludot-editor-mcp) for why the product name and
 the identifiers differ.
 
 ---

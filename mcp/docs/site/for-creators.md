@@ -1,7 +1,7 @@
 ---
 type: index
 title: "For creators"
-description: "Make a Godot game by talking to your AI assistant. Set up Godot Editor MCP once, then build, run, and verify inside your real editor."
+description: "Make a Godot game by talking to your AI assistant. Set up Ludot Editor MCP once, then build, run, and verify inside your real editor."
 created: 2026-10-18
 updated: 2026-10-18
 ---
@@ -11,7 +11,7 @@ updated: 2026-10-18
 **You make games. You want an AI assistant to help inside the editor you already use.**
 This track gets you there without learning MCP or typing tool names.
 
-Godot Editor MCP connects your AI assistant to the **live Godot editor** through a small
+Ludot Editor MCP connects your AI assistant to the **live Godot editor** through a small
 addon. The assistant can inspect the scene you can see, create and edit nodes, write
 GDScript, run the game, and check its own work. Every change lands on Godot's own undo
 stack, so **Ctrl+Z works exactly as it does for you**.
@@ -21,7 +21,7 @@ stack, so **Ctrl+Z works exactly as it does for you**.
 - **Godot 4.4 or newer**, with your project open.
 - An AI assistant that can **run commands and edit files** — for example Claude Code,
   OpenAI Codex, or OpenCode.
-- That's it. The assistant installs Godot Editor MCP for you.
+- That's it. The assistant installs Ludot Editor MCP for you.
 
 ## Start here
 

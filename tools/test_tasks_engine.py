@@ -255,7 +255,7 @@ func _process(_delta: float) -> bool:
 
 with tempfile.TemporaryDirectory(prefix='ludot-task-engine-') as directory:
     project = Path(directory)
-    (project / 'project.godot').write_text('config_version=5\n')
+    (project / 'project.ludot').write_text('config_version=5\n')
     files = {
         'log.luau': LOG, 'waiter.luau': WAITER, 'cancel.luau': CANCEL, 'doomed.luau': DOOMED,
         'failing.luau': FAILING, 'paused.luau': PAUSED, 'signal.luau': SIGNAL, 'reloaded.luau': RELOAD_V1, 'run.gd': RUN,

@@ -29,14 +29,14 @@ _ENV_DEFAULT_TEXT = (
 )
 
 _DEFAULT_INTRO = (
-    "You are connected to a Godot Editor MCP server that gates its tools into categories "
+    "You are connected to a Ludot Editor MCP server that gates its tools into categories "
     "called 'toolsets'. Only 'core' (diagnostics, toolset management) and 'inspection' "
     "(read-only project/scene/node reading) are enabled by default. Every other "
     "capability is hidden until you explicitly enable it."
 )
 
 _SEEDED_INTRO = (
-    "You are connected to a Godot Editor MCP server that gates its tools into categories "
+    "You are connected to a Ludot Editor MCP server that gates its tools into categories "
     "called 'toolsets'. The default exposure is 'core' (diagnostics, toolset "
     "management) plus the toolsets seeded at startup via GODOT_MCP_DEFAULT_TOOLSETS "
     "— this server was started with extra toolsets already enabled, so some or all "

@@ -54,7 +54,7 @@ All knobs are optional; the defaults serve a local single-user setup.
 # Generate + set a token
 TOKEN=$(openssl rand -hex 32)
 GODOT_MCP_TRANSPORT=http GODOT_MCP_HTTP_HOST=0.0.0.0 GODOT_MCP_AUTH_TOKEN=$TOKEN \
-  uv run godot-editor-mcp
+  uv run ludot-editor-mcp
 ```
 
 Clients pass the same token (HTTP `Authorization: Bearer …` header).
@@ -81,7 +81,7 @@ either side.
 ```bash
 # Shared/self-hosted runner: pin the same token on both sides
 TOKEN=$(openssl rand -hex 32)
-GODOT_MCP_BRIDGE_TOKEN=$TOKEN uv run godot-editor-mcp          # server
+GODOT_MCP_BRIDGE_TOKEN=$TOKEN uv run ludot-editor-mcp          # server
 GODOT_MCP_BRIDGE_TOKEN=$TOKEN godot --editor --path ./game     # the editor's env
 ```
 

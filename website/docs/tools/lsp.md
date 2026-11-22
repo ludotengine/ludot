@@ -41,7 +41,7 @@ Engine types come from `types/engine.api`. Regenerate it after changing the nati
 
 Project settings come from two places:
 
-- **Casing** comes from the nearest `project.godot`. Restart the server after changing it.
+- **Casing** comes from the nearest `project.ludot` (or legacy `project.godot`). Restart the server after changing it.
 - **Aliases and language mode** come from `.luaurc` files.
 
 The standalone server can't see your scenes, so `getNode` returns a general `Node`. Add a `::` assertion when you need a specific type.

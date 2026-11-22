@@ -1,6 +1,6 @@
 #define MyAppName "Ludot Engine"
 #ifndef MyAppVersion
-  #define MyAppVersion "4.7.2-lu.8"
+  #define MyAppVersion "4.7.2-lu.9"
 #endif
 #ifndef SourceDirectory
   #define SourceDirectory "."
@@ -10,7 +10,7 @@
 #define MyAppExeName "ludot.exe"
 
 #ifndef MyAppNumericVersion
-  #define MyAppNumericVersion "4.7.2.8"
+  #define MyAppNumericVersion "4.7.2.9"
 #endif
 
 [Setup]

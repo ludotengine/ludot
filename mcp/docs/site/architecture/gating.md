@@ -16,7 +16,7 @@ them.
 ## The enabled set
 
 `enable_toolset` / `disable_toolset` write into a **single server-global
-enabled set** (issue #364). Godot Editor MCP is a single-user, locally-run server —
+enabled set** (issue #364). Ludot Editor MCP is a single-user, locally-run server —
 per-session isolation was removed because it was dead code on the sessionless
 MCP `2026-07-28` protocol (a fresh `session_id` per call made it useless) and
 violated the no-server-initiated-hook rule. Consequences, which are features:
